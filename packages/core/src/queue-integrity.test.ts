@@ -10,6 +10,7 @@ import { getProfile, profileFingerprint, updateProfile } from "./profile.js";
 import { reconcileCareerOps } from "./career-ops.js";
 import { repairPositionData } from "./data-repair.js";
 import type { AtsJob } from "@job-scout/ats";
+import { isPlaceholderAtsUrl, LEGACY_SYNTHETIC_POSTING_URLS } from "@job-scout/shared";
 
 const dir = mkdtempSync(join(tmpdir(), "job-scout-integrity-"));
 function job(company: string, id: string, over: Partial<AtsJob> = {}): AtsJob {
@@ -153,5 +154,58 @@ describe("queue integrity on isolated PGlite", () => {
     expect(fixed?.metadata?.originalLocations).toBeTruthy();
     expect(fixed?.locationRaw).toBe("AMER");
     expect((await repairPositionData()).count).toBe(0);
+  });
+
+  it("recovers URL-less operator work without accepting URL-less ATS ingestion", async () => {
+    expect(isPlaceholderAtsUrl(null)).toBe(false);
+    expect(isPlaceholderAtsUrl("https://jobs.ashbyhq.com/acme/12345678-0000-0000-0000-123456789abc")).toBe(false);
+    await expect(upsertFromJob(job("missing-url", "1", { url: "" }))).rejects.toThrow("placeholder");
+    const db = await getDb();
+    for (const status of ["materials", "applied"] as const) {
+      const { position } = await upsertFromJob(job(`recovery-${status}`, "1"), { status });
+      await db.update(positions).set({ primaryUrl: null, metadata: { quarantined: { reason: "placeholder_url", previousStatus: status }, operatorNote: "keep me" } }).where(eq(positions.id, position.id));
+      await repairPositionData({ dryRun: false });
+      const fixed = await getPosition(position.id);
+      expect(fixed?.status).toBe(status);
+      expect(fixed?.metadata?.quarantined).toBeUndefined();
+      expect(fixed?.metadata?.recoveredQuarantine).toMatchObject({ reason: "placeholder_url" });
+      expect(fixed?.metadata?.operatorNote).toBe("keep me");
+      expect((await listPositions({ company: `recovery-${status}`, actionable: "true" })).total).toBe(1);
+    }
+    const { position } = await upsertFromJob(job("other-quarantine", "1"), { status: "materials" });
+    await db.update(positions).set({ primaryUrl: null, metadata: { quarantined: { reason: "operator_hold" } } }).where(eq(positions.id, position.id));
+    await repairPositionData({ dryRun: false });
+    expect((await getPosition(position.id))?.metadata?.quarantined).toMatchObject({ reason: "operator_hold" });
+    expect((await repairPositionData()).count).toBe(0);
+  });
+
+  it("retains synthetic manual work but retires its fabricated posting URL", async () => {
+    const url = [...LEGACY_SYNTHETIC_POSTING_URLS][0];
+    await expect(upsertFromJob(job("synthetic", "1", { url }))).rejects.toThrow("placeholder");
+    const { position } = await upsertFromJob(job("synthetic", "1"), { status: "materials" });
+    await (await getDb()).update(positions).set({ primaryUrl: url, metadata: { quarantined: { reason: "placeholder_url" } } }).where(eq(positions.id, position.id));
+    await repairPositionData({ dryRun: false });
+    expect(await getPosition(position.id)).toMatchObject({ status: "materials", primaryUrl: null, watchEnabled: false, metadata: { synthetic: { originalUrl: url } } });
+    expect((await listPositions({ company: "synthetic", actionable: "true" })).total).toBe(1);
+    expect((await repairPositionData()).count).toBe(0);
+  });
+
+  it("separates failed reviews while preserving explicit human promotion and reassertion", async () => {
+    const { position } = await upsertFromJob(job("review-intent", "1"), { status: "review" });
+    await (await getDb()).update(positions).set({ triageVerdict: "fail", triageScore: 0 }).where(eq(positions.id, position.id));
+    const query = { company: "review-intent", status: "review", actionable: "true" };
+    expect((await listPositions({ ...query, reviewLane: "pending" })).total).toBe(0);
+    expect((await listPositions({ ...query, reviewLane: "failed" })).total).toBe(1);
+    await patchPosition(position.id, { status: "review" }, "operator");
+    expect((await listPositions({ ...query, reviewLane: "pending" })).total).toBe(1);
+    expect((await listPositions({ ...query, reviewLane: "failed" })).total).toBe(0);
+    await patchPosition(position.id, { status: "triaged" }, "system");
+    await patchPosition(position.id, { status: "review" }, "autopilot");
+    expect((await listPositions({ ...query, reviewLane: "pending" })).total).toBe(0);
+    await patchPosition(position.id, { status: "triaged" }, "operator");
+    await patchPosition(position.id, { status: "review" }, "operator");
+    // Existing installations have timeline evidence but no reviewIntent marker.
+    await (await getDb()).update(positions).set({ metadata: {} }).where(eq(positions.id, position.id));
+    expect((await listPositions({ ...query, reviewLane: "pending" })).total).toBe(1);
   });
 });

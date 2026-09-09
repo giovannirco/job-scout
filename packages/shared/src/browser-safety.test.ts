@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { runInNewContext } from "node:vm";
+import { stripTypeScriptTypes } from "node:module";
 
 /**
  * apps/web imports the @job-scout/shared barrel, so every module the barrel
@@ -13,6 +15,13 @@ const dir = new URL(".", import.meta.url).pathname;
 const sources = readdirSync(dir).filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"));
 
 describe("shared is safe to evaluate in a browser", () => {
+  it("can evaluate and call the logger without a process global", () => {
+    const code = stripTypeScriptTypes(readFileSync(join(dir, "log.ts"), "utf8")).replace(/^export /gm, "");
+    const records: unknown[] = [];
+    const sandbox = { console: { warn: (...args: unknown[]) => records.push(args) } };
+    runInNewContext(code + '\nlog.warn("browser smoke");', sandbox);
+    expect(records).toHaveLength(1);
+  });
   it("has sources to check", () => expect(sources.length).toBeGreaterThan(5));
 
   it.each(sources)("%s uses no named import of a node: builtin", (file) => {

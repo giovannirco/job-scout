@@ -501,7 +501,7 @@ export const llmRuns = pgTable(
     tokensOut: integer("tokens_out"),
     latencyMs: integer("latency_ms"),
     error: text("error"),
-    /** What was sent to the model: the serialized message transcript, truncated. */
+    /** Application messages before schema hints/provider formatting/retries, truncated. */
     prompt: text("prompt"),
     /** What the model returned: assistant content, truncated. */
     response: text("response"),

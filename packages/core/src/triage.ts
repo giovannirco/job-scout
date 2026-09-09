@@ -7,6 +7,8 @@ import { currentJdText, getPosition } from "./positions.js";
 import { briefOf, getProfile, profileFingerprint } from "./profile.js";
 import { getSettings } from "./settings.js";
 import { addEvent } from "./timeline.js";
+import { log } from "@job-scout/shared";
+import { ingestQuality } from "./metrics.js";
 
 /** Run LLM triage for one position and persist score/verdict/json. */
 export async function runTriage(positionId: string, opts: { force?: boolean } = {}) {
@@ -48,6 +50,10 @@ export async function runTriage(positionId: string, opts: { force?: boolean } = 
   );
   const out = res.data;
   const score = Math.round(out.score * 10) / 10;
+  if (score === 0) {
+    ingestQuality.labels({ reason: "triage_zero_score" }).inc();
+    log.warn("triage.score_anomaly", { positionId: pos.id, score, model: res.model, jdChars: jdText.length });
+  }
   const verdict = verdictFor(score, out.hardDq, settings.triage);
   const db = await getDb();
   const now = new Date();

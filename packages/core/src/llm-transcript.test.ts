@@ -2,7 +2,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { closeDb } from "@job-scout/db";
+import { closeDb, getDb, llmRuns } from "@job-scout/db";
+import { eq } from "drizzle-orm";
+import { LlmError } from "@job-scout/llm";
 import { bootstrap } from "./bootstrap.js";
 import { getLlmRun, listLlmRuns, logged, renderPrompt, LLM_TRANSCRIPT_MAX_CHARS } from "./llm.js";
 
@@ -70,5 +72,37 @@ describe("llm transcript capture", () => {
     const hit = await listLlmRuns({ q: "Senior SRE, Brazil" });
     expect(hit.items.some((r) => r.operation === "triage")).toBe(true);
     expect((await listLlmRuns({ q: "no-such-text-anywhere" })).items).toHaveLength(0);
+  });
+
+  it("captures tool-only responses and correlates tool results", async () => {
+    const toolCalls = [{ id: "call-1", name: "list_positions", arguments: "{}" }];
+    await logged("chat", "test-model", null, async () => ({ ...result(""), toolCalls }), [
+      { role: "assistant", content: null, tool_calls: toolCalls },
+      { role: "tool", content: "[]", tool_call_id: "call-1" },
+    ]);
+    const list = await listLlmRuns({ operation: "chat" });
+    const run = await getLlmRun(list.items[0].id);
+    expect(run?.prompt).toContain("list_positions");
+    expect(run?.prompt).toContain("call-1");
+    expect(run?.response).toContain("list_positions");
+  });
+
+  it("retains a malformed provider response on failure", async () => {
+    await expect(logged("test", "test-model", null, async () => { throw new LlmError("invalid JSON", 200, "malformed-answer"); })).rejects.toThrow("invalid JSON");
+    const list = await listLlmRuns({ operation: "test" });
+    expect((await getLlmRun(list.items[0].id))?.response).toBe("malformed-answer");
+  });
+
+  it("bounds body search, keeps historical metadata and treats wildcards literally", async () => {
+    await logged("company_research", "test-model", null, async () => result("old distinctive body"));
+    const old = (await listLlmRuns({ operation: "company_research" })).items[0];
+    await (await getDb()).update(llmRuns).set({ createdAt: new Date(Date.now() - 15 * 86400_000) }).where(eq(llmRuns.id, old.id));
+    expect((await listLlmRuns({ q: "old distinctive body" })).total).toBe(0);
+    expect((await listLlmRuns({ operation: "company_research" })).total).toBe(1);
+    expect((await listLlmRuns({ q: "   ", operation: "company_research" })).total).toBe(1);
+    expect((await listLlmRuns({ q: "distinctive" })).searchSince).toBeTruthy();
+    await logged("form_answers", "test-model", null, async () => result("literal 100%_done\\path"));
+    expect((await listLlmRuns({ q: "%_done\\path" })).total).toBe(1);
+    expect((await listLlmRuns({ q: "absent%" })).total).toBe(0);
   });
 });

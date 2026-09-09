@@ -118,7 +118,7 @@ const inboxRoute = createRoute({
   }),
 });
 
-export type AiLogsSearch = { operation?: string; status?: string; q?: string; run?: string };
+export type AiLogsSearch = { operation?: string; status?: string; q?: string; run?: string; page?: number; model?: string };
 const aiLogsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/ai-logs",
@@ -128,6 +128,8 @@ const aiLogsRoute = createRoute({
     status: s.status === "ok" || s.status === "error" ? s.status : undefined,
     q: typeof s.q === "string" && s.q ? s.q : undefined,
     run: typeof s.run === "string" && s.run ? s.run : undefined,
+    page: Number.isInteger(Number(s.page)) && Number(s.page) > 1 ? Number(s.page) : undefined,
+    model: typeof s.model === "string" && s.model ? s.model : undefined,
   }),
 });
 

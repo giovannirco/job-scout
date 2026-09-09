@@ -63,6 +63,10 @@ const RESET = "\x1b[0m";
 function write(level: LogLevel, msg: string, fields: LogFields) {
   if (LEVELS[level] < FLOOR) return;
   const record: LogFields & { ts: string; level: LogLevel; msg: string } = { ts: new Date().toISOString(), level, ...baseContext, msg, ...normalize(fields) };
+  if (typeof process === "undefined" || !process.stdout || !process.stderr) {
+    console[level](msg, record);
+    return;
+  }
   const stream = level === "error" || level === "warn" ? process.stderr : process.stdout;
   if (envFormat === "json") {
     stream.write(JSON.stringify(record) + "\n");

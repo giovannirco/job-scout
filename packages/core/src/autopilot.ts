@@ -5,13 +5,13 @@ import {
   getDb,
   id,
   positions,
+  timelineEvents,
   type ApprovalKind,
   type ApprovalStatus,
   type PositionStatus,
 } from "@job-scout/db";
 import { HOT_STATUSES, type AutopilotConfig } from "@job-scout/shared";
 import { enqueueJob } from "./jobs.js";
-import { archivePosition, getPosition, patchPosition } from "./positions.js";
 import { getSettings } from "./settings.js";
 import { addEvent } from "./timeline.js";
 import { log as rootLog } from "@job-scout/shared";
@@ -66,7 +66,7 @@ async function hasFreshResearch(companyId: string, staleDays: number): Promise<b
 export function afterTriage(ctx: { positionId: string; companyId: string; score: number; verdict: "pass" | "marginal" | "fail"; status: PositionStatus }) {
   return safe("afterTriage", ctx, async (c, cfg) => {
     const out: Record<string, unknown> = {};
-    if (c.verdict !== "pass" || c.status === "archived") return out;
+    if (c.verdict !== "pass" || !["triaged", "review"].includes(c.status)) return out;
     const wantEval = cfg.evaluate.mode === "all_pass" || (cfg.evaluate.mode === "threshold" && c.score >= cfg.evaluate.minTriageScore);
     if (wantEval) {
       const q = await enqueueJob("evaluate", { positionId: c.positionId, auto: true }, { dedupeKey: `evaluate:${c.positionId}`, priority: 70 });
@@ -96,6 +96,7 @@ export function afterEvaluate(ctx: {
 }) {
   return safe("afterEvaluate", ctx, async (c, cfg) => {
     const out: Record<string, unknown> = {};
+    if (!["triaged", "review", "materials"].includes(c.status)) return out;
     if (cfg.companyResearch.mode !== "off" && !(await hasFreshResearch(c.companyId, cfg.companyResearch.staleDays))) {
       const q = await enqueueJob(
         "company_research",
@@ -240,31 +241,48 @@ export async function pendingApprovalCount(): Promise<number> {
 /** Approve (apply the proposed action) or dismiss. */
 export async function resolveApproval(approvalId: string, decision: "approved" | "dismissed", actor = "operator") {
   const db = await getDb();
-  const row = (await db.select().from(approvals).where(eq(approvals.id, approvalId)).limit(1))[0];
-  if (!row) throw new Error("approval not found");
-  if (row.status !== "pending") return { id: row.id, status: row.status, applied: false };
-  let applied = false;
-  if (decision === "approved" && row.positionId) {
-    const p = row.payload || {};
-    const pos = await getPosition(row.positionId);
-    if (pos) {
-      if (row.kind === "status_suggestion" && typeof p.toStatus === "string") {
-        await patchPosition(pos.id, { status: p.toStatus }, actor);
-        applied = true;
-      } else if (row.kind === "archive_suggestion") {
-        await archivePosition(pos.id, String(p.reason || "autopilot suggestion"), actor);
-        applied = true;
-      } else if (row.kind === "materials_draft") {
-        if (pos.status === "review" || pos.status === "triaged") await patchPosition(pos.id, { status: "materials" }, actor);
+  // Lock both records: approval resolution and the position transition are one action.
+  // An old suggestion is not authority to resurrect an archived/closed job or regress an application.
+  return db.transaction(async (tx) => {
+    const row = (await tx.select().from(approvals).where(eq(approvals.id, approvalId)).limit(1).for("update"))[0];
+    if (!row) throw new Error("approval not found");
+    if (row.status !== "pending") return { id: row.id, status: row.status, applied: false };
+    let applied = false;
+    let status: ApprovalStatus = decision;
+    let staleReason: string | null = null;
+    if (decision === "approved") {
+      const pos = row.positionId ? (await tx.select().from(positions).where(eq(positions.id, row.positionId)).limit(1).for("update"))[0] : null;
+      const p = row.payload || {};
+      if (!pos) staleReason = "position_missing";
+      else if (pos.listingStatus === "closed") staleReason = "listing_closed";
+      else if (!["triaged", "review", ...(row.kind === "materials_draft" ? ["materials"] : [])].includes(pos.status)) staleReason = "operator_already_decided";
+      else if (row.kind === "status_suggestion" && p.toStatus !== "materials") staleReason = "unsupported_transition";
+      if (!staleReason && pos && typeof p.evaluationId === "string") {
+        const latest = (await tx.select().from(evaluations).where(and(eq(evaluations.positionId, pos.id), eq(evaluations.kind, "evaluate"))).orderBy(desc(evaluations.createdAt), desc(evaluations.id)).limit(1))[0];
+        if (latest?.id !== p.evaluationId) staleReason = "evaluation_superseded";
+      }
+      if (staleReason) status = "expired";
+      else if (pos) {
+        const nextStatus = row.kind === "archive_suggestion" ? "archived" : "materials";
+        if (pos.status !== nextStatus) {
+          const metadata = { ...(pos.metadata || {}) };
+          delete metadata.reviewIntent;
+          await tx.update(positions).set({
+            status: nextStatus, metadata, updatedAt: new Date(),
+            archiveReason: nextStatus === "archived" ? String(p.reason || "autopilot suggestion").slice(0, 300) : null,
+            ...(nextStatus === "archived" ? { watchEnabled: false } : {}),
+          }).where(eq(positions.id, pos.id));
+          await tx.insert(timelineEvents).values({ id: id("tl"), positionId: pos.id, kind: "status", title: `${pos.status} → ${nextStatus}`, actor });
+        }
         applied = true;
       }
     }
-  }
-  await db.update(approvals).set({ status: decision, resolvedAt: new Date(), resolvedBy: actor }).where(eq(approvals.id, approvalId));
-  if (row.positionId) await addEvent({ positionId: row.positionId, kind: "approval", title: `${decision}: ${row.title}`, actor });
-  approvalsResolved.labels({ kind: row.kind, decision }).inc();
-  log.info("approval.resolved", { approvalId, kind: row.kind, decision, applied, actor, positionId: row.positionId });
-  return { id: row.id, status: decision, applied };
+    await tx.update(approvals).set({ status, resolvedAt: new Date(), resolvedBy: actor }).where(eq(approvals.id, approvalId));
+    if (row.positionId) await tx.insert(timelineEvents).values({ id: id("tl"), positionId: row.positionId, kind: "approval", title: `${status}: ${row.title}`.slice(0, 300), actor, metadata: { staleReason } });
+    approvalsResolved.labels({ kind: row.kind, decision: status }).inc();
+    log.info("approval.resolved", { approvalId, kind: row.kind, decision: status, applied, actor, positionId: row.positionId, staleReason });
+    return { id: row.id, status, applied, staleReason };
+  });
 }
 
 /** Counts for the Today page / settings header. */

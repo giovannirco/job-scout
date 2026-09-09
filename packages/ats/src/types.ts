@@ -52,6 +52,8 @@ export type BoardJobSummary = {
   url?: string;
   locationRaw?: string;
   company: string;
+  /** Original publication time, never the last edit or observation time. */
+  postedAt?: string;
 };
 
 export type DetectedAts = {

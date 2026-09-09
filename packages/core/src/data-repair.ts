@@ -1,6 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { getDb, jdRevisions, positions } from "@job-scout/db";
-import { classifyListing, cleanLocation, employerFromPosting, isNoiseJobTitle, isPlaceholderAtsUrl, requisitionId, unresolvedCompany, UNRESOLVED_COMPANY } from "@job-scout/shared";
+import { classifyListing, cleanLocation, employerFromPosting, isNoiseJobTitle, isPlaceholderAtsUrl, LEGACY_SYNTHETIC_POSTING_URLS, requisitionId, unresolvedCompany, UNRESOLVED_COMPANY } from "@job-scout/shared";
 import { resolveCompanyForName } from "./companies.js";
 import { archivePosition } from "./positions.js";
 import { groupingRows, repostFor } from "./position-groups.js";
@@ -14,7 +14,20 @@ export async function repairPositionData({ dryRun = true } = {}) {
     const metadata = { ...(row.metadata || {}) };
     const reasons: string[] = [];
     const patch: Record<string, unknown> = {};
-    const invalid = isPlaceholderAtsUrl(row.primaryUrl) ? "placeholder_url" : isNoiseJobTitle(row.title) ? "junk_title" : null;
+    const synthetic = LEGACY_SYNTHETIC_POSTING_URLS.has(row.primaryUrl || "") && ["materials", "applied", "screen", "interview", "offer"].includes(row.status);
+    if (synthetic) {
+      metadata.synthetic = { kind: "legacy_manual_sibling", originalUrl: row.primaryUrl };
+      patch.primaryUrl = null;
+      patch.watchEnabled = false;
+      reasons.push("synthetic_posting_reference");
+    }
+    const quarantine = metadata.quarantined as { reason?: string; previousStatus?: string } | undefined;
+    if (quarantine?.reason === "placeholder_url" && (!row.primaryUrl?.trim() || synthetic) && !isNoiseJobTitle(row.title) && !unresolvedCompany(row.company)) {
+      metadata.recoveredQuarantine = quarantine;
+      delete metadata.quarantined;
+      reasons.push("recover_missing_url_quarantine");
+    }
+    const invalid = !synthetic && isPlaceholderAtsUrl(row.primaryUrl) ? "placeholder_url" : isNoiseJobTitle(row.title) ? "junk_title" : null;
     if (invalid && !metadata.quarantined) {
       metadata.quarantined = { reason: invalid, previousStatus: row.status, at: new Date().toISOString() };
       reasons.push(invalid);

@@ -40,10 +40,16 @@ export function isNoiseJobTitle(title?: string | null): boolean {
 }
 
 /** Seed / fake ATS links that never yield a real single-job page. */
+export const LEGACY_SYNTHETIC_POSTING_URLS = new Set([
+  "https://jobs.ashbyhq.com/supabase/ed6cedb1-0000-0000-0000-000000000001",
+  "https://jobs.ashbyhq.com/kraken/02e188b8-0000-0000-0000-000000000001",
+]);
+
 export function isPlaceholderAtsUrl(url?: string | null): boolean {
-  if (!url) return true;
+  if (!url) return false;
   const u = url.trim();
-  if (!u) return true;
+  if (!u) return false;
+  if (LEGACY_SYNTHETIC_POSTING_URLS.has(u)) return true;
   try {
     const parsed = new URL(u);
     if (!/^https?:$/.test(parsed.protocol)) return true;
@@ -52,10 +58,8 @@ export function isPlaceholderAtsUrl(url?: string | null): boolean {
   } catch { return true; }
   if (/\/jobs?\/example\b/i.test(u)) return true;
   if (/\/example(\/|$|\?)/i.test(u)) return true;
-  if (/0{4}-0{4}-0{4}-0{12}/i.test(u)) return true;
+  if (/00000000-0000-0000-0000-000000000000/i.test(u)) return true;
   if (/00000000000/i.test(u)) return true;
-  // Ashby zero-padded fake UUIDs (…-0000-0000-0000-…)
-  if (/[0-9a-f]{8}-0{4}-0{4}-0{4}-[0-9a-f]{12}/i.test(u)) return true;
   // Greenhouse board token is a generic path segment (mis-imported)
   if (/greenhouse\.io\/(careers|boards|jobs|job-boards)\//i.test(u)) return true;
   return false;

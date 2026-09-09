@@ -1,4 +1,5 @@
 import { and, desc, eq, ne, sql } from "drizzle-orm";
+import { createHash } from "node:crypto";
 import { companies, getDb, jdRevisions, positions } from "@job-scout/db";
 import {
   classifyListing,
@@ -22,14 +23,42 @@ const ListingClassifyOutput = z.object({
   evidence: z.string().optional(),
 });
 
+async function classificationFingerprint(pos: NonNullable<Awaited<ReturnType<typeof getPosition>>>, model: string) {
+  const db = await getDb();
+  const rev = (await db.select().from(jdRevisions).where(eq(jdRevisions.positionId, pos.id)).orderBy(desc(jdRevisions.revision)).limit(1))[0];
+  return createHash("sha256").update(JSON.stringify({ version: 1, model, title: pos.title, company: pos.company.name,
+    location: rev?.locationRaw, ats: pos.metadata?.ats, jd: (await currentJdText(pos.id)).slice(0, 8000) })).digest("hex");
+}
+
+function classificationInactive(pos: NonNullable<Awaited<ReturnType<typeof getPosition>>>) {
+  return pos.listingStatus === "closed" || ["archived", "skip", "rejected"].includes(pos.status) || Boolean(pos.metadata?.quarantined);
+}
+
 export async function maybeEnqueueListingClassify(
   positionId: string,
   facts: { workplace: Workplace; geoClass: GeoClass; locationDiscarded: boolean },
 ): Promise<{ enqueued: boolean; jobId?: string }> {
-  if (!listingClassifyNeeded(facts)) return { enqueued: false };
   const s = await getSettings();
   const cfg = s.llm.operations.listing_classify;
   if (!cfg?.enabled || !cfg.model) return { enqueued: false };
+  const pos = await getPosition(positionId);
+  if (!pos || classificationInactive(pos) || !(await currentJdText(pos.id)).trim()) return { enqueued: false };
+  const fingerprint = await classificationFingerprint(pos, cfg.model);
+  const cache = pos.metadata?.listingClassify as { inputHash?: string; result?: Record<string, unknown> } | undefined;
+  if (cache?.inputHash === fingerprint && cache.result) {
+    const parsed = ListingClassifyOutput.safeParse(cache.result);
+    if (parsed.success) {
+      const db = await getDb();
+      const rev = (await db.select().from(jdRevisions).where(eq(jdRevisions.positionId, pos.id)).orderBy(desc(jdRevisions.revision)).limit(1))[0];
+      const result = mergeListingClassify({ ...facts, locationRaw: rev?.locationRaw || "" }, parsed.data);
+      // afterAtsFetch recomputes deterministic facts: restore the same-input model result.
+      await db.update(positions).set({ workplace: result.workplace, geoClass: result.geoClass,
+        remoteClass: remoteClass(rev?.locationRaw || "", result.workplace === "remote" ? "remote" : ""),
+        geoNotes: parsed.data.geoNote || pos.geoNotes }).where(eq(positions.id, pos.id));
+      return { enqueued: false };
+    }
+  }
+  if (!listingClassifyNeeded(facts)) return { enqueued: false };
   const q = await enqueueJob("listing_classify", { positionId }, { dedupeKey: `listing_classify:${positionId}`, priority: 90 });
   return { enqueued: !q.deduped, jobId: q.id };
 }
@@ -37,6 +66,12 @@ export async function maybeEnqueueListingClassify(
 export async function runListingClassify(positionId: string) {
   const pos = await getPosition(positionId);
   if (!pos) throw new Error("position not found");
+  if (classificationInactive(pos)) return { skipped: true, reason: "inactive" };
+  const jdText = await currentJdText(pos.id);
+  if (!jdText.trim()) return { skipped: true, reason: "missing_jd" };
+  const settings = await getSettings();
+  const inputHash = await classificationFingerprint(pos, settings.llm.operations.listing_classify.model);
+  if ((pos.metadata?.listingClassify as { inputHash?: string } | undefined)?.inputHash === inputHash) return { skipped: true, reason: "unchanged_input" };
   const db = await getDb();
   const rev = (
     await db
@@ -55,7 +90,6 @@ export async function runListingClassify(positionId: string) {
     title: pos.title,
   });
   const cfg = await gateOperation("listing_classify");
-  const jdText = await currentJdText(pos.id);
   const messages: ChatMessage[] = [
     {
       role: "system",
@@ -107,6 +141,8 @@ export async function runListingClassify(positionId: string) {
         metadata: {
           ...(pos.metadata || {}),
           listingClassify: {
+            inputHash,
+            result: { workplace: merged.workplace, geoClass: merged.geoClass, geoNote: res.data.geoNote },
             at: new Date().toISOString(),
             model: res.model,
             evidence: res.data.evidence ?? null,

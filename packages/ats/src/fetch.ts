@@ -231,6 +231,13 @@ export async function fetchGreenhouseJob(
   };
 }
 
+function postingDate(value: unknown): string | undefined {
+  if (typeof value !== "string" && typeof value !== "number") return undefined;
+  if (!value) return undefined;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}
+
 export async function listGreenhouseBoard(
   token: string,
   company: string,
@@ -243,6 +250,7 @@ export async function listGreenhouseBoard(
       id: number;
       title: string;
       absolute_url?: string;
+      first_published?: string;
       location?: { name?: string };
     }>;
   };
@@ -253,6 +261,7 @@ export async function listGreenhouseBoard(
     externalIdentity: `greenhouse:${token}:${j.id}`,
     title: j.title,
     url: j.absolute_url,
+    postedAt: postingDate(j.first_published),
     locationRaw: j.location?.name,
     company,
   }));
@@ -459,6 +468,7 @@ export async function listAshbyBoard(
       id: string;
       title: string;
       jobUrl?: string;
+      publishedAt?: string;
       location?: AshbyLocation;
       secondaryLocations?: AshbyLocation[];
     }>;
@@ -470,6 +480,7 @@ export async function listAshbyBoard(
     externalIdentity: `ashby:${token}:${j.id}`,
     title: j.title,
     url: j.jobUrl,
+    postedAt: postingDate(j.publishedAt),
     locationRaw: joinAshbyLocations(j.location, j.secondaryLocations),
     company,
   }));
@@ -546,6 +557,7 @@ export async function listLeverBoard(
     id: string;
     text: string;
     hostedUrl?: string;
+    createdAt?: number;
     categories?: { location?: string };
   }>;
   const jobs = (Array.isArray(data) ? data : []).map((j) => ({
@@ -555,6 +567,7 @@ export async function listLeverBoard(
     externalIdentity: `lever:${token}:${j.id}`,
     title: j.text,
     url: j.hostedUrl,
+    postedAt: postingDate(j.createdAt),
     locationRaw: j.categories?.location,
     company,
   }));
@@ -739,6 +752,7 @@ type RemoteOkRow = {
   location?: string;
   url?: string;
   tags?: unknown;
+  date?: string;
 };
 
 function remoteOkTags(row: RemoteOkRow): string[] {
@@ -783,6 +797,7 @@ export async function listRemoteOk(
       boardToken,
       jobId,
       externalIdentity: `remoteok:${jobId}`,
+      postedAt: postingDate(row.date),
       title,
       url,
       locationRaw: typeof row.location === "string" ? row.location : undefined,
@@ -853,6 +868,7 @@ export async function listWeWorkRemotely(
       boardToken,
       jobId,
       externalIdentity: `weworkremotely:${jobId}`,
+      postedAt: postingDate(rssField(block, "pubDate")),
       title,
       url: /^https?:\/\//i.test(link) ? link : undefined,
       locationRaw: rssField(block, "region") || undefined,
@@ -875,6 +891,7 @@ type RemotiveRow = {
   title?: string;
   company_name?: string;
   candidate_required_location?: string;
+  publication_date?: string;
 };
 
 export async function listRemotive(
@@ -902,6 +919,7 @@ export async function listRemotive(
       title,
       url: typeof row.url === "string" && /^https?:\/\//i.test(row.url) ? row.url : undefined,
       locationRaw: typeof row.candidate_required_location === "string" ? row.candidate_required_location : undefined,
+      postedAt: postingDate(row.publication_date),
       company: String(row.company_name || company || "").trim() || company,
     });
   }

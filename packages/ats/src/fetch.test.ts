@@ -5,6 +5,31 @@ const REMOTEOK_API = "https://remoteok.com/api";
 const WWR_RSS = "https://weworkremotely.com/categories/remote-devops-sysadmin-jobs.rss";
 const REMOTIVE_API = "https://remotive.com/api/remote-jobs?category=software-dev";
 
+describe("board publication dates", () => {
+  const iso = "2026-01-01T00:00:00.000Z";
+  it.each([
+    ["greenhouse", { jobs: [{ id: 1, title: "Platform Engineer", first_published: iso, updated_at: "2026-09-09" }] }],
+    ["ashby", { jobs: [{ id: "1", title: "Platform Engineer", publishedAt: iso }] }],
+    ["lever", [{ id: "1", text: "Platform Engineer", createdAt: Date.parse(iso) }]],
+    ["remoteok", [{ id: "1", position: "Platform Engineer", date: iso }]],
+    ["remotive", { jobs: [{ id: "1", title: "Platform Engineer", publication_date: iso }] }],
+  ])("preserves original date from %s", async (provider, body) => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(body), { status: 200 })));
+    expect((await listBoard(String(provider), "date-test", "Date test")).jobs[0]?.postedAt).toBe(iso);
+  });
+  it("preserves RSS pubDate", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response('<rss><channel><item><title>Acme: Platform Engineer</title><link>https://weworkremotely.com/remote-jobs/acme-platform</link><pubDate>Thu, 01 Jan 2026 00:00:00 GMT</pubDate></item></channel></rss>')));
+    expect((await listBoard("weworkremotely", "weworkremotely", "WWR")).jobs[0]?.postedAt).toBe(iso);
+  });
+  it("does not substitute an edit date for unknown or malformed publication", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ jobs: [
+      { id: 1, title: "Platform Engineer", updated_at: iso },
+      { id: 2, title: "Platform Engineer", first_published: "not-a-date", updated_at: iso },
+    ] }))));
+    expect((await listBoard("greenhouse", "date-test", "Date test")).jobs.map(j => j.postedAt)).toEqual([undefined, undefined]);
+  });
+});
+
 /** Live-shaped WWR DevOps/Sysadmin RSS: mix of craft titles and category noise. */
 export const WWR_RSS_FIXTURE = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0">

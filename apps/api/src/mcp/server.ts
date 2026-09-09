@@ -233,16 +233,17 @@ export function createJobScoutMcpServer() {
 
   server.registerTool(
     "work_queue",
-    { title: "Work queue", description: "What needs the operator: PASS verdicts awaiting decision, positions in review without evaluation, materials pending, applied > 7d.", inputSchema: { limit: z.number().int().min(1).max(100).optional() }, annotations: { readOnlyHint: true } },
+    { title: "Work queue", description: "Decision lanes: PASS awaiting decision; review (including deliberate operator overrides); applied; marginal; failedReview (failed triage without an operator override, lower priority). Closed/invalid decision rows are excluded.", inputSchema: { limit: z.number().int().min(1).max(100).optional() }, annotations: { readOnlyHint: true } },
     async (a) => {
       const lim = String(a.limit ?? 20);
-      const [decide, review, applied, marginal] = await Promise.all([
+      const [decide, review, applied, marginal, failedReview] = await Promise.all([
         listPositions({ status: "triaged", verdict: "pass", sort: "score_desc", pageSize: lim, actionable: "true", collapseFamilies: "true" }),
-        listPositions({ status: "review", sort: "updated_desc", pageSize: lim, actionable: "true", collapseFamilies: "true" }),
+        listPositions({ status: "review", reviewLane: "pending", sort: "updated_desc", pageSize: lim, actionable: "true", collapseFamilies: "true" }),
         listPositions({ status: "applied", sort: "updated_desc", pageSize: lim }),
         listPositions({ status: "triaged", verdict: "marginal", sort: "score_desc", pageSize: lim, actionable: "true", collapseFamilies: "true" }),
+        listPositions({ status: "review", reviewLane: "failed", sort: "score_desc", pageSize: lim, actionable: "true", collapseFamilies: "true" }),
       ]);
-      return text({ decide: decide.items, review: review.items, applied: applied.items, marginal: marginal.items });
+      return text({ decide: decide.items, review: review.items, applied: applied.items, marginal: marginal.items, failedReview: failedReview.items });
     },
   );
 

@@ -64,7 +64,9 @@ export async function scanBoard(boardId: string, opts: { force?: boolean } = {})
   const passedJobs: Array<{ j: BoardJobSummary; verdict: GateVerdict }> = [];
   const nowIso = new Date();
   for (const j of list) {
-    const verdict = gateListing({ title: j.title, locationRaw: j.locationRaw }, settings.gate);
+    const verdict: GateVerdict = isNoiseJobTitle(j.title)
+      ? { pass: false, reason: "junk_title", matchedInclude: null }
+      : gateListing({ title: j.title, locationRaw: j.locationRaw, postedAt: j.postedAt }, settings.gate);
     const lane = verdict.pass ? "passed" : "filtered";
     if (verdict.pass) {
       res.passed++;
@@ -88,6 +90,7 @@ export async function scanBoard(boardId: string, opts: { force?: boolean } = {})
         gateReason: verdict.reason,
         provider: j.provider,
         observedAt: nowIso,
+        postedAt: j.postedAt ? new Date(j.postedAt) : null,
         metadata: { matchedInclude: verdict.matchedInclude },
       })
       .onConflictDoUpdate({
@@ -99,6 +102,7 @@ export async function scanBoard(boardId: string, opts: { force?: boolean } = {})
           lane,
           gateReason: verdict.reason,
           observedAt: nowIso,
+          postedAt: j.postedAt ? new Date(j.postedAt) : null,
         },
       });
 
@@ -157,7 +161,6 @@ export async function scanBoard(boardId: string, opts: { force?: boolean } = {})
 
   // Passed: make sure a position exists (fetch full JD only for new identities or forced).
   for (const { j } of passedJobs) {
-    if (isNoiseJobTitle(j.title)) continue;
     const existing = (
       await db.select({ id: positions.id, triagedAt: positions.triagedAt, status: positions.status }).from(positions).where(eq(positions.externalIdentity, j.externalIdentity)).limit(1)
     )[0];

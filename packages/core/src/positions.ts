@@ -109,6 +109,7 @@ export type ListPositionsQuery = {
   actionable?: string;
   withoutEvaluation?: string;
   staleProfile?: string;
+  reviewLane?: "pending" | "failed";
 };
 
 export async function listPositions(q: ListPositionsQuery) {
@@ -134,6 +135,13 @@ export async function listPositions(q: ListPositionsQuery) {
   }
   if (q.withoutEvaluation === "true") conds.push(sql`not exists (select 1 from evaluations e where e.position_id = ${positions.id} and e.kind = 'evaluate')`);
   if (q.staleProfile === "true") conds.push(sql`${positions.triagedAt} is not null and ${positions.triageJson}->>'profileHash' is distinct from ${profileHash}`);
+  if (q.reviewLane) {
+    const deliberateReview = sql`(${positions.metadata}->'reviewIntent'->>'kind' = 'operator'
+      or (select t.actor = 'operator' and t.title like '% → review' from timeline_events t where t.position_id = ${positions.id} and t.kind = 'status'
+        order by t.created_at desc, t.id desc limit 1))`;
+    const failedWithoutOverride = sql`(${positions.triageVerdict} = 'fail' and not coalesce(${deliberateReview}, false))`;
+    conds.push(q.reviewLane === "failed" ? failedWithoutOverride : sql`not coalesce(${failedWithoutOverride}, false)`);
+  }
 
   if (q.status) {
     const parts = q.status.split(",").map((s) => s.trim()).filter(Boolean);
@@ -399,6 +407,13 @@ export async function patchPosition(idOrSlug: string, patch: Record<string, unkn
   if (patch.metadata && typeof patch.metadata === "object") {
     set.metadata = { ...(pos.metadata || {}), ...(patch.metadata as object) };
   }
+  if (set.status) {
+    const metadata = { ...(pos.metadata || {}), ...((set.metadata || {}) as Record<string, unknown>) };
+    const automated = /^(system|autopilot|career-ops|intake|scan(?::.*)?|triage|evaluate|import|seed)$/.test(actor);
+    if (set.status === "review" && !automated) metadata.reviewIntent = { kind: "operator", actor, at: new Date().toISOString() };
+    else delete metadata.reviewIntent;
+    set.metadata = metadata;
+  }
   await db.update(positions).set(set).where(eq(positions.id, pos.id));
   if (set.status && set.status !== pos.status) {
     await addEvent({ positionId: pos.id, kind: "status", title: `${pos.status} → ${String(set.status)}`, actor });
@@ -631,7 +646,7 @@ export async function upsertFromJob(
   opts: { status?: PositionStatus; source?: string; companyName?: string; reviveArchived?: boolean } = {},
 ): Promise<{ position: NonNullable<Awaited<ReturnType<typeof getPosition>>>; created: boolean; revived: boolean }> {
   const db = await getDb();
-  if (isPlaceholderAtsUrl(job.url)) {
+  if (!job.url?.trim() || isPlaceholderAtsUrl(job.url)) {
     ingestQuality.labels({ reason: "placeholder_url" }).inc();
     log.warn("ingest.rejected", { reason: "placeholder_url", url: job.url });
     throw new Error("placeholder or invalid posting URL");

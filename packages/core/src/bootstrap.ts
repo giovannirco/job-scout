@@ -91,6 +91,12 @@ export async function bootstrap(opts: { seedBoards?: boolean } = {}) {
           ),
         );
     }
+    // Verified ATS migrations (#18). Runs after the catalog sync so a catalog row
+    // re-inserted under the old token is corrected in the same boot.
+    const { reconcileBoardSources } = await import("./board-reconcile.js");
+    await reconcileBoardSources({ dryRun: false })
+      .then((r) => { if (r.count || r.conflicts.length) log.info("bootstrap.boards.reconciled", { migrated: r.migrated.length, demoted: r.demoted.length, conflicts: r.conflicts.length }); })
+      .catch((e) => log.error("bootstrap.boards.reconcile.failed", { err: e }));
     const n = (await db.select({ c: sql<number>`count(*)::int` }).from(boardSources))[0]?.c ?? 0;
     log.info("bootstrap.boards.synced", { catalog: FULL_CATALOG.length, boards: n });
   }

@@ -109,7 +109,7 @@ function clip(value: string): string {
 }
 
 /** Anything message-shaped: chat, agent (nullable content plus tool calls), or a raw prompt. */
-export type TranscriptMessage = { role?: string; content?: unknown };
+export type TranscriptMessage = { role?: string; content?: unknown; tool_calls?: unknown; tool_call_id?: string };
 
 /** Render the outbound messages as readable text rather than raw JSON. */
 export function renderPrompt(messages?: TranscriptMessage[]): { text: string | null; chars: number | null } {
@@ -117,22 +117,24 @@ export function renderPrompt(messages?: TranscriptMessage[]): { text: string | n
   const text = messages
     .map((m) => {
       const body = typeof m.content === "string" ? m.content : m.content == null ? "" : JSON.stringify(m.content, null, 2);
-      return `### ${String(m.role || "user").toUpperCase()}\n${body}`;
+      const calls = m.tool_calls ? `\nTool calls:\n${JSON.stringify(m.tool_calls, null, 2)}` : "";
+      return `### ${String(m.role || "user").toUpperCase()}${m.tool_call_id ? ` (${m.tool_call_id})` : ""}\n${body}${calls}`;
     })
     .join("\n\n");
   return { text: clip(text), chars: text.length };
 }
 
 function renderResponse(out: unknown): { text: string | null; chars: number | null } {
-  const r = out as { content?: unknown; json?: unknown } | null;
+  const r = out as { content?: unknown; json?: unknown; data?: unknown; toolCalls?: unknown[] } | null;
   const raw =
     typeof r?.content === "string" && r.content.trim()
       ? r.content
-      : r?.json !== undefined
-        ? JSON.stringify(r.json, null, 2)
+      : r?.json !== undefined || r?.data !== undefined
+        ? JSON.stringify(r.json ?? r.data, null, 2)
         : "";
-  if (!raw) return { text: null, chars: null };
-  return { text: clip(raw), chars: raw.length };
+  const text = raw + (r?.toolCalls?.length ? `\nTool calls:\n${JSON.stringify(r.toolCalls, null, 2)}` : "");
+  if (!text) return { text: null, chars: null };
+  return { text: clip(text), chars: text.length };
 }
 
 /** Wrap one model call: log to llm_runs whether it succeeds or fails. */
@@ -141,7 +143,7 @@ export async function logged<T extends Pick<ChatResult, "model" | "tokensIn" | "
   model: string,
   positionId: string | null,
   fn: () => Promise<T>,
-  /** Outbound messages, stored so the operator can read what was actually asked. */
+  /** Application messages before client schema hints, retries and provider formatting. */
   messages?: TranscriptMessage[],
 ): Promise<T> {
   const db = await getDb();
@@ -175,6 +177,7 @@ export async function logged<T extends Pick<ChatResult, "model" | "tokensIn" | "
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     const ms = Date.now() - t0;
+    const failedResponse = e instanceof LlmError ? renderResponse({ content: e.body }) : { text: null, chars: null };
     await db.insert(llmRuns).values({
       id: id("run"),
       operation,
@@ -185,6 +188,8 @@ export async function logged<T extends Pick<ChatResult, "model" | "tokensIn" | "
       error: msg.slice(0, 2000),
       prompt: prompt.text,
       promptChars: prompt.chars,
+      response: failedResponse.text,
+      responseChars: failedResponse.chars,
     });
     llmCalls.labels({ operation, model, status: "error" }).inc();
     llmLatency.labels({ operation, model }).observe(ms / 1000);
@@ -282,8 +287,15 @@ export async function listLlmRuns(q: LlmRunsQuery = {}) {
   if (q.status) conds.push(eq(llmRuns.status, String(q.status)));
   if (q.model) conds.push(eq(llmRuns.model, String(q.model)));
   if (q.positionId) conds.push(eq(llmRuns.positionId, String(q.positionId)));
-  if (q.q) {
-    const like = `%${String(q.q).trim()}%`;
+  const search = String(q.q || "").trim();
+  let searchSince: string | null = null;
+  if (search) {
+    const settings = await getSettings();
+    const days = Math.min(14, Math.max(1, settings.retention.llmTranscriptDays));
+    const since = new Date(Date.now() - days * 86_400_000);
+    searchSince = since.toISOString();
+    conds.push(gte(llmRuns.createdAt, since));
+    const like = `%${search.replace(/[\\%_]/g, "\\$&")}%`;
     conds.push(sql`(${llmRuns.prompt} ilike ${like} or ${llmRuns.response} ilike ${like} or ${llmRuns.error} ilike ${like})`);
   }
   const where = conds.length ? and(...conds) : undefined;
@@ -308,12 +320,12 @@ export async function listLlmRuns(q: LlmRunsQuery = {}) {
       .from(llmRuns)
       .leftJoin(positions, eq(llmRuns.positionId, positions.id))
       .where(where)
-      .orderBy(desc(llmRuns.createdAt))
+      .orderBy(desc(llmRuns.createdAt), desc(llmRuns.id))
       .limit(pageSize)
       .offset((page - 1) * pageSize),
     db.select({ c: sql<number>`count(*)::int` }).from(llmRuns).where(where),
   ]);
-  return { items: rows, total: total[0]?.c ?? 0, page, pageSize };
+  return { items: rows, total: total[0]?.c ?? 0, page, pageSize, searchSince };
 }
 
 /** One run with the full stored transcript. */

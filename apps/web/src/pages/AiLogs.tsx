@@ -40,7 +40,7 @@ function Transcript({ title, body, truncated, chars: total }: { title: string; b
     return (
       <Panel title={title}>
         <div className="text-[12.5px] text-faint">
-          Not recorded. Runs from before transcript capture, and streamed chat turns that failed before a first token, have no stored body.
+          No stored body. It may predate capture, have expired under retention, or come from a call that returned no content.
         </div>
       </Panel>
     );
@@ -71,26 +71,29 @@ export function AiLogsPage() {
   const status = search.status || "all";
   const operation = search.operation || "";
   const selected = search.run || "";
+  const page = search.page || 1;
 
   const qs = new URLSearchParams({ pageSize: "100" });
+  qs.set("page", String(page));
+  if (search.model) qs.set("model", search.model);
   if (operation) qs.set("operation", operation);
   if (status !== "all") qs.set("status", status);
   if (search.q) qs.set("q", search.q);
 
-  const runs = useApi<{ items: LlmRunRow[]; total: number }>(["llm-runs", operation, status, search.q], `/api/v1/settings/llm/runs?${qs}`, {
+  const runs = useApi<{ items: LlmRunRow[]; total: number; searchSince: string | null }>(["llm-runs", operation, status, search.q, search.model, page], `/api/v1/settings/llm/runs?${qs}`, {
     refetchInterval: 30_000,
   });
   const facets = useApi<Facets>(["llm-run-facets"], "/api/v1/settings/llm/runs/facets");
   const detail = useApi<LlmRunDetail>(["llm-run", selected], `/api/v1/settings/llm/runs/${selected}`, { enabled: Boolean(selected) });
 
   const items = runs.data?.items || [];
-  const setSearch = (patch: Record<string, unknown>) => navigate({ search: (prev) => ({ ...prev, ...patch }) });
+  const setSearch = (patch: Record<string, unknown>) => navigate({ search: (prev) => ({ ...prev, ...("run" in patch || "page" in patch ? {} : { page: undefined }), ...patch }) });
 
   return (
     <Page wide>
       <PageHeader
         title="AI logs"
-        subtitle="Every model call, with what was asked and what came back."
+        subtitle="AI operations, with captured application messages and responses."
         actions={<span className="text-[11.5px] text-faint">{runs.data?.total ?? 0} runs</span>}
       >
         <div className="flex flex-wrap items-center gap-2">
@@ -104,6 +107,7 @@ export function AiLogsPage() {
             ]}
           />
           <select
+            aria-label="Operation"
             value={operation}
             onChange={(e) => setSearch({ operation: e.target.value || undefined })}
             className="h-7 rounded-md border border-border bg-surface px-2 text-[12px]"
@@ -115,7 +119,13 @@ export function AiLogsPage() {
               </option>
             ))}
           </select>
+          <select aria-label="Model" value={search.model || ""} onChange={e => setSearch({ model: e.target.value || undefined })} className="h-7 rounded-md border border-border bg-surface px-2 text-[12px]">
+            <option value="">All models</option>
+            {(facets.data?.models || []).map(m => <option key={m.v} value={m.v}>{m.v} ({m.c})</option>)}
+          </select>
           <input
+            aria-label="Search transcripts"
+            key={search.q || ""}
             defaultValue={search.q || ""}
             placeholder="Search prompt, response or error…"
             onKeyDown={(e) => {
@@ -127,6 +137,8 @@ export function AiLogsPage() {
       </PageHeader>
 
       {runs.error ? <ErrorNote error={runs.error} /> : null}
+      {runs.data?.searchSince ? <div className="text-xs text-muted">Text search covers retained transcripts and errors since {new Date(runs.data.searchSince).toLocaleDateString()} (up to 14 days). Clear search to browse older run metadata.</div> : null}
+      <div className="flex items-center gap-2 text-xs"><Btn variant="outline" disabled={page <= 1} onClick={() => setSearch({ page: page - 1 })}>Previous</Btn><span>Page {page} of {Math.max(1, Math.ceil((runs.data?.total || 0) / 100))}</span><Btn variant="outline" disabled={page * 100 >= (runs.data?.total || 0)} onClick={() => setSearch({ page: page + 1 })}>Next</Btn></div>
 
       <div className="grid gap-3 lg:grid-cols-[minmax(340px,420px)_1fr]">
         <div className="min-w-0">
@@ -197,7 +209,8 @@ export function AiLogsPage() {
                 </div>
                 {detail.data.error ? <div className="mt-2 rounded-md bg-surface-2 p-2 text-[12px] text-bad">{detail.data.error}</div> : null}
               </Panel>
-              <Transcript title="Prompt sent" body={detail.data.prompt} truncated={detail.data.promptTruncated} chars={detail.data.promptChars} />
+              <div className="text-xs text-muted">Application prompt, before client schema hints and retries. Tool calls and tool-result IDs are included when captured.</div>
+              <Transcript title="Application prompt" body={detail.data.prompt} truncated={detail.data.promptTruncated} chars={detail.data.promptChars} />
               <Transcript title="Model response" body={detail.data.response} truncated={detail.data.responseTruncated} chars={detail.data.responseChars} />
             </>
           ) : null}
