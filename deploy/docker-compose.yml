@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: job_scout
+      POSTGRES_PASSWORD: job_scout
+      POSTGRES_DB: job_scout
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U job_scout"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    command: ["node", "--import", "tsx", "apps/api/src/index.ts"]
+    environment:
+      DATABASE_URL: postgresql://job_scout:job_scout@postgres:5432/job_scout
+      AUTH_MODE: dev
+      AUTH_PASSWORD: job-scout
+      API_TOKEN_SEED: dev-agent-token
+      HOST: 0.0.0.0
+      PORT: 8080
+      PUBLIC_BASE_URL: http://localhost:8080
+      EMBED_WORKER: "0"
+      NODE_ENV: production
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    command: ["node", "--import", "tsx", "apps/worker/src/index.ts"]
+    environment:
+      DATABASE_URL: postgresql://job_scout:job_scout@postgres:5432/job_scout
+      API_TOKEN_SEED: dev-agent-token
+      WORKER_CONCURRENCY: "2"
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:

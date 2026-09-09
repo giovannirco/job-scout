@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "job-scout.fullname" . }}-worker
+  labels:
+    {{- include "job-scout.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "job-scout.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        {{- include "job-scout.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: worker
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- include "job-scout.metricsAnnotations" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "job-scout.fullname" . }}
+      {{- include "job-scout.podSecurityContext" . | nindent 6 }}
+      terminationGracePeriodSeconds: 60
+      {{- include "job-scout.podScheduling" . | nindent 6 }}
+      containers:
+        - name: worker
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- include "job-scout.containerSecurityContext" . | nindent 10 }}
+          args: ["node", "--import", "tsx", "apps/worker/src/index.ts"]
+          ports:
+            {{- include "job-scout.metricsPort" . | nindent 12 }}
+          {{- include "job-scout.envFrom" . | nindent 10 }}
+          env:
+            {{- include "job-scout.metricsEnv" . | nindent 12 }}
+            # CronJobs own discovery/watch/retention; the in-process scheduler stays off.
+            - name: WORKER_SCHEDULER
+              value: {{ .Values.worker.inProcessScheduler | ternary "1" "0" | quote }}
+            - name: NODE_OPTIONS
+              value: {{ .Values.worker.nodeOptions | quote }}
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}

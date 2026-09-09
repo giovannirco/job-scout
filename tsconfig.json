@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "@job-scout/shared": ["./packages/shared/src/index.ts"],
+      "@job-scout/db": ["./packages/db/src/index.ts"],
+      "@job-scout/ats": ["./packages/ats/src/index.ts"],
+      "@job-scout/llm": ["./packages/llm/src/index.ts"],
+      "@job-scout/core": ["./packages/core/src/index.ts"],
+      "@desk-ui/api-client": ["./packages/desk-ui/api-client/src/index.ts"],
+      "@/*": ["./apps/web/src/*"]
+    }
+  },
+  "include": ["apps", "packages", "scripts/*.ts"],
+  "exclude": ["node_modules", "**/dist"]
+}

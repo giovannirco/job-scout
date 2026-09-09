@@ -1,0 +1,50 @@
+{{- /* One CronJob per scheduled task, all running the app image's one-shot entry. */ -}}
+{{- range $name, $cron := .Values.cronJobs }}
+{{- if $cron.enabled }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "job-scout.fullname" $ }}-{{ $name }}
+  labels:
+    {{- include "job-scout.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: cron-{{ $name }}
+spec:
+  schedule: {{ $cron.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: {{ $cron.activeDeadlineSeconds | default 600 }}
+      template:
+        metadata:
+          labels:
+            {{- include "job-scout.selectorLabels" $ | nindent 12 }}
+            app.kubernetes.io/component: cron-{{ $name }}
+        spec:
+          restartPolicy: Never
+          serviceAccountName: {{ include "job-scout.fullname" $ }}
+          {{- include "job-scout.podSecurityContext" $ | nindent 10 }}
+          {{- include "job-scout.podScheduling" $ | nindent 10 }}
+          containers:
+            - name: {{ $name }}
+              image: "{{ $.Values.image.repository }}:{{ $.Values.image.tag }}"
+              imagePullPolicy: {{ $.Values.image.pullPolicy }}
+              {{- include "job-scout.containerSecurityContext" $ | nindent 14 }}
+              args:
+                - node
+                - --import
+                - tsx
+                - apps/worker/src/once.ts
+                - {{ $cron.task | default $name | quote }}
+                {{- range $cron.extraArgs }}
+                - {{ . | quote }}
+                {{- end }}
+              {{- include "job-scout.envFrom" $ | nindent 14 }}
+              resources:
+                {{- toYaml ($cron.resources | default $.Values.cronDefaults.resources) | nindent 16 }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,131 @@
+import type { SalaryParse } from "./types.js";
+
+/**
+ * Parse common posted salary strings. Returns nulls when unknown — never invents.
+ * Examples: $129–304k, BRL 422.5–485k, $4–5k/mo, USD 200000-250000, $200,000 – $250,000
+ */
+export function parseSalary(raw: string | null | undefined): SalaryParse {
+  if (!raw || !String(raw).trim()) {
+    return { min: null, max: null, currency: null, period: null, raw: null };
+  }
+  const text = String(raw).trim();
+  const lower = text.toLowerCase();
+
+  let currency: string | null = null;
+  if (/\bbrl\b|r\$/i.test(text)) currency = "BRL";
+  else if (/\$|usd|us\$/i.test(text)) currency = "USD";
+  else if (/\beur\b|€/i.test(text)) currency = "EUR";
+  else if (/\bgbp\b|£/i.test(text)) currency = "GBP";
+
+  let period: SalaryParse["period"] = "year";
+  if (/\/\s*mo|per\s*month|monthly|\/mo\b/i.test(lower)) period = "month";
+  else if (/\/\s*hr|per\s*hour|hourly|\/hr\b/i.test(lower)) period = "hour";
+
+  // Strip thousands separators for numeric parse, keep original as raw
+  const normalized = text.replace(/,/g, "");
+
+  // $129–304k / $129k-$304k / 129-304k / $200000 – $250000
+  const kRange = normalized.match(
+    /(?:(?:USD|BRL|EUR|GBP|US\$|R\$|\$)\s*)?(\d+(?:\.\d+)?)\s*[kK]?\s*[-–—to]+\s*(?:(?:USD|BRL|EUR|GBP|US\$|R\$|\$)\s*)?(\d+(?:\.\d+)?)\s*[kK]?/,
+  );
+  if (kRange) {
+    let min = parseFloat(kRange[1]);
+    let max = parseFloat(kRange[2]);
+    const hasK = /[kK]/.test(normalized) || (min < 1000 && max < 1000 && max > 10);
+    if (hasK && max < 10000) {
+      min *= 1000;
+      max *= 1000;
+    }
+    if (!currency) currency = "USD";
+    return {
+      min: Math.round(min),
+      max: Math.round(max),
+      currency,
+      period,
+      raw: text,
+    };
+  }
+
+  // single value $200k or 200000
+  const single = normalized.match(
+    /(?:(?:USD|BRL|EUR|GBP|US\$|R\$|\$)\s*)?(\d+(?:\.\d+)?)\s*([kK])?/,
+  );
+  if (single) {
+    let v = parseFloat(single[1]);
+    if (single[2] || (v < 1000 && /[kK]/.test(normalized))) v *= 1000;
+    if (!currency) currency = "USD";
+    return {
+      min: Math.round(v),
+      max: Math.round(v),
+      currency,
+      period,
+      raw: text,
+    };
+  }
+
+  return { min: null, max: null, currency, period, raw: text };
+}
+
+export type SalaryPeriodGuard = {
+  period: "year" | "month" | "hour" | "unknown";
+  periodLabel: string;
+  yearlyMin: number | null;
+  yearlyMax: number | null;
+  warnMonthly: boolean;
+  warnLooksMonthly: boolean;
+};
+
+/** Flag monthly/hourly vs yearly so $4–5k/mo is never treated as annual cash. Never invents hours. */
+export function salaryPeriodGuard(opts: {
+  min?: number | null;
+  max?: number | null;
+  period?: string | null;
+  raw?: string | null;
+}): SalaryPeriodGuard {
+  const raw = (opts.raw || "").toLowerCase();
+  let period: SalaryPeriodGuard["period"] = "unknown";
+  if (opts.period === "month" || /\/\s*mo|per\s*month|monthly/.test(raw)) period = "month";
+  else if (opts.period === "hour" || /\/\s*hr|hourly|per\s*hour/.test(raw)) period = "hour";
+  else if (opts.period === "year" || /\/\s*yr|annual|per\s*year|yearly/.test(raw)) period = "year";
+  else if (opts.period) period = "year";
+
+  const min = opts.min ?? null;
+  const max = opts.max ?? null;
+  const peak = max ?? min;
+  const warnLooksMonthly =
+    period !== "month" &&
+    period !== "hour" &&
+    peak != null &&
+    peak >= 800 &&
+    peak <= 20000 &&
+    !/[kK]/.test(opts.raw || "");
+
+  if (period === "month") {
+    return {
+      period,
+      periodLabel: "/mo",
+      yearlyMin: min != null ? min * 12 : null,
+      yearlyMax: max != null ? max * 12 : null,
+      warnMonthly: true,
+      warnLooksMonthly: false,
+    };
+  }
+  if (period === "hour") {
+    return {
+      period,
+      periodLabel: "/hr",
+      yearlyMin: null,
+      yearlyMax: null,
+      warnMonthly: false,
+      warnLooksMonthly: false,
+    };
+  }
+  return {
+    period: period === "year" ? "year" : "unknown",
+    periodLabel: period === "year" ? "/yr" : "",
+    yearlyMin: min,
+    yearlyMax: max,
+    warnMonthly: false,
+    warnLooksMonthly,
+  };
+}

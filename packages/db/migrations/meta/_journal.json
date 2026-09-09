@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1788452486369,
+      "tag": "0000_v2_initial",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788464024151,
+      "tag": "0001_autopilot_chat",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788532000000,
+      "tag": "0002_listing_workplace",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788960000000,
+      "tag": "0003_llm_run_transcript",
+      "breakpoints": true
+    }
+  ]
+}

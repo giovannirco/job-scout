@@ -1,0 +1,91 @@
+image:
+  repository: job-scout
+  tag: "local"
+  pullPolicy: IfNotPresent
+
+nameOverride: job-scout
+fullnameOverride: ""
+
+imagePullSecrets: []
+
+api:
+  replicas: 1
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: 500m, memory: 768Mi }
+
+worker:
+  replicas: 1
+  inProcessScheduler: false
+  nodeOptions: "--max-old-space-size=384"
+  resources:
+    requests: { cpu: 50m, memory: 256Mi }
+    limits: { cpu: 500m, memory: 512Mi }
+
+cronJobs:
+  discovery:
+    enabled: true
+    schedule: "*/30 * * * *"
+    task: discovery
+  watch:
+    enabled: true
+    schedule: "15 */2 * * *"
+    task: watch
+  retention:
+    enabled: true
+    schedule: "30 3 * * *"
+    task: retention
+cronDefaults:
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { cpu: 300m, memory: 384Mi }
+
+service:
+  port: 8080
+
+metrics:
+  enabled: true
+  port: 9464
+  scrapeInterval: 30s
+  job: job-scout
+
+dashboard:
+  enabled: false
+  folder: job-scout
+
+env:
+  AUTH_MODE: dev
+  PUBLIC_BASE_URL: http://localhost:8080
+  HOST: 0.0.0.0
+  PORT: "8080"
+  WORKER_CONCURRENCY: "2"
+  WORKER_POLL_MS: "1500"
+  ATS_USER_AGENT: job-scout/2 (local; no apply)
+  LLM_TIMEOUT_MS: "180000"
+  PG_POOL_MAX: "6"
+  LOG_FORMAT: json
+  LOG_LEVEL: info
+  OPENAI_BASE_URL: ""
+  STEEL_BASE_URL: ""
+  BROWSER_MCP_URL: ""
+  WAHA_BASE_URL: ""
+  WAHA_SESSION: default
+
+existingSecret: job-scout-secrets
+extraSecrets: []
+secrets:
+  create: false
+  databaseUrl: ""
+  apiTokenSeed: ""
+  authPassword: ""
+  openaiApiKey: ""
+  extra: {}
+
+httpRoute:
+  enabled: false
+  hostnames: []
+  parentRefs: []
+
+nodeSelector: {}
+affinity: {}
+tolerations: []
