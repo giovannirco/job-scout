@@ -1,0 +1,11 @@
+{
+  "name": "@job-scout/lint-config",
+  "private": true,
+  "type": "module",
+  "exports": "./eslint.config.mjs",
+  "devDependencies": {
+    "eslint": "10.10.0",
+    "typescript": "npm:@typescript/typescript6@6.0.2",
+    "typescript-eslint": "8.70.0"
+  }
+}

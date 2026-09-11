@@ -115,6 +115,9 @@ export const JobType = z.enum([
   "materials",
   "company_research",
   "jd_review",
+  "listing_classify",
+  "form_answers",
+  "interview_brief",
   "retention",
 ]);
 export type JobType = z.infer<typeof JobType>;

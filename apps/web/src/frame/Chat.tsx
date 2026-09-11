@@ -141,9 +141,9 @@ export function ChatPanel() {
     } finally {
       abortRef.current = null;
       setStream(null);
-      qc.invalidateQueries({ queryKey: ["chat", "thread", id] });
-      qc.invalidateQueries({ queryKey: ["chat", "threads", scopeKey] });
-      qc.invalidateQueries({ queryKey: ["today"] });
+      void qc.invalidateQueries({ queryKey: ["chat", "thread", id] });
+      void qc.invalidateQueries({ queryKey: ["chat", "threads", scopeKey] });
+      void qc.invalidateQueries({ queryKey: ["today"] });
     }
   }, [text, stream, threadId, newThread, qc, scopeKey]);
 
@@ -191,7 +191,7 @@ export function ChatPanel() {
                 if (!confirm("Delete this thread?")) return;
                 await del(`/api/v1/chat/threads/${threadId}`);
                 setThreadId(null);
-                qc.invalidateQueries({ queryKey: ["chat", "threads", scopeKey] });
+                void qc.invalidateQueries({ queryKey: ["chat", "threads", scopeKey] });
               }}
             >
               <Trash2 className="h-3.5 w-3.5" />

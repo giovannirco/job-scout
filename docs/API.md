@@ -48,8 +48,10 @@ curl -H "Authorization: Bearer dev-agent-token" http://localhost:8080/api/v1/tod
 | PUT | `/positions/:idOrSlug/career-ops` | merge a career-ops stamp into `metadata.careerOps` |
 | GET / POST | `/positions/:idOrSlug/people` | company-scoped contacts `{name, title?, linkedinUrl?, email?, notes?}` |
 | DELETE | `/positions/:idOrSlug/people/:personId` | 404 if the person is not on this company |
-| GET / POST | `/positions/:idOrSlug/interviews` | `{stage?, scheduledAt?, status?, notes?}`. status `pending\|completed\|cancelled` |
+| GET / POST | `/positions/:idOrSlug/interviews` | list is slim (metadata + char counts). POST body: `stage`, `title`, interviewer, `scheduledAt`/`occurredAt`, `status` `pending\|completed\|cancelled`, `outcome` `advanced\|hold\|rejected\|cancelled\|unclear`, notes/review/transcript markdown. A transcript queues `interview_brief` unless `skipBrief` |
+| GET | `/positions/:idOrSlug/interviews/:interviewId` | full round including transcript + AI brief |
 | PATCH / DELETE | `/positions/:idOrSlug/interviews/:interviewId` | |
+| POST | `/positions/:idOrSlug/interviews/:interviewId/brief` | queue AI brief (`202`); `?sync=1` runs in-process |
 
 ### Companies
 

@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import { boardSources, discoveryFeed, getDb, id } from "@job-scout/db";
 import {
+  boardErrorKind,
   createWatch,
   deleteWatch,
   discoverySummary,
@@ -55,7 +56,7 @@ radarRoutes.post("/boards", async (c) => {
   const row = (await db.select().from(boardSources).where(eq(boardSources.id, bid)).limit(1))[0];
   if (!row) return fail(c, "CONFLICT", "board with that provider/token already exists");
   await enqueueJob("board_scan", { boardId: bid, company: b.company }, { dedupeKey: `board_scan:${bid}`, priority: 50 });
-  return ok(c, row, {}, 201);
+  return ok(c, { ...row, errorKind: boardErrorKind(row.lastError) }, {}, 201);
 });
 
 radarRoutes.patch("/boards/:id", async (c) => {
@@ -68,7 +69,7 @@ radarRoutes.patch("/boards/:id", async (c) => {
   if (!Object.keys(set).length) return fail(c, "VALIDATION_ERROR", "nothing to update");
   await db.update(boardSources).set(set).where(eq(boardSources.id, c.req.param("id")));
   const row = (await db.select().from(boardSources).where(eq(boardSources.id, c.req.param("id"))).limit(1))[0];
-  return row ? ok(c, row) : fail(c, "NOT_FOUND", "board not found");
+  return row ? ok(c, { ...row, errorKind: boardErrorKind(row.lastError) }) : fail(c, "NOT_FOUND", "board not found");
 });
 
 radarRoutes.post("/boards/:id/scan", async (c) => {

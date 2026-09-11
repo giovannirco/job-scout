@@ -35,7 +35,7 @@ export function CompaniesPage() {
               className="relative"
               onSubmit={(e) => {
                 e.preventDefault();
-                navigate({ search: { q: q.trim() || undefined, all: search.all } });
+                void navigate({ search: { q: q.trim() || undefined, all: search.all } });
               }}
             >
               <Search className="h-3.5 w-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-faint" />

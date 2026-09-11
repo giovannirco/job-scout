@@ -6,6 +6,7 @@ import { craftFamily, gateListing, geoClass, isNoiseJobTitle, parseClipListing, 
 import { enqueueJob } from "./jobs.js";
 import { upsertFromJob } from "./positions.js";
 import { getSettings } from "./settings.js";
+import { boardErrorKind, type BoardErrorKind } from "./board-reconcile.js";
 import type { PositionStatus } from "@job-scout/db";
 import { log as rootLog } from "@job-scout/shared";
 import { boardScans, scanListings } from "./metrics.js";
@@ -25,6 +26,7 @@ export type ScanResult = {
   closed: number;
   triageEnqueued: number;
   error?: string;
+  errorKind?: BoardErrorKind;
 };
 
 /**
@@ -48,8 +50,9 @@ export async function scanBoard(boardId: string, opts: { force?: boolean } = {})
     const msg = e instanceof Error ? e.message : String(e);
     await db.update(boardSources).set({ lastScannedAt: new Date(), lastError: msg.slice(0, 500) }).where(eq(boardSources.id, board.id));
     res.error = msg;
+    res.errorKind = boardErrorKind(msg);
     boardScans.labels({ provider: board.provider, status: "error" }).inc();
-    log.warn("scan.board.failed", { boardId: board.id, company: board.company, provider: board.provider, err: e });
+    log.warn("scan.board.failed", { boardId: board.id, company: board.company, provider: board.provider, errorKind: res.errorKind, err: e });
     return res;
   }
   res.seen = list.length;

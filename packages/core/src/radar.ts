@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, gte, ilike, or, sql, type SQL } from "drizzle-orm";
 import { boardDeltas, boardSources, discoveryFeed, getDb, positions } from "@job-scout/db";
 import { parseListSort } from "@job-scout/shared";
+import { boardErrorKind } from "./board-reconcile.js";
 
 export async function listDiscovery(q: {
   lane?: string;
@@ -126,10 +127,11 @@ export async function listBoards(q: { q?: string; enabled?: string; sort?: strin
         : field === "last_scanned"
           ? [d(boardSources.lastScannedAt), asc(boardSources.company)]
           : [d(boardSources.company)];
-  return db
+  const rows = await db
     .select()
     .from(boardSources)
     .where(conds.length ? and(...conds) : undefined)
     .orderBy(...order)
     .limit(1000);
+  return rows.map(row => ({ ...row, errorKind: boardErrorKind(row.lastError) }));
 }

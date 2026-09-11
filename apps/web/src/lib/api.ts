@@ -230,9 +230,29 @@ export type Interview = {
   id: string;
   positionId: string;
   stage: string;
+  title: string | null;
+  interviewerName: string | null;
+  interviewerRole: string | null;
   scheduledAt: string | null;
+  occurredAt: string | null;
+  durationSeconds: number | null;
   status: string;
+  outcome: string | null;
   notes: string | null;
+  notesMarkdown?: string | null;
+  reviewMarkdown?: string | null;
+  transcriptMarkdown?: string | null;
+  transcriptSource: string | null;
+  aiBriefMarkdown?: string | null;
+  aiBriefJson?: Record<string, unknown> | null;
+  aiBriefModel: string | null;
+  aiBriefedAt: string | null;
+  sourcePath: string | null;
+  transcriptChars?: number;
+  reviewChars?: number;
+  notesMarkdownChars?: number;
+  aiBriefChars?: number;
+  briefJobId?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -382,6 +402,7 @@ export type Board = {
   notes: string | null;
   lastScannedAt: string | null;
   lastError: string | null;
+  errorKind: "missing" | "transient" | "auth" | "unknown" | "none";
 };
 
 export type Watch = {
@@ -536,7 +557,7 @@ export function useApiMeta<T>(key: unknown[], path: string, opts?: Partial<UseQu
 export function useInvalidate() {
   const qc = useQueryClient();
   return (...prefixes: string[]) => {
-    for (const p of prefixes) qc.invalidateQueries({ queryKey: [p] });
+    for (const p of prefixes) void qc.invalidateQueries({ queryKey: [p] });
   };
 }
 

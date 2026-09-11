@@ -116,10 +116,10 @@ function Discovery({ search, set, summary }: { search: RadarSearch; set: (p: Par
       const res = await apiMeta<{ id: string; slug: string }>(`/api/v1/radar/discovery/${r.id}/promote`, { method: "POST" });
       const revived = Boolean(res.meta.revived);
       toast.success(res.meta.created ? "Promoted — triage queued" : revived ? "Revived — back in the pipeline" : "Already in the pipeline");
-      qc.invalidateQueries({ queryKey: ["radar"] });
-      qc.invalidateQueries({ queryKey: ["positions"] });
+      void qc.invalidateQueries({ queryKey: ["radar"] });
+      void qc.invalidateQueries({ queryKey: ["positions"] });
       const slug = res.data?.slug;
-      if (slug) navigate({ to: "/positions/$id", params: { id: slug } });
+      if (slug) void navigate({ to: "/positions/$id", params: { id: slug } });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed");
     }
@@ -321,7 +321,7 @@ function Boards({ search, set }: { search: RadarSearch; set: (p: Partial<RadarSe
 
   async function toggle(b: Board) {
     await patch(`/api/v1/radar/boards/${b.id}`, { enabled: !b.enabled });
-    qc.invalidateQueries({ queryKey: ["radar", "boards"] });
+    void qc.invalidateQueries({ queryKey: ["radar", "boards"] });
   }
   async function scan(b: Board) {
     await post(`/api/v1/radar/boards/${b.id}/scan?force=1`);
@@ -333,7 +333,7 @@ function Boards({ search, set }: { search: RadarSearch; set: (p: Partial<RadarSe
       toast.success("Board added");
       setAdding(false);
       setForm({ company: "", provider: "greenhouse", token: "" });
-      qc.invalidateQueries({ queryKey: ["radar"] });
+      void qc.invalidateQueries({ queryKey: ["radar"] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed");
     }
@@ -409,7 +409,7 @@ function Boards({ search, set }: { search: RadarSearch; set: (p: Partial<RadarSe
             {rows.map((b) => (
               <Tr key={b.id} className={b.enabled ? "" : "opacity-50"}>
                 <Td className="pr-0">
-                  <Dot tone={b.lastError ? "bad" : b.enabled ? "good" : "faint"} />
+                  <Dot tone={b.errorKind === "transient" ? "warn" : b.lastError ? "bad" : b.enabled ? "good" : "faint"} />
                 </Td>
                 <Td className="font-medium">{b.company}</Td>
                 <Td mono className="text-muted">
@@ -422,6 +422,7 @@ function Boards({ search, set }: { search: RadarSearch; set: (p: Partial<RadarSe
                   {ago(b.lastScannedAt)}
                 </Td>
                 <Td className="max-w-[260px] text-bad text-[11px]">
+                  {b.lastError ? <div className={b.errorKind === "transient" ? "text-warn" : "text-bad"}>{b.errorKind === "transient" ? "Temporary failure" : b.errorKind === "missing" ? "Board not found" : b.errorKind === "auth" ? "Access denied" : "Unclassified error"}</div> : null}
                   <div className="truncate" title={b.lastError || ""}>
                     {b.lastError || ""}
                   </div>
@@ -458,14 +459,14 @@ function Watches({ search, set }: { search: RadarSearch; set: (p: Partial<RadarS
       await post("/api/v1/radar/watches", { url, label: label || undefined });
       setUrl("");
       setLabel("");
-      qc.invalidateQueries({ queryKey: ["radar", "watches"] });
+      void qc.invalidateQueries({ queryKey: ["radar", "watches"] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed");
     }
   }
   async function remove(w: Watch) {
     await del(`/api/v1/radar/watches/${w.id}`);
-    qc.invalidateQueries({ queryKey: ["radar", "watches"] });
+    void qc.invalidateQueries({ queryKey: ["radar", "watches"] });
   }
   return (
     <div className="space-y-3">

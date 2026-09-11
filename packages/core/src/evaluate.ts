@@ -1,5 +1,5 @@
 import { and, desc, eq } from "drizzle-orm";
-import { evaluations, getDb, id, positions, type EvaluationKind, type PositionStatus } from "@job-scout/db";
+import { evaluations, getDb, id, positions, timelineEvents, type EvaluationKind, type PositionStatus } from "@job-scout/db";
 import {
   buildCompanyResearchMessages,
   buildEvaluateMessages,
@@ -34,13 +34,16 @@ export async function getEvaluationById(evalId: string) {
 }
 
 export function nextStatusAfterEvaluate(status: PositionStatus): PositionStatus {
-  if (status === "triaged" || status === "archived") return "review";
+  if (status === "triaged") return "review";
   return status;
 }
 
-export async function runEvaluate(positionId: string) {
+export async function runEvaluate(positionId: string, opts: { auto?: boolean } = {}) {
   const pos = await getPosition(positionId);
   if (!pos) throw new Error("position not found");
+  if (opts.auto && (!["triaged", "review"].includes(pos.status) || pos.listingStatus === "closed" || pos.metadata?.quarantined)) {
+    return { skipped: true, reason: "position_no_longer_eligible" };
+  }
   const cfg = await gateOperation("evaluate");
   const profile = await getProfile();
   const jdText = await currentJdText(pos.id);
@@ -63,39 +66,55 @@ export async function runEvaluate(positionId: string) {
   );
   const db = await getDb();
   const evalId = id("ev");
-  await db.insert(evaluations).values({
-    id: evalId,
-    positionId: pos.id,
-    companyId: pos.companyId,
-    kind: "evaluate",
-    model: res.model,
-    markdown: res.markdown,
-    json: { ...res.data, profileHash: profileFingerprint(profile) },
-    tokensIn: res.tokensIn,
-    tokensOut: res.tokensOut,
-    latencyMs: res.latencyMs,
+  const profileHash = profileFingerprint(profile);
+  const profileChanged = profileFingerprint(await getProfile()) !== profileHash;
+  // Never hold a database lock during the model call. Revalidate under lock when
+  // it returns; keep the report even when an operator decision superseded it.
+  const completion = await db.transaction(async tx => {
+    const current = (await tx.select().from(positions).where(eq(positions.id, pos.id)).limit(1).for("update"))[0];
+    if (!current) throw new Error("position removed during evaluation");
+    const stale = profileChanged || current.updatedAt.getTime() !== pos.updatedAt.getTime()
+      || current.status !== pos.status || current.listingStatus !== pos.listingStatus || current.contentHash !== pos.contentHash
+      || Boolean(current.metadata?.quarantined) !== Boolean(pos.metadata?.quarantined);
+    await tx.insert(evaluations).values({
+      id: evalId,
+      positionId: pos.id,
+      companyId: pos.companyId,
+      kind: "evaluate",
+      model: res.model,
+      markdown: res.markdown,
+      json: { ...res.data, profileHash, staleAtCompletion: stale, sourcePositionUpdatedAt: pos.updatedAt.toISOString() },
+      tokensIn: res.tokensIn,
+      tokensOut: res.tokensOut,
+      latencyMs: res.latencyMs,
+    });
+    const status = stale || current.listingStatus === "closed" || current.metadata?.quarantined ? current.status : nextStatusAfterEvaluate(current.status);
+    const updatedAt = status !== current.status ? new Date() : current.updatedAt;
+    if (status !== current.status) {
+      await tx.update(positions).set({ status, archiveReason: null, updatedAt }).where(eq(positions.id, pos.id));
+      await tx.insert(timelineEvents).values({ id: id("tl"), positionId: pos.id, kind: "status", title: `${current.status} → ${status}`, actor: "evaluate" });
+    }
+    await tx.insert(timelineEvents).values({
+      id: id("tl"),
+      positionId: pos.id,
+      kind: "evaluate",
+      title: `Evaluation ${res.data.verdict} ${res.data.score.toFixed(1)}`,
+      body: res.data.headline,
+      metadata: { evaluationId: evalId, model: res.model, staleAtCompletion: stale },
+    });
+    return { status, updatedAt: updatedAt.toISOString(), stale };
   });
-  let status = nextStatusAfterEvaluate(pos.status);
-  if (status !== pos.status) {
-    await db.update(positions).set({ status, archiveReason: status === "review" ? null : pos.archiveReason, updatedAt: new Date() }).where(eq(positions.id, pos.id));
-  }
-  await addEvent({
-    positionId: pos.id,
-    kind: "evaluate",
-    title: `Evaluation ${res.data.verdict} ${res.data.score.toFixed(1)}`,
-    body: res.data.headline,
-    metadata: { evaluationId: evalId, model: res.model },
-  });
-  const auto = await afterEvaluate({
+  const auto = completion.stale ? { autopilotSkipped: "evaluation_superseded" } : await afterEvaluate({
     positionId: pos.id,
     companyId: pos.companyId,
     evaluationId: evalId,
     score: res.data.score,
     verdict: res.data.verdict,
     headline: res.data.headline,
-    status,
+    status: completion.status,
+    expectedUpdatedAt: completion.updatedAt,
   });
-  return { evaluationId: evalId, summary: res.data, model: res.model, ...auto };
+  return { evaluationId: evalId, summary: res.data, model: res.model, staleAtCompletion: completion.stale, ...auto };
 }
 
 export async function runJdReview(positionId: string) {

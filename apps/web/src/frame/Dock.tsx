@@ -172,10 +172,10 @@ function ApprovalCard({ a, full }: { a: Approval; full?: boolean }) {
     try {
       await post(`/api/v1/approvals/${a.id}/${decision}`);
       toast.success(decision === "approve" ? "Approved" : "Dismissed");
-      qc.invalidateQueries({ queryKey: ["today"] });
-      qc.invalidateQueries({ queryKey: ["approvals"] });
-      qc.invalidateQueries({ queryKey: ["positions"] });
-      if (a.position) qc.invalidateQueries({ queryKey: ["position", a.position.slug] });
+      void qc.invalidateQueries({ queryKey: ["today"] });
+      void qc.invalidateQueries({ queryKey: ["approvals"] });
+      void qc.invalidateQueries({ queryKey: ["positions"] });
+      if (a.position) void qc.invalidateQueries({ queryKey: ["position", a.position.slug] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed");
     }

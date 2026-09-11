@@ -258,12 +258,18 @@ const LOCAL_TOOLS: LocalTool[] = [
   {
     name: "run_operation",
     description: "Queue an LLM operation on a position: triage | evaluate | materials | jd_review | company_research (company of the position). Returns a job id; results land on the position within a minute or two.",
-    parameters: { type: "object", properties: { slug: { type: "string" }, operation: { type: "string", enum: ["triage", "evaluate", "materials", "jd_review", "company_research"] } }, required: ["operation"] },
+    parameters: { type: "object", properties: { slug: { type: "string" }, operation: { type: "string", enum: ["triage", "evaluate", "materials", "jd_review", "company_research", "interview_brief"] }, interviewId: { type: "string" } }, required: ["operation"] },
     write: true,
     run: async (a, ctx) => {
       const pos = await getPosition(slugOrScope(a, ctx));
       if (!pos) return { error: "position not found" };
       const op = str(a.operation) as Exclude<LlmOperationId, "chat">;
+      if (op === "interview_brief") {
+        const interviewId = str(a.interviewId);
+        if (!interviewId) return { error: "interviewId required" };
+        const q = await enqueueJob("interview_brief", { positionId: pos.id, interviewId, requestedBy: "chat" }, { dedupeKey: `interview_brief:${interviewId}`, priority: 20 });
+        return { jobId: q.id, deduped: q.deduped, operation: op, position: pos.slug, interviewId };
+      }
       const payload = op === "company_research" ? { companyId: pos.companyId, positionId: pos.id } : { positionId: pos.id, force: op === "triage" };
       const q = await enqueueJob(op, { ...payload, requestedBy: "chat" }, { dedupeKey: `${op}:${op === "company_research" ? pos.companyId : pos.id}`, priority: 20 });
       return { jobId: q.id, deduped: q.deduped, operation: op, position: pos.slug };

@@ -23,6 +23,7 @@ export * from "./questions.js";
 export * from "./listing-classify.js";
 export * from "./people.js";
 export * from "./interviews.js";
+export * from "./interview-brief.js";
 export * from "./funnel.js";
 export * from "./career-ops.js";
 export * from "./data-repair.js";

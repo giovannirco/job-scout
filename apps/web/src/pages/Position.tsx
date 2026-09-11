@@ -7,7 +7,7 @@ import { GeoChip, ListingBadge, ScoreMeter, STATUS_LABEL, STATUS_PATH, STATUS_TE
 import { Markdown } from "@/components/markdown";
 import { StatusMenu, useStatusChange } from "@/components/status-menu";
 import { openDock, useChatScope } from "@/frame/store";
-import { isCompanyNameLocation } from "@job-scout/shared";
+import { INTERVIEW_OUTCOMES, INTERVIEW_STAGES, INTERVIEW_STATUSES, isCompanyNameLocation } from "@job-scout/shared";
 import { api, del, patch, post, qs, useApi, type Evaluation, type Interview, type Material, type Person, type PipelineStatus, type PositionDetail, type Revision, type TimelineEvent, type TriageJson } from "@/lib/api";
 import { ago, dateShort, dateTime, host, money, titleCase } from "@/lib/format";
 import { Btn, Card, Chip, Dot, Empty, ErrorNote, Field, IconBtn, Input, Loading, Monogram, Page, Panel, Select, SortHead, Tabs, Textarea, TONE_DOT, TONE_TEXT, cn } from "@/ui/kit";
@@ -44,9 +44,9 @@ export function PositionPage() {
       setPendingUntil(0);
       pollingKey.current = null;
       toast.success("Done");
-      qc.invalidateQueries({ queryKey: ["today"] });
+      void qc.invalidateQueries({ queryKey: ["today"] });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Run when the selected position changes, not when its query result refreshes.
   }, [p?.evaluations.length, p?.materials.length, p?.triagedAt, p?.updatedAt, polling]);
 
   async function runAction(action: string, body: Record<string, unknown> = {}) {
@@ -66,7 +66,7 @@ export function PositionPage() {
     try {
       const r = await post<{ changed: boolean; listingStatus?: string }>(`/api/v1/positions/${p.id}/refresh`);
       toast.success(r.changed ? "JD changed — new revision recorded" : "No change");
-      qc.invalidateQueries({ queryKey: ["position", id] });
+      void qc.invalidateQueries({ queryKey: ["position", id] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed");
     }
@@ -75,7 +75,7 @@ export function PositionPage() {
   async function toggleWatch() {
     if (!p) return;
     await patch(`/api/v1/positions/${p.id}`, { watchEnabled: !p.watchEnabled });
-    qc.invalidateQueries({ queryKey: ["position", id] });
+    void qc.invalidateQueries({ queryKey: ["position", id] });
   }
 
   async function archive() {
@@ -83,8 +83,8 @@ export function PositionPage() {
     const reason = window.prompt("Archive reason (optional)", "manual");
     if (reason === null) return;
     await post(`/api/v1/positions/${p.id}/archive`, { reason });
-    qc.invalidateQueries({ queryKey: ["position", id] });
-    qc.invalidateQueries({ queryKey: ["positions"] });
+    void qc.invalidateQueries({ queryKey: ["position", id] });
+    void qc.invalidateQueries({ queryKey: ["positions"] });
     toast("Archived");
   }
 
@@ -267,8 +267,8 @@ function BriefTab({ p, onTriage }: { p: PositionDetail; onTriage: () => void }) 
 
   async function save() {
     await patch(`/api/v1/positions/${p.id}`, { notes: notes || null, nextAction: next || null });
-    qc.invalidateQueries({ queryKey: ["position", p.slug] });
-    qc.invalidateQueries({ queryKey: ["position", p.id] });
+    void qc.invalidateQueries({ queryKey: ["position", p.slug] });
+    void qc.invalidateQueries({ queryKey: ["position", p.id] });
     toast.success("Saved");
   }
   const latestEval = p.evaluations.find((e) => e.kind === "evaluate");
@@ -645,7 +645,7 @@ function HistoryTab({ p }: { p: PositionDetail }) {
     if (!note.trim()) return;
     await api(`/api/v1/positions/${p.id}/notes`, { method: "POST", body: JSON.stringify({ title: "Note", body: note.trim() }) });
     setNote("");
-    qc.invalidateQueries({ queryKey: ["timeline", p.id] });
+    void qc.invalidateQueries({ queryKey: ["timeline", p.id] });
   }
   return (
     <div className="space-y-3 max-w-3xl">
@@ -733,7 +733,7 @@ function FormsTab({ p, onDraft }: { p: PositionDetail; onDraft: () => void }) {
               size="xs"
               onClick={async () => {
                 await patch(`/api/v1/positions/${id}/questions/${row.id}`, { status: "answered" });
-                qc.invalidateQueries({ queryKey: ["position", id, "questions"] });
+                void qc.invalidateQueries({ queryKey: ["position", id, "questions"] });
               }}
             >
               Mark answered
@@ -743,7 +743,7 @@ function FormsTab({ p, onDraft }: { p: PositionDetail; onDraft: () => void }) {
               variant="ghost"
               onClick={async () => {
                 await patch(`/api/v1/positions/${id}/questions/${row.id}`, { status: "skipped" });
-                qc.invalidateQueries({ queryKey: ["position", id, "questions"] });
+                void qc.invalidateQueries({ queryKey: ["position", id, "questions"] });
               }}
             >
               Skip
@@ -756,8 +756,6 @@ function FormsTab({ p, onDraft }: { p: PositionDetail; onDraft: () => void }) {
   );
 }
 
-const INTERVIEW_STAGES = ["screen", "hiring_manager", "technical", "onsite", "offer", "other"] as const;
-const INTERVIEW_STATUSES = ["pending", "completed", "cancelled"] as const;
 
 function ContactsPanel({ positionId }: { positionId: string }) {
   const qc = useQueryClient();
@@ -779,7 +777,7 @@ function ContactsPanel({ positionId }: { positionId: string }) {
       setLinkedinUrl("");
       setEmail("");
       setNotes("");
-      qc.invalidateQueries({ queryKey: ["people", positionId] });
+      void qc.invalidateQueries({ queryKey: ["people", positionId] });
       toast.success("Contact saved");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed");
@@ -790,7 +788,7 @@ function ContactsPanel({ positionId }: { positionId: string }) {
 
   async function remove(id: string) {
     await del(`/api/v1/positions/${positionId}/people/${id}`);
-    qc.invalidateQueries({ queryKey: ["people", positionId] });
+    void qc.invalidateQueries({ queryKey: ["people", positionId] });
   }
 
   const rows = q.data || [];
@@ -843,28 +841,98 @@ function ContactsPanel({ positionId }: { positionId: string }) {
   );
 }
 
+function InterviewRoundBody({ positionId, row, onBrief }: { positionId: string; row: Interview; onBrief: () => void }) {
+  const q = useApi<Interview>(["interview", positionId, row.id], `/api/v1/positions/${positionId}/interviews/${row.id}`);
+  const i = q.data;
+  if (q.isLoading && !i) return <div className="mt-2 text-[11px] text-faint">Loading round…</div>;
+  if (!i) return <div className="mt-2 text-[11px] text-bad">Could not load round.</div>;
+  const transcriptChars = i.transcriptMarkdown?.length ?? row.transcriptChars ?? 0;
+  const canBrief = Boolean(i.transcriptMarkdown || i.notesMarkdown || i.notes);
+  return (
+    <div className="mt-2 space-y-2 text-[12px]">
+      {i.notesMarkdown || i.notes ? (
+        <div>
+          <div className="text-[10.5px] uppercase tracking-wide text-faint mb-1">Notes</div>
+          <Markdown compact>{i.notesMarkdown || i.notes || ""}</Markdown>
+        </div>
+      ) : null}
+      {i.reviewMarkdown ? (
+        <div>
+          <div className="text-[10.5px] uppercase tracking-wide text-faint mb-1">Review</div>
+          <Markdown compact>{i.reviewMarkdown}</Markdown>
+        </div>
+      ) : null}
+      {i.transcriptMarkdown ? (
+        <details>
+          <summary className="cursor-pointer text-muted">Transcript ({transcriptChars.toLocaleString()} chars)</summary>
+          <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap font-mono text-[11px] text-muted">{i.transcriptMarkdown}</pre>
+        </details>
+      ) : null}
+      {i.aiBriefMarkdown ? (
+        <div>
+          <div className="text-[10.5px] uppercase tracking-wide text-faint mb-1">AI brief {i.aiBriefModel ? `· ${i.aiBriefModel}` : ""}</div>
+          <Markdown compact>{i.aiBriefMarkdown}</Markdown>
+        </div>
+      ) : null}
+      <div className="flex justify-end">
+        <Btn size="xs" onClick={onBrief} disabled={!canBrief}>
+          <Sparkles className="h-3 w-3" /> {i.aiBriefMarkdown ? "Re-run AI brief" : "AI brief"}
+        </Btn>
+      </div>
+    </div>
+  );
+}
+
 function InterviewsPanel({ positionId }: { positionId: string }) {
   const qc = useQueryClient();
   const q = useApi<Interview[]>(["interviews", positionId], `/api/v1/positions/${positionId}/interviews`);
   const [stage, setStage] = useState<string>("screen");
+  const [title, setTitle] = useState("");
+  const [interviewerName, setInterviewerName] = useState("");
+  const [interviewerRole, setInterviewerRole] = useState("");
   const [scheduledAt, setScheduledAt] = useState("");
+  const [occurredAt, setOccurredAt] = useState("");
+  const [outcome, setOutcome] = useState("");
   const [notes, setNotes] = useState("");
+  const [transcript, setTranscript] = useState("");
   const [busy, setBusy] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
+
+  function refresh() {
+    void qc.invalidateQueries({ queryKey: ["interviews", positionId] });
+    void qc.invalidateQueries({ queryKey: ["interview", positionId] });
+    void qc.invalidateQueries({ queryKey: ["today"] });
+    void qc.invalidateQueries({ queryKey: ["position", positionId] });
+  }
 
   async function add() {
     setBusy(true);
     try {
       await post(`/api/v1/positions/${positionId}/interviews`, {
         stage,
+        title: title.trim() || null,
+        interviewerName: interviewerName.trim() || null,
+        interviewerRole: interviewerRole.trim() || null,
         scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+        occurredAt: occurredAt ? new Date(occurredAt).toISOString() : null,
+        outcome: outcome || null,
         notes: notes.trim() || null,
+        notesMarkdown: notes.trim() || null,
+        transcriptMarkdown: transcript.trim() || null,
+        transcriptSource: transcript.trim() ? "paste" : null,
+        status: occurredAt || transcript.trim() ? "completed" : "pending",
       });
       setStage("screen");
+      setTitle("");
+      setInterviewerName("");
+      setInterviewerRole("");
       setScheduledAt("");
+      setOccurredAt("");
+      setOutcome("");
       setNotes("");
-      qc.invalidateQueries({ queryKey: ["interviews", positionId] });
-      qc.invalidateQueries({ queryKey: ["today"] });
-      toast.success("Interview logged");
+      setTranscript("");
+      refresh();
+      toast.success(transcript.trim() ? "Interview logged — AI brief queued" : "Interview logged");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed");
     } finally {
@@ -874,14 +942,22 @@ function InterviewsPanel({ positionId }: { positionId: string }) {
 
   async function setStatus(id: string, status: string) {
     await patch(`/api/v1/positions/${positionId}/interviews/${id}`, { status });
-    qc.invalidateQueries({ queryKey: ["interviews", positionId] });
-    qc.invalidateQueries({ queryKey: ["today"] });
+    refresh();
   }
 
   async function remove(id: string) {
     await del(`/api/v1/positions/${positionId}/interviews/${id}`);
-    qc.invalidateQueries({ queryKey: ["interviews", positionId] });
-    qc.invalidateQueries({ queryKey: ["today"] });
+    refresh();
+  }
+
+  async function brief(id: string) {
+    try {
+      await post(`/api/v1/positions/${positionId}/interviews/${id}/brief`);
+      toast("AI brief queued");
+      refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed");
+    }
   }
 
   const rows = q.data || [];
@@ -889,30 +965,45 @@ function InterviewsPanel({ positionId }: { positionId: string }) {
     <Panel title="Interviews" meta={rows.length ? String(rows.length) : undefined} flush>
       {rows.length ? (
         <div className="divide-y divide-border/60">
-          {rows.map((i) => (
-            <div key={i.id} className="px-3 py-2 flex items-start gap-2">
-              <div className="min-w-0 flex-1">
-                <div className="text-[12.5px] font-medium truncate">{i.stage.replace(/_/g, " ")}</div>
-                <div className="text-[11px] text-muted">{i.scheduledAt ? dateTime(i.scheduledAt) : "unscheduled"}</div>
-                {i.notes ? <div className="text-[11px] text-faint mt-0.5">{i.notes}</div> : null}
+          {rows.map((i) => {
+            const open = openId === i.id;
+            const when = i.occurredAt || i.scheduledAt;
+            return (
+              <div key={i.id} className="px-3 py-2">
+                <div className="flex items-start gap-2">
+                  <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setOpenId(open ? null : i.id)}>
+                    <div className="text-[12.5px] font-medium truncate">
+                      {i.title || i.stage.replace(/_/g, " ")}
+                      {i.outcome ? <span className="text-muted font-normal"> · {i.outcome}</span> : null}
+                    </div>
+                    <div className="text-[11px] text-muted">
+                      {i.interviewerName ? `${i.interviewerName}${i.interviewerRole ? ` · ${i.interviewerRole}` : ""} · ` : ""}
+                      {when ? dateTime(when) : "unscheduled"}
+                      {(i.transcriptChars ?? 0) > 0 ? ` · transcript ${i.transcriptChars!.toLocaleString()}c` : ""}
+                      {i.aiBriefedAt ? " · AI brief" : ""}
+                    </div>
+                    {i.notes && !open ? <div className="text-[11px] text-faint mt-0.5 line-clamp-2">{i.notes}</div> : null}
+                  </button>
+                  <select
+                    aria-label="Interview status"
+                    value={i.status}
+                    onChange={(e) => void setStatus(i.id, e.target.value)}
+                    className="h-7 rounded-md border border-border bg-bg px-1.5 text-[11px] text-muted"
+                  >
+                    {INTERVIEW_STATUSES.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                  <IconBtn label="Delete interview" onClick={() => remove(i.id)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </IconBtn>
+                </div>
+                {open ? <InterviewRoundBody positionId={positionId} row={i} onBrief={() => void brief(i.id)} /> : null}
               </div>
-              <select
-                aria-label="Interview status"
-                value={i.status}
-                onChange={(e) => void setStatus(i.id, e.target.value)}
-                className="h-7 rounded-md border border-border bg-bg px-1.5 text-[11px] text-muted"
-              >
-                {INTERVIEW_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-              <IconBtn label="Delete interview" onClick={() => remove(i.id)}>
-                <Trash2 className="h-3.5 w-3.5" />
-              </IconBtn>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className="px-3 py-2 text-[12px] text-faint">No interviews logged.</div>
@@ -931,8 +1022,21 @@ function InterviewsPanel({ positionId }: { positionId: string }) {
             </option>
           ))}
         </Select>
-        <Input label="When" type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
+        <Input label="Title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="TA screen — Ryan Zubal" />
+        <Input label="Interviewer" value={interviewerName} onChange={(e) => setInterviewerName(e.target.value)} />
+        <Input label="Interviewer role" value={interviewerRole} onChange={(e) => setInterviewerRole(e.target.value)} placeholder="Talent Sourcing Manager" />
+        <Input label="Scheduled" type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
+        <Input label="Occurred" type="datetime-local" value={occurredAt} onChange={(e) => setOccurredAt(e.target.value)} />
+        <Select label="Outcome" value={outcome} onChange={(e) => setOutcome(e.target.value)}>
+          <option value="">unset</option>
+          {INTERVIEW_OUTCOMES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </Select>
         <Input label="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
+        <Textarea label="Transcript" value={transcript} onChange={(e) => setTranscript(e.target.value)} placeholder="Paste merged transcript — queues an AI brief vs the JD" className="min-h-[72px]" />
         <div className="flex justify-end">
           <Btn variant="primary" type="submit" disabled={busy}>
             Add

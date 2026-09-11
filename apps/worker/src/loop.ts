@@ -22,6 +22,7 @@ import {
   runMaterials,
   runRetention,
   runTriage,
+  runInterviewBrief,
   scanBoard,
   type JobRow,
 } from "@job-scout/core";
@@ -30,7 +31,7 @@ import { log as rootLog } from "@job-scout/shared";
 
 const log = rootLog.child({ scope: "worker" });
 
-const LLM_TYPES: JobType[] = ["triage", "evaluate", "materials", "company_research", "jd_review", "listing_classify", "form_answers"];
+const LLM_TYPES: JobType[] = ["triage", "evaluate", "materials", "company_research", "jd_review", "listing_classify", "form_answers", "interview_brief"];
 
 export async function processJob(job: JobRow): Promise<Record<string, unknown>> {
   const p = job.payload as Record<string, unknown>;
@@ -47,7 +48,7 @@ export async function processJob(job: JobRow): Promise<Record<string, unknown>> 
     case "triage":
       return (await runTriage(String(p.positionId), { force: Boolean(p.force) })) as unknown as Record<string, unknown>;
     case "evaluate":
-      return await runEvaluate(String(p.positionId));
+      return await runEvaluate(String(p.positionId), { auto: Boolean(p.auto) });
     case "materials":
       return await runMaterials(String(p.positionId), { surface: p.surface ? String(p.surface) : null, auto: Boolean(p.auto) });
     case "company_research":
@@ -58,6 +59,8 @@ export async function processJob(job: JobRow): Promise<Record<string, unknown>> 
       return (await runFormAnswers(String(p.positionId))) as unknown as Record<string, unknown>;
     case "listing_classify":
       return (await runListingClassify(String(p.positionId))) as unknown as Record<string, unknown>;
+    case "interview_brief":
+      return (await runInterviewBrief(String(p.positionId), String(p.interviewId))) as unknown as Record<string, unknown>;
     case "retention":
       return (await runRetention()) as unknown as Record<string, unknown>;
     default:

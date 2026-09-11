@@ -12,6 +12,7 @@ import {
 } from "@job-scout/db";
 import { HOT_STATUSES, type AutopilotConfig } from "@job-scout/shared";
 import { enqueueJob } from "./jobs.js";
+import { getPosition } from "./positions.js";
 import { getSettings } from "./settings.js";
 import { addEvent } from "./timeline.js";
 import { log as rootLog } from "@job-scout/shared";
@@ -93,10 +94,17 @@ export function afterEvaluate(ctx: {
   verdict: "apply" | "consider" | "skip";
   headline: string;
   status: PositionStatus;
+  expectedUpdatedAt?: string;
 }) {
   return safe("afterEvaluate", ctx, async (c, cfg) => {
     const out: Record<string, unknown> = {};
     if (!["triaged", "review", "materials"].includes(c.status)) return out;
+    if (c.expectedUpdatedAt) {
+      const current = await getPosition(c.positionId);
+      if (!current || current.updatedAt.toISOString() !== c.expectedUpdatedAt || current.status !== c.status || current.listingStatus === "closed" || current.metadata?.quarantined) {
+        return { autopilotSkipped: "position_changed" };
+      }
+    }
     if (cfg.companyResearch.mode !== "off" && !(await hasFreshResearch(c.companyId, cfg.companyResearch.staleDays))) {
       const q = await enqueueJob(
         "company_research",

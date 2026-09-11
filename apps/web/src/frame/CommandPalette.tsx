@@ -56,7 +56,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         run: async () => {
           const r = await post<{ enqueued: number }>("/api/v1/radar/boards/scan-all");
           toast.success(`Discovery queued for ${r.enqueued} boards`);
-          qc.invalidateQueries({ queryKey: ["today"] });
+          void qc.invalidateQueries({ queryKey: ["today"] });
         },
       },
       { kind: "nav", id: "today", label: "Today", to: "/today" },
@@ -87,10 +87,10 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
 
   const run = async (it: Item) => {
     onClose();
-    if (it.kind === "nav") navigate({ to: it.to, search: it.search as never });
+    if (it.kind === "nav") void navigate({ to: it.to, search: it.search as never });
     else if (it.kind === "action") await it.run();
-    else if (it.kind === "position") navigate({ to: "/positions/$id", params: { id: it.row.slug } });
-    else if (it.kind === "company") navigate({ to: "/companies/$id", params: { id: it.row.slug } });
+    else if (it.kind === "position") void navigate({ to: "/positions/$id", params: { id: it.row.slug } });
+    else if (it.kind === "company") void navigate({ to: "/companies/$id", params: { id: it.row.slug } });
   };
 
   if (!open) return null;

@@ -29,6 +29,8 @@ job-scout **is** the MCP server; there is no separate process. Every capability 
 | `get_profile` / `get_identity` | operator profile / identity + master resume + scout brief markdown |
 | `list_activity` | timeline events, optionally for one position |
 | `list_changes` | positions and evaluations updated after an ISO timestamp — the sync primitive |
+| `list_interviews` | rounds for a position (slim: metadata + char counts, not transcript bodies) |
+| `get_interview` | one round with notes, review, transcript, AI brief |
 
 ### Write
 
@@ -39,6 +41,8 @@ job-scout **is** the MCP server; there is no separate process. Every capability 
 | `update_position` | PATCH status, priority, notes, nextAction, resumeSurface, watchEnabled, appliedAt |
 | `set_position_status` | any pipeline status; `archived` requires a reason |
 | `log_activity` | append a timeline note |
+| `upsert_interview` | create/patch a screen or interview (transcript queues an AI brief unless `skipBrief`) |
+| `brief_interview` | queue or `sync` the `interview_brief` model vs JD + company pack |
 | `run_llm` | run `triage` / `evaluate` / `materials` / `jd_review` synchronously with the model from Settings › AI |
 | `run_discovery_radar` | enqueue board scans for due boards (`all=true` forces every enabled board) |
 | `promote_discovery` | create a position from a discovery row and triage it |

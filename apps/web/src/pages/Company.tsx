@@ -30,7 +30,7 @@ export function CompanyPage() {
   async function scan(bid: string) {
     await post(`/api/v1/radar/boards/${bid}/scan?force=1`);
     toast.success("Scan queued");
-    qc.invalidateQueries({ queryKey: ["radar"] });
+    void qc.invalidateQueries({ queryKey: ["radar"] });
   }
 
   if (q.isLoading) return <Page><Loading rows={6} /></Page>;
@@ -162,4 +162,3 @@ export function CompanyPage() {
     </Page>
   );
 }
-

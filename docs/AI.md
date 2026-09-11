@@ -12,6 +12,7 @@ job-scout talks to one OpenAI-compatible gateway (`OPENAI_BASE_URL`, `OPENAI_API
 | `jd_review` | a material JD change; you | mid | what changed and whether it matters → `evaluations(kind=jd_review)` |
 | `materials` | you, autopilot, MCP | strong | tailored resume + cover markdown → `application_materials` (surface: ai / sre / platform) |
 | `chat` | the dock chat | strong, streaming, tool calls | thread messages → `chat_threads` |
+| `interview_brief` | transcript (or notes) stored on a round; Position › Interviews › AI brief; MCP `brief_interview` | same class as evaluate (inherits that model if unset) | markdown debrief + JSON (jd hits/misses, signals, next-round prep) → `interviews.ai_brief_*` |
 
 Settings › AI: per operation a **model** (from the cached `/v1/models` catalog, refreshable), **enabled**, **daily cap** (0 = none), optional **temperature**. `POST /settings/llm/test` runs a smoke prompt on any model. Settings › AI also lists recent runs with latency, tokens and status. **Retry failed** (`POST /settings/llm/retry`) re-enqueues the latest failed ops in a window; `scope=failed_and_missing` also triages open positions with no successful triage. It does not re-run successful evaluate/materials. Daily caps still apply.
 

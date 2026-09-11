@@ -1,7 +1,7 @@
 {
   "name": "job-scout",
   "private": true,
-  "version": "2.5.0",
+  "version": "2.6.0",
   "type": "module",
   "packageManager": "pnpm@9.15.0",
   "scripts": {
@@ -18,7 +18,8 @@
     "bench:models": "tsx scripts/bench-models.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "lint": "echo ok"
+    "lint": "eslint apps packages scripts",
+    "lint:strict": "pnpm lint --max-warnings 0"
   },
   "workspaces": [
     "apps/*",
@@ -50,6 +51,8 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@job-scout/lint-config": "workspace:*",
+    "eslint": "10.10.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/bcryptjs": "^3.0.0",
     "@types/node": "^26.2.0",

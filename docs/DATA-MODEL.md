@@ -12,8 +12,8 @@ Schema: `packages/db/src/schema.ts` (drizzle). Migrations: `packages/db/migratio
 | **EvaluationKind** | `evaluate` · `jd_review` · `company_research` |
 | **ListingStatus** | `open` · `changed` · `closed` · `paused` |
 | **DiscoveryLane** | `passed` · `marginal` · `filtered` |
-| **JobType** | `board_scan` `watch_check` `scan_url` `triage` `evaluate` `materials` `company_research` `jd_review` `retention` |
-| **LlmOperation** | `triage` `evaluate` `materials` `company_research` `jd_review` `chat` (+ `test`) |
+| **JobType** | `board_scan` `watch_check` `scan_url` `triage` `evaluate` `materials` `company_research` `jd_review` `listing_classify` `form_answers` `interview_brief` `retention` |
+| **LlmOperation** | `triage` `evaluate` `materials` `company_research` `jd_review` `chat` `listing_classify` `form_answers` `interview_brief` (+ `test`) |
 | **ApprovalKind / Status** | `status_suggestion` `materials_draft` `archive_suggestion` / `pending` `approved` `dismissed` `expired` |
 | **ChatScope** | `global` · `position` · `company` |
 
@@ -30,7 +30,7 @@ Schema: `packages/db/src/schema.ts` (drizzle). Migrations: `packages/db/migratio
 | `evaluations` | one row per LLM report: `kind`, `model`, `markdown`, `summary` JSON, score/verdict; `position_id` or `company_id` |
 | `application_materials` | `kind` resume / cover, `version`, markdown, surface + keyword coverage in metadata |
 | `application_questions` | Q&A drafts for application forms |
-| `people`, `interviews`, `outreach_events` | contacts, scheduled interviews (Today › Interviews), outreach log |
+| `people`, `interviews`, `outreach_events` | contacts; interview rounds (stage, interviewer, outcome, transcript, same-day review, AI brief vs JD/company pack); outreach log |
 
 ### Radar
 

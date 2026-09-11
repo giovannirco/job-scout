@@ -162,8 +162,8 @@ export function TodayPage() {
                           scope: "failed_and_missing",
                         });
                         toast.success(`Retry queued: ${r.items.length} jobs`);
-                        qc.invalidateQueries({ queryKey: ["today"] });
-                        qc.invalidateQueries({ queryKey: ["llm"] });
+                        void qc.invalidateQueries({ queryKey: ["today"] });
+                        void qc.invalidateQueries({ queryKey: ["llm"] });
                       } catch (e) {
                         toast.error(e instanceof Error ? e.message : "Retry failed");
                       }
@@ -367,4 +367,3 @@ function DecisionList({ rows }: { rows: TodaySlim[] }) {
     </div>
   );
 }
-

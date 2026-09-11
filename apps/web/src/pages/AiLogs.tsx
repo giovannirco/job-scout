@@ -129,7 +129,7 @@ export function AiLogsPage() {
             defaultValue={search.q || ""}
             placeholder="Search prompt, response or error…"
             onKeyDown={(e) => {
-              if (e.key === "Enter") setSearch({ q: (e.target as HTMLInputElement).value || undefined });
+              if (e.key === "Enter") void setSearch({ q: (e.target as HTMLInputElement).value || undefined });
             }}
             className="h-7 w-[240px] rounded-md border border-border bg-surface px-2 text-[12px]"
           />

@@ -14,6 +14,7 @@ export const LLM_OPERATION_IDS = [
   "chat",
   "listing_classify",
   "form_answers",
+  "interview_brief",
 ] as const;
 export type LlmOperationId = (typeof LLM_OPERATION_IDS)[number];
 
@@ -232,6 +233,7 @@ export const DEFAULT_SETTINGS: Settings = {
       chat: { model: "", enabled: true, dailyCap: 400 },
       listing_classify: { model: "", enabled: true, dailyCap: 200 },
       form_answers: { model: "", enabled: true, dailyCap: 40 },
+      interview_brief: { model: "", enabled: true, dailyCap: 40 },
     },
     modelsCatalog: [],
     modelsCatalogCachedAt: null,

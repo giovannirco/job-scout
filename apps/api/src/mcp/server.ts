@@ -537,6 +537,122 @@ export function createJobScoutMcpServer() {
     },
   );
 
+  server.registerTool(
+    "list_interviews",
+    {
+      title: "List interviews",
+      description: "Interview rounds for a position (screen, hiring manager, technical). Slim: metadata + char counts, not transcript bodies. Use get_interview for the corpus.",
+      inputSchema: { idOrSlug: z.string() },
+      annotations: { readOnlyHint: true },
+    },
+    async (a) => {
+      const p = await getPositionDetail(a.idOrSlug);
+      if (!p) return text({ error: "not found" }, true);
+      const { listInterviews } = await import("@job-scout/core");
+      return text(await listInterviews(p.id));
+    },
+  );
+
+  server.registerTool(
+    "get_interview",
+    {
+      title: "Get one interview round",
+      description: "Full round: notes, review, transcript, AI brief vs JD/company pack.",
+      inputSchema: { idOrSlug: z.string(), interviewId: z.string() },
+      annotations: { readOnlyHint: true },
+    },
+    async (a) => {
+      const p = await getPositionDetail(a.idOrSlug);
+      if (!p) return text({ error: "not found" }, true);
+      const { getInterview } = await import("@job-scout/core");
+      const row = await getInterview(p.id, a.interviewId);
+      return row ? text(row) : text({ error: "not found" }, true);
+    },
+  );
+
+  server.registerTool(
+    "upsert_interview",
+    {
+      title: "Create or update an interview round",
+      description:
+        "Store a screen/interview: stage, interviewer, outcome, notes, review, transcript. If transcriptMarkdown is set, queues an AI brief against the JD and company pack unless skipBrief=true. Pass id to patch an existing round.",
+      inputSchema: {
+        idOrSlug: z.string(),
+        id: z.string().optional(),
+        stage: z.string().optional(),
+        title: z.string().optional(),
+        interviewerName: z.string().optional(),
+        interviewerRole: z.string().optional(),
+        scheduledAt: z.string().optional(),
+        occurredAt: z.string().optional(),
+        durationSeconds: z.number().optional(),
+        status: z.string().optional(),
+        outcome: z.string().optional(),
+        notes: z.string().optional(),
+        notesMarkdown: z.string().optional(),
+        reviewMarkdown: z.string().optional(),
+        transcriptMarkdown: z.string().optional(),
+        transcriptSource: z.string().optional(),
+        sourcePath: z.string().optional(),
+        skipBrief: z.boolean().optional(),
+      },
+    },
+    async (a) => {
+      const p = await getPositionDetail(a.idOrSlug);
+      if (!p) return text({ error: "not found" }, true);
+      const { addInterview, patchInterview } = await import("@job-scout/core");
+      const input = {
+        stage: a.stage,
+        title: a.title,
+        interviewerName: a.interviewerName,
+        interviewerRole: a.interviewerRole,
+        scheduledAt: a.scheduledAt,
+        occurredAt: a.occurredAt,
+        durationSeconds: a.durationSeconds,
+        status: a.status,
+        outcome: a.outcome,
+        notes: a.notes,
+        notesMarkdown: a.notesMarkdown,
+        reviewMarkdown: a.reviewMarkdown,
+        transcriptMarkdown: a.transcriptMarkdown,
+        transcriptSource: a.transcriptSource,
+        sourcePath: a.sourcePath,
+        skipBrief: a.skipBrief,
+      };
+      try {
+        if (a.id) {
+          const row = await patchInterview(p.id, a.id, input);
+          return row ? text(row) : text({ error: "not found" }, true);
+        }
+        return text(await addInterview(p.id, input));
+      } catch (e) {
+        return errText(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "brief_interview",
+    {
+      title: "AI-brief an interview",
+      description:
+        "Run (or queue) the interview_brief model: reasoned view of this round vs the JD, company pack, and candidate identity. Default queues a worker job; sync=true runs in-process.",
+      inputSchema: { idOrSlug: z.string(), interviewId: z.string(), sync: z.boolean().optional() },
+    },
+    async (a) => {
+      const p = await getPositionDetail(a.idOrSlug);
+      if (!p) return text({ error: "not found" }, true);
+      const { enqueueInterviewBrief, runInterviewBrief } = await import("@job-scout/core");
+      try {
+        if (a.sync) return text(await runInterviewBrief(p.id, a.interviewId));
+        const q = await enqueueInterviewBrief(p.id, a.interviewId);
+        return q ? text({ jobId: q.id, deduped: q.deduped }) : text({ error: "not found" }, true);
+      } catch (e) {
+        return errText(e);
+      }
+    },
+  );
+
   return server;
 }
 

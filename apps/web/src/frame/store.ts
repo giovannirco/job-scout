@@ -117,6 +117,6 @@ export function useChatScope(scope: ChatScopeCtx | null) {
     if (!scope) return;
     setUi({ chatScope: scope });
     return () => setUi({ chatScope: { scope: "global" } });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Scope identity is represented by key; do not reset for a new object reference.
   }, [key]);
 }

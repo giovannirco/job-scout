@@ -93,10 +93,12 @@ export async function reconcileBoardSources({ dryRun = true } = {}) {
 }
 
 /** A network abort is a transient condition, not evidence a board moved. */
-export function boardErrorKind(error?: string | null): "missing" | "transient" | "none" {
+export type BoardErrorKind = "missing" | "transient" | "auth" | "unknown" | "none";
+export function boardErrorKind(error?: string | null): BoardErrorKind {
   if (!error?.trim()) return "none";
   // Trailing \w* matters: the recorded value is "aborted", not "abort".
-  return /\b(404|not found|gone|410)\b/i.test(error) ? "missing"
-    : /\b(abort\w*|time\s?d?\s?out\w*|etimedout|econn\w*|esocket\w*|socket\w*|network\w*|enotfound|eai_again|503|502|504|429)\b/i.test(error) ? "transient"
-    : "missing";
+  return /\b(401|403|unauthorized|forbidden)\b/i.test(error) ? "auth"
+    : /\b(404|not found|gone|410)\b/i.test(error) ? "missing"
+    : /\b(abort\w*|time\s?d?\s?out\w*|etimedout|econn\w*|esocket\w*|socket\w*|network\w*|enotfound|eai_again|5\d\d|429)\b|fetch failed/i.test(error) ? "transient"
+    : "unknown";
 }

@@ -58,7 +58,7 @@ export function PipelinePage() {
               className="relative"
               onSubmit={(e) => {
                 e.preventDefault();
-                set({ q: q.trim() || undefined });
+                void set({ q: q.trim() || undefined });
               }}
             >
               <Search className="h-3.5 w-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-faint" />
@@ -85,7 +85,7 @@ export function PipelinePage() {
             value={preset || "custom"}
             onChange={(v) => {
               const p = PRESETS.find((x) => x.value === v);
-              if (p) set({ verdict: p.params.verdict, status: p.params.status, sort: p.params.sort, view: s.view });
+              if (p) void set({ verdict: p.params.verdict, status: p.params.status, sort: p.params.sort, view: s.view });
             }}
             options={[...PRESETS.map((p) => ({ value: p.value, label: p.label })), ...(preset ? [] : [{ value: "custom" as const, label: "Custom" }])]}
           />
@@ -173,7 +173,7 @@ function PositionsTable({ rows }: { rows: PositionRow[] }) {
   const search = useSearch({ from: "/pipeline" });
   const [cursor, setCursor] = useState<number>(-1);
   function sortTo(next: string) {
-    navigate({ search: (prev) => ({ ...prev, sort: next, page: undefined }) });
+    void navigate({ search: (prev) => ({ ...prev, sort: next, page: undefined }) });
   }
 
   // j / k / enter navigate the list; o opens the posting
@@ -183,7 +183,7 @@ function PositionsTable({ rows }: { rows: PositionRow[] }) {
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || e.metaKey || e.ctrlKey) return;
       if (e.key === "j") setCursor((c) => Math.min(rows.length - 1, c + 1));
       else if (e.key === "k") setCursor((c) => Math.max(0, c - 1));
-      else if (e.key === "Enter" && cursor >= 0 && rows[cursor]) navigate({ to: "/positions/$id", params: { id: rows[cursor]!.slug } });
+      else if (e.key === "Enter" && cursor >= 0 && rows[cursor]) void navigate({ to: "/positions/$id", params: { id: rows[cursor]!.slug } });
       else if (e.key === "o" && cursor >= 0 && rows[cursor]?.primaryUrl) window.open(rows[cursor]!.primaryUrl!, "_blank", "noreferrer");
     };
     window.addEventListener("keydown", onKey);
@@ -307,7 +307,7 @@ function Board({ rows }: { rows: PositionRow[] }) {
             onDrop={() => {
               if (!drag) return;
               const r = rows.find((x) => x.id === drag);
-              if (r && r.status !== col) m.mutateAsync({ id: drag, status: col }).then(() => toast.success(`Moved to ${STATUS_LABEL[col]}`));
+              if (r && r.status !== col) m.mutateAsync({ id: drag, status: col }).then(() => toast.success(`Moved to ${STATUS_LABEL[col]}`)).catch(e => toast.error(e instanceof Error ? e.message : "Move failed"));
               setDrag(null);
             }}
           >

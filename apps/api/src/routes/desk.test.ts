@@ -141,6 +141,29 @@ describe("desk API on pglite", () => {
     expect(empty.data).toEqual([]);
   });
 
+  it("stores a transcript on an interview round", async () => {
+    const created = await app.request(`/api/v1/positions/${acmeId}/interviews`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        stage: "screen",
+        title: "TA screen",
+        interviewerName: "Ryan",
+        outcome: "advanced",
+        status: "completed",
+        transcriptMarkdown: "Ryan: hello\nAlex: hi",
+        skipBrief: true,
+      }),
+    });
+    expect(created.status).toBe(201);
+    const row = (await json<{ id: string; outcome: string; transcriptMarkdown: string; briefJobId: string | null }>(created)).data;
+    expect(row.outcome).toBe("advanced");
+    expect(row.transcriptMarkdown).toContain("Ryan:");
+    expect(row.briefJobId).toBeNull();
+    const one = await json<{ interviewerName: string }>(await app.request(`/api/v1/positions/${acmeId}/interviews/${row.id}`));
+    expect(one.data.interviewerName).toBe("Ryan");
+  });
+
   it("today funnel counts last 30d by status and applied this week", async () => {
     const { getDb, positions } = await import("@job-scout/db");
     const { eq } = await import("drizzle-orm");

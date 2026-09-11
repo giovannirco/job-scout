@@ -122,7 +122,7 @@ function Frame() {
         onClose={() => setUi({ addOpen: false })}
         onCreated={(p) => {
           setUi({ addOpen: false });
-          navigate({ to: "/positions/$id", params: { id: p.slug } });
+          void navigate({ to: "/positions/$id", params: { id: p.slug } });
         }}
       />
     </div>
@@ -339,8 +339,8 @@ function AddUrlModal({ open, onClose, onCreated }: { open: boolean; onClose: () 
     try {
       const p = await post<PositionRow>("/api/v1/positions", { url: url.trim(), companyName: company.trim() || undefined });
       toast.success(`${p.company?.name || "Position"} added — triage queued`);
-      qc.invalidateQueries({ queryKey: ["positions"] });
-      qc.invalidateQueries({ queryKey: ["today"] });
+      void qc.invalidateQueries({ queryKey: ["positions"] });
+      void qc.invalidateQueries({ queryKey: ["today"] });
       setUrl("");
       setCompany("");
       onCreated(p);

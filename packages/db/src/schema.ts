@@ -322,6 +322,7 @@ export const JOB_TYPES = [
   "jd_review",
   "listing_classify",
   "form_answers",
+  "interview_brief",
   "retention",
 ] as const;
 export type JobType = (typeof JOB_TYPES)[number];
@@ -362,19 +363,38 @@ export const people = pgTable("people", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const interviews = pgTable("interviews", {
-  id: text("id").primaryKey(),
-  positionId: text("position_id")
-    .notNull()
-    .references(() => positions.id, { onDelete: "cascade" }),
-  stage: text("stage").notNull().default("screen"),
-  scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
-  status: text("status").notNull().default("pending"),
-  notes: text("notes"),
-  metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const interviews = pgTable(
+  "interviews",
+  {
+    id: text("id").primaryKey(),
+    positionId: text("position_id")
+      .notNull()
+      .references(() => positions.id, { onDelete: "cascade" }),
+    stage: text("stage").notNull().default("screen"),
+    title: text("title"),
+    interviewerName: text("interviewer_name"),
+    interviewerRole: text("interviewer_role"),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }),
+    durationSeconds: integer("duration_seconds"),
+    status: text("status").notNull().default("pending"),
+    outcome: text("outcome"),
+    notes: text("notes"),
+    notesMarkdown: text("notes_markdown"),
+    reviewMarkdown: text("review_markdown"),
+    transcriptMarkdown: text("transcript_markdown"),
+    transcriptSource: text("transcript_source"),
+    aiBriefMarkdown: text("ai_brief_markdown"),
+    aiBriefJson: jsonb("ai_brief_json").$type<Record<string, unknown>>(),
+    aiBriefModel: text("ai_brief_model"),
+    aiBriefedAt: timestamp("ai_briefed_at", { withTimezone: true }),
+    sourcePath: text("source_path"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("interviews_position_idx").on(t.positionId)],
+);
 
 export const outreachEvents = pgTable("outreach_events", {
   id: text("id").primaryKey(),
@@ -485,6 +505,7 @@ export const LLM_OPERATIONS = [
   "test",
   "listing_classify",
   "form_answers",
+  "interview_brief",
 ] as const;
 export type LlmOperation = (typeof LLM_OPERATIONS)[number];
 

@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -6,6 +6,8 @@ import { and, eq } from "drizzle-orm";
 import { boardSources, closeDb, getDb, id } from "@job-scout/db";
 import { bootstrap } from "./bootstrap.js";
 import { BOARD_MIGRATIONS, boardErrorKind, reconcileBoardSources, UNSUPPORTED_BOARDS } from "./board-reconcile.js";
+import { scanBoard } from "./scan.js";
+import { radarRoutes } from "../../../apps/api/src/routes/radar.js";
 
 const dir = mkdtempSync(join(tmpdir(), "job-scout-boards-"));
 const row = (provider: string, token: string, company: string, over: Record<string, unknown> = {}) =>
@@ -18,6 +20,7 @@ describe("board reconciliation", () => {
     await bootstrap({ seedBoards: false });
   });
   afterAll(async () => { await closeDb(); rmSync(dir, { recursive: true, force: true }); });
+  afterEach(() => { vi.unstubAllGlobals(); });
 
   it("moves a migrated board in place, keeping its id and history", async () => {
     const db = await getDb();
@@ -73,7 +76,32 @@ describe("board reconciliation", () => {
     expect(boardErrorKind("aborted")).toBe("transient");
     expect(boardErrorKind("ETIMEDOUT")).toBe("transient");
     expect(boardErrorKind("HTTP 503")).toBe("transient");
+    expect(boardErrorKind("fetch failed")).toBe("transient");
+    expect(boardErrorKind("HTTP 429")).toBe("transient");
+    expect(boardErrorKind("HTTP 403 Forbidden")).toBe("auth");
+    expect(boardErrorKind("HTTP 401 Unauthorized")).toBe("auth");
+    expect(boardErrorKind("invalid JSON at position 14")).toBe("unknown");
+    expect(boardErrorKind("unexpected provider response")).toBe("unknown");
     expect(boardErrorKind(null)).toBe("none");
+  });
+
+  it.each([[403, "auth"], [404, "missing"], [503, "transient"]] as const)("surfaces HTTP %s through scan results and board API", async (status, errorKind) => {
+    const db = await getDb();
+    const board = row("ashby", `error-${status}`, `Error ${status}`);
+    await db.insert(boardSources).values(board);
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("unavailable", { status })));
+    expect(await scanBoard(board.id)).toMatchObject({ errorKind });
+    const response = await radarRoutes.request("/boards");
+    const envelope = await response.json() as { data: Array<{ id: string; errorKind: string; lastError: string | null; enabled: boolean }> };
+    expect(envelope.data.find(b => b.id === board.id)).toMatchObject({ errorKind, enabled: true });
+    const patched = await radarRoutes.request(`/boards/${board.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ notes: "observed" }) });
+    expect(await patched.json()).toMatchObject({ data: { errorKind } });
+
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ jobs: [] }), { status: 200 })));
+    expect((await scanBoard(board.id)).error).toBeUndefined();
+    const recovered = await radarRoutes.request("/boards");
+    const rows = await recovered.json() as typeof envelope;
+    expect(rows.data.find(b => b.id === board.id)).toMatchObject({ errorKind: "none", lastError: null, enabled: true });
   });
 
   it("every migration and demotion is a distinct, verified entry", () => {

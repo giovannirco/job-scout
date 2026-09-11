@@ -1,25 +1,82 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { getDb, id, interviews } from "@job-scout/db";
+import { INTERVIEW_OUTCOMES, INTERVIEW_STATUSES, type InterviewOutcome, type InterviewStatus } from "@job-scout/shared";
+import { enqueueJob } from "./jobs.js";
 
-export const INTERVIEW_STATUSES = ["pending", "completed", "cancelled"] as const;
-export type InterviewStatus = (typeof INTERVIEW_STATUSES)[number];
+export { INTERVIEW_OUTCOMES, INTERVIEW_STAGES, INTERVIEW_STATUSES } from "@job-scout/shared";
+export type { InterviewOutcome, InterviewStage, InterviewStatus } from "@job-scout/shared";
 
 export type InterviewInput = {
   stage?: string;
+  title?: string | null;
+  interviewerName?: string | null;
+  interviewerRole?: string | null;
   scheduledAt?: string | Date | null;
+  occurredAt?: string | Date | null;
+  durationSeconds?: number | null;
   status?: string;
+  outcome?: string | null;
   notes?: string | null;
+  notesMarkdown?: string | null;
+  reviewMarkdown?: string | null;
+  transcriptMarkdown?: string | null;
+  transcriptSource?: string | null;
+  sourcePath?: string | null;
+  metadata?: Record<string, unknown> | null;
+  skipBrief?: boolean;
 };
 
 const INTERVIEW_ROW = {
   id: interviews.id,
   positionId: interviews.positionId,
   stage: interviews.stage,
+  title: interviews.title,
+  interviewerName: interviews.interviewerName,
+  interviewerRole: interviews.interviewerRole,
   scheduledAt: interviews.scheduledAt,
+  occurredAt: interviews.occurredAt,
+  durationSeconds: interviews.durationSeconds,
   status: interviews.status,
+  outcome: interviews.outcome,
   notes: interviews.notes,
+  notesMarkdown: interviews.notesMarkdown,
+  reviewMarkdown: interviews.reviewMarkdown,
+  transcriptMarkdown: interviews.transcriptMarkdown,
+  transcriptSource: interviews.transcriptSource,
+  aiBriefMarkdown: interviews.aiBriefMarkdown,
+  aiBriefJson: interviews.aiBriefJson,
+  aiBriefModel: interviews.aiBriefModel,
+  aiBriefedAt: interviews.aiBriefedAt,
+  sourcePath: interviews.sourcePath,
+  metadata: interviews.metadata,
   createdAt: interviews.createdAt,
   updatedAt: interviews.updatedAt,
+};
+
+const INTERVIEW_LIST_ROW = {
+  id: interviews.id,
+  positionId: interviews.positionId,
+  stage: interviews.stage,
+  title: interviews.title,
+  interviewerName: interviews.interviewerName,
+  interviewerRole: interviews.interviewerRole,
+  scheduledAt: interviews.scheduledAt,
+  occurredAt: interviews.occurredAt,
+  durationSeconds: interviews.durationSeconds,
+  status: interviews.status,
+  outcome: interviews.outcome,
+  notes: interviews.notes,
+  transcriptSource: interviews.transcriptSource,
+  aiBriefModel: interviews.aiBriefModel,
+  aiBriefedAt: interviews.aiBriefedAt,
+  sourcePath: interviews.sourcePath,
+  metadata: interviews.metadata,
+  createdAt: interviews.createdAt,
+  updatedAt: interviews.updatedAt,
+  transcriptChars: sql<number>`coalesce(char_length(${interviews.transcriptMarkdown}), 0)`.mapWith(Number),
+  reviewChars: sql<number>`coalesce(char_length(${interviews.reviewMarkdown}), 0)`.mapWith(Number),
+  notesMarkdownChars: sql<number>`coalesce(char_length(${interviews.notesMarkdown}), 0)`.mapWith(Number),
+  aiBriefChars: sql<number>`coalesce(char_length(${interviews.aiBriefMarkdown}), 0)`.mapWith(Number),
 };
 
 function trimOrNull(v: string | null | undefined): string | null {
@@ -28,11 +85,11 @@ function trimOrNull(v: string | null | undefined): string | null {
   return t ? t : null;
 }
 
-function parseScheduledAt(v: string | Date | null | undefined): Date | null | undefined {
+function parseWhen(v: string | Date | null | undefined): Date | null | undefined {
   if (v === undefined) return undefined;
   if (v === null || v === "") return null;
   const d = v instanceof Date ? v : new Date(v);
-  if (Number.isNaN(d.getTime())) throw new Error("scheduledAt must be ISO date");
+  if (Number.isNaN(d.getTime())) throw new Error("date must be ISO");
   return d;
 }
 
@@ -42,20 +99,60 @@ function parseStatus(v: string | undefined, fallback: InterviewStatus): Intervie
   return v as InterviewStatus;
 }
 
+function parseOutcome(v: string | null | undefined): InterviewOutcome | null | undefined {
+  if (v === undefined) return undefined;
+  if (v == null || v === "") return null;
+  if (!(INTERVIEW_OUTCOMES as readonly string[]).includes(v)) throw new Error(`outcome must be ${INTERVIEW_OUTCOMES.join("|")}`);
+  return v as InterviewOutcome;
+}
+
+function parseDuration(v: number | null | undefined): number | null | undefined {
+  if (v === undefined) return undefined;
+  if (v == null) return null;
+  if (!Number.isFinite(v) || v < 0) throw new Error("durationSeconds must be >= 0");
+  return Math.round(v);
+}
+
 export async function listInterviews(positionId: string) {
   const db = await getDb();
   return db
-    .select(INTERVIEW_ROW)
+    .select(INTERVIEW_LIST_ROW)
     .from(interviews)
     .where(eq(interviews.positionId, positionId))
-    .orderBy(sql`${interviews.scheduledAt} asc nulls last`, desc(interviews.createdAt));
+    .orderBy(sql`${interviews.occurredAt} asc nulls last`, sql`${interviews.scheduledAt} asc nulls last`, desc(interviews.createdAt));
+}
+
+export async function getInterview(positionId: string, interviewId: string) {
+  const db = await getDb();
+  return (
+    await db
+      .select(INTERVIEW_ROW)
+      .from(interviews)
+      .where(and(eq(interviews.id, interviewId), eq(interviews.positionId, positionId)))
+      .limit(1)
+  )[0] ?? null;
+}
+
+export async function getInterviewById(interviewId: string) {
+  const db = await getDb();
+  return (await db.select(INTERVIEW_ROW).from(interviews).where(eq(interviews.id, interviewId)).limit(1))[0] ?? null;
+}
+
+async function maybeEnqueueBrief(positionId: string, interviewId: string, transcript: string | null, skip?: boolean) {
+  if (skip || !transcript?.trim()) return null;
+  const q = await enqueueJob("interview_brief", { positionId, interviewId }, { dedupeKey: `interview_brief:${interviewId}`, priority: 25 });
+  return q.id;
 }
 
 export async function addInterview(positionId: string, input: InterviewInput) {
   const stage = (input.stage || "screen").trim();
   if (!stage) throw new Error("stage required");
   const status = parseStatus(input.status, "pending");
-  const scheduledAt = parseScheduledAt(input.scheduledAt);
+  const scheduledAt = parseWhen(input.scheduledAt);
+  const occurredAt = parseWhen(input.occurredAt);
+  const outcome = parseOutcome(input.outcome);
+  const durationSeconds = parseDuration(input.durationSeconds);
+  const transcriptMarkdown = trimOrNull(input.transcriptMarkdown);
   const db = await getDb();
   const iid = id("iv");
   const now = new Date();
@@ -63,16 +160,28 @@ export async function addInterview(positionId: string, input: InterviewInput) {
     id: iid,
     positionId,
     stage,
+    title: trimOrNull(input.title),
+    interviewerName: trimOrNull(input.interviewerName),
+    interviewerRole: trimOrNull(input.interviewerRole),
     scheduledAt: scheduledAt === undefined ? null : scheduledAt,
+    occurredAt: occurredAt === undefined ? null : occurredAt,
+    durationSeconds: durationSeconds === undefined ? null : durationSeconds,
     status,
+    outcome: outcome === undefined ? null : outcome,
     notes: trimOrNull(input.notes),
-    metadata: {},
+    notesMarkdown: trimOrNull(input.notesMarkdown),
+    reviewMarkdown: trimOrNull(input.reviewMarkdown),
+    transcriptMarkdown,
+    transcriptSource: trimOrNull(input.transcriptSource),
+    sourcePath: trimOrNull(input.sourcePath),
+    metadata: input.metadata ?? {},
     createdAt: now,
     updatedAt: now,
   });
   const row = (await db.select(INTERVIEW_ROW).from(interviews).where(eq(interviews.id, iid)))[0];
   if (!row) throw new Error("interview insert failed");
-  return row;
+  const briefJobId = await maybeEnqueueBrief(positionId, iid, transcriptMarkdown, input.skipBrief);
+  return { ...row, briefJobId };
 }
 
 export async function patchInterview(positionId: string, interviewId: string, input: InterviewInput) {
@@ -85,24 +194,35 @@ export async function patchInterview(positionId: string, interviewId: string, in
       .limit(1)
   )[0];
   if (!existing) return null;
-  const patch: { stage?: string; scheduledAt?: Date | null; status?: string; notes?: string | null; updatedAt: Date } = {
-    updatedAt: new Date(),
-  };
+  const patch: Record<string, unknown> = { updatedAt: new Date() };
   if (input.stage !== undefined) {
     const stage = input.stage.trim();
     if (!stage) throw new Error("stage required");
     patch.stage = stage;
   }
+  if (input.title !== undefined) patch.title = trimOrNull(input.title);
+  if (input.interviewerName !== undefined) patch.interviewerName = trimOrNull(input.interviewerName);
+  if (input.interviewerRole !== undefined) patch.interviewerRole = trimOrNull(input.interviewerRole);
   if (input.status !== undefined) patch.status = parseStatus(input.status, existing.status as InterviewStatus);
-  if (input.scheduledAt !== undefined) patch.scheduledAt = parseScheduledAt(input.scheduledAt) ?? null;
+  if (input.scheduledAt !== undefined) patch.scheduledAt = parseWhen(input.scheduledAt) ?? null;
+  if (input.occurredAt !== undefined) patch.occurredAt = parseWhen(input.occurredAt) ?? null;
+  if (input.durationSeconds !== undefined) patch.durationSeconds = parseDuration(input.durationSeconds) ?? null;
+  if (input.outcome !== undefined) patch.outcome = parseOutcome(input.outcome) ?? null;
   if (input.notes !== undefined) patch.notes = trimOrNull(input.notes);
-  if (patch.stage === undefined && patch.status === undefined && patch.scheduledAt === undefined && patch.notes === undefined) {
-    throw new Error("nothing to update");
-  }
+  if (input.notesMarkdown !== undefined) patch.notesMarkdown = trimOrNull(input.notesMarkdown);
+  if (input.reviewMarkdown !== undefined) patch.reviewMarkdown = trimOrNull(input.reviewMarkdown);
+  if (input.transcriptMarkdown !== undefined) patch.transcriptMarkdown = trimOrNull(input.transcriptMarkdown);
+  if (input.transcriptSource !== undefined) patch.transcriptSource = trimOrNull(input.transcriptSource);
+  if (input.sourcePath !== undefined) patch.sourcePath = trimOrNull(input.sourcePath);
+  if (input.metadata !== undefined) patch.metadata = input.metadata ?? {};
+  const keys = Object.keys(patch).filter((k) => k !== "updatedAt");
+  if (!keys.length) throw new Error("nothing to update");
   await db.update(interviews).set(patch).where(eq(interviews.id, interviewId));
   const row = (await db.select(INTERVIEW_ROW).from(interviews).where(eq(interviews.id, interviewId)))[0];
   if (!row) throw new Error("interview update failed");
-  return row;
+  const transcript = input.transcriptMarkdown !== undefined ? row.transcriptMarkdown : null;
+  const briefJobId = await maybeEnqueueBrief(positionId, interviewId, transcript, input.skipBrief);
+  return { ...row, briefJobId };
 }
 
 export async function deleteInterview(positionId: string, interviewId: string) {
@@ -117,4 +237,13 @@ export async function deleteInterview(positionId: string, interviewId: string) {
   if (!row) return false;
   await db.delete(interviews).where(eq(interviews.id, interviewId));
   return true;
+}
+
+export async function enqueueInterviewBrief(positionId: string, interviewId: string) {
+  const row = await getInterview(positionId, interviewId);
+  if (!row) return null;
+  if (!row.transcriptMarkdown?.trim() && !row.notesMarkdown?.trim() && !row.notes?.trim()) {
+    throw new Error("interview has no transcript or notes to brief");
+  }
+  return enqueueJob("interview_brief", { positionId, interviewId }, { dedupeKey: `interview_brief:${interviewId}`, priority: 20 });
 }

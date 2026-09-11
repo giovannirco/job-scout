@@ -30,6 +30,9 @@ import {
   addInterview,
   patchInterview,
   deleteInterview,
+  getInterview,
+  enqueueInterviewBrief,
+  runInterviewBrief,
   reconcileCareerOps,
 } from "@job-scout/core";
 import type { EvaluationKind } from "@job-scout/db";
@@ -262,4 +265,30 @@ positionsRoutes.delete("/:id/interviews/:interviewId", async (c) => {
   if (!p) return fail(c, "NOT_FOUND", "position not found");
   const gone = await deleteInterview(p.id, c.req.param("interviewId"));
   return gone ? ok(c, { deleted: true }) : fail(c, "NOT_FOUND", "interview not found");
+});
+
+positionsRoutes.get("/:id/interviews/:interviewId", async (c) => {
+  const p = await getPosition(c.req.param("id"));
+  if (!p) return fail(c, "NOT_FOUND", "position not found");
+  const row = await getInterview(p.id, c.req.param("interviewId"));
+  return row ? ok(c, row) : fail(c, "NOT_FOUND", "interview not found");
+});
+
+positionsRoutes.post("/:id/interviews/:interviewId/brief", async (c) => {
+  const p = await getPosition(c.req.param("id"));
+  if (!p) return fail(c, "NOT_FOUND", "position not found");
+  const interviewId = c.req.param("interviewId");
+  const sync = c.req.query("sync") === "1";
+  try {
+    if (!sync) {
+      const q = await enqueueInterviewBrief(p.id, interviewId);
+      if (!q) return fail(c, "NOT_FOUND", "interview not found");
+      return ok(c, { jobId: q.id, deduped: q.deduped, action: "interview_brief" }, {}, 202);
+    }
+    const result = await runInterviewBrief(p.id, interviewId);
+    return ok(c, result);
+  } catch (e) {
+    if (e instanceof LlmGateError) return fail(c, "LLM_GATE", e.message, { code: e.code });
+    return fail(c, "VALIDATION_ERROR", e instanceof Error ? e.message : String(e));
+  }
 });

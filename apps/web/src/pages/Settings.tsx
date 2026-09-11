@@ -83,7 +83,7 @@ function ProfileTab() {
     const { id: _id, ...rest } = f as Profile;
     void _id;
     await patch("/api/v1/settings/profile", rest);
-    qc.invalidateQueries({ queryKey: ["profile"] });
+    void qc.invalidateQueries({ queryKey: ["profile"] });
     toast.success("Profile saved");
   }
   if (q.isLoading || !q.data) return <Loading rows={6} />;
@@ -159,7 +159,7 @@ function GateTab() {
 
   async function save() {
     await patch("/api/v1/settings", { gate, triage, scan });
-    qc.invalidateQueries({ queryKey: ["settings"] });
+    void qc.invalidateQueries({ queryKey: ["settings"] });
     toast.success("Gate saved");
   }
 
@@ -228,6 +228,7 @@ const OP_HELP: Record<string, string> = {
   test: "Smoke calls from this page.",
   listing_classify: "Cheap pass when ATS workplace/geo is messy. Tightens to hard_geo only.",
   form_answers: "Draft application-form answers from profile + resume. Status stays open.",
+  interview_brief: "Debrief one round vs the JD and company pack. Same class as evaluate if unset.",
 };
 
 function AiTab() {
@@ -260,7 +261,7 @@ function AiTab() {
 
   async function save() {
     await patch("/api/v1/settings", { llm: { operations: draft, fallbackModel: fallback } });
-    qc.invalidateQueries({ queryKey: ["llm"] });
+    void qc.invalidateQueries({ queryKey: ["llm"] });
     toast.success("Models saved");
   }
   async function test(op: string) {
@@ -274,7 +275,7 @@ function AiTab() {
       toast.error(e instanceof Error ? e.message : "Failed");
     } finally {
       setTesting(null);
-      qc.invalidateQueries({ queryKey: ["llm"] });
+      void qc.invalidateQueries({ queryKey: ["llm"] });
     }
   }
   async function refreshCatalog() {
@@ -308,8 +309,8 @@ function AiTab() {
             try {
               const r = await post<{ items: unknown[] }>("/api/v1/settings/llm/retry", { hours: 24, scope: "failed_and_missing" });
               toast.success(`Retry queued: ${r.items.length} jobs`);
-              qc.invalidateQueries({ queryKey: ["today"] });
-              qc.invalidateQueries({ queryKey: ["llm"] });
+              void qc.invalidateQueries({ queryKey: ["today"] });
+              void qc.invalidateQueries({ queryKey: ["llm"] });
             } catch (e) {
               toast.error(e instanceof Error ? e.message : "Retry failed");
             }
@@ -520,15 +521,15 @@ function AutopilotTab() {
 
   async function applyPreset(p: "manual" | "assisted" | "autopilot") {
     await post("/api/v1/settings/autopilot/preset", { preset: p });
-    qc.invalidateQueries({ queryKey: ["autopilot"] });
-    qc.invalidateQueries({ queryKey: ["settings"] });
+    void qc.invalidateQueries({ queryKey: ["autopilot"] });
+    void qc.invalidateQueries({ queryKey: ["settings"] });
     toast.success(`Autopilot set to ${p}`);
   }
   async function save() {
     if (!cfg) return;
     await patch("/api/v1/settings", { autopilot: { ...cfg, preset: "custom" } });
-    qc.invalidateQueries({ queryKey: ["autopilot"] });
-    qc.invalidateQueries({ queryKey: ["settings"] });
+    void qc.invalidateQueries({ queryKey: ["autopilot"] });
+    void qc.invalidateQueries({ queryKey: ["settings"] });
     toast.success("Autopilot saved");
   }
   const set = (patchCfg: Partial<AutopilotConfig>) => setCfg((c) => (c ? { ...c, ...patchCfg } : c));
@@ -745,7 +746,7 @@ function SystemTab() {
 
   async function saveRet() {
     await patch("/api/v1/settings", { retention: ret });
-    qc.invalidateQueries({ queryKey: ["settings"] });
+    void qc.invalidateQueries({ queryKey: ["settings"] });
     toast.success("Retention saved");
   }
   async function runRetention() {
@@ -755,17 +756,17 @@ function SystemTab() {
   async function enqueue(type: string) {
     await post("/api/v1/settings/system/jobs", { type });
     toast.success(`${type} queued`);
-    qc.invalidateQueries({ queryKey: ["system"] });
+    void qc.invalidateQueries({ queryKey: ["system"] });
   }
   async function createToken() {
     const r = await post<{ token: string }>("/api/v1/settings/tokens", { name: tokName });
     setNewTok(r.token);
     setTokName("");
-    qc.invalidateQueries({ queryKey: ["tokens"] });
+    void qc.invalidateQueries({ queryKey: ["tokens"] });
   }
   async function revoke(id: string) {
     await del(`/api/v1/settings/tokens/${id}`);
-    qc.invalidateQueries({ queryKey: ["tokens"] });
+    void qc.invalidateQueries({ queryKey: ["tokens"] });
   }
 
   const stats = sys.data?.jobs || [];
@@ -911,8 +912,7 @@ function SystemTab() {
               <IconBtn
                 label="Copy token"
                 onClick={() => {
-                  navigator.clipboard.writeText(newTok);
-                  toast.success("Copied");
+                  navigator.clipboard.writeText(newTok).then(() => toast.success("Copied")).catch(() => toast.error("Could not copy token"));
                 }}
               >
                 <Copy className="h-3.5 w-3.5" />

@@ -300,9 +300,9 @@ describe("core on pglite", () => {
     expect(parsed[0]?.required).toBe(true);
   });
 
-  it("moves archived and triaged to review after evaluate", async () => {
+  it("moves only triaged to review after evaluate", async () => {
     const { nextStatusAfterEvaluate } = await import("./evaluate.js");
-    expect(nextStatusAfterEvaluate("archived")).toBe("review");
+    expect(nextStatusAfterEvaluate("archived")).toBe("archived");
     expect(nextStatusAfterEvaluate("triaged")).toBe("review");
     expect(nextStatusAfterEvaluate("applied")).toBe("applied");
     expect(nextStatusAfterEvaluate("skip")).toBe("skip");
