@@ -4,9 +4,11 @@ import {
   Activity,
   Briefcase,
   Building2,
+  CalendarClock,
   ChevronsLeft,
   ChevronsRight,
   Inbox,
+  ListTodo,
   MessageSquareText,
   Moon,
   PanelRightClose,
@@ -96,6 +98,7 @@ function Frame() {
   const pending = today.data?.approvals.length ?? 0;
   const c = today.data?.counts.byStatus || {};
   const hot = ["review", "materials", "applied", "screen", "interview", "offer"].reduce((n, s) => n + (c[s] || 0), 0);
+  const process = ["applied", "screen", "interview", "offer"].reduce((n, s) => n + (c[s] || 0), 0);
   const running = (today.data?.queue || []).filter((q) => q.status === "running").reduce((n, q) => n + q.c, 0);
   const queued = (today.data?.queue || []).filter((q) => q.status === "queued").reduce((n, q) => n + q.c, 0);
 
@@ -103,7 +106,7 @@ function Frame() {
     <div className="h-full flex min-h-0 bg-bg">
       <Sidebar
         collapsed={ui.sidebarCollapsed}
-        counts={{ today: today.data?.decisions.length ?? 0, pipeline: hot, inbox: pending }}
+        counts={{ today: today.data?.decisions.length ?? 0, pipeline: hot, process, interviews: today.data?.upcoming.length ?? 0, inbox: pending }}
         footer={{ running, queued, llm24: (today.data?.llm.byOperation || []).reduce((n, r) => n + r.runs, 0) }}
       />
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
@@ -115,7 +118,7 @@ function Frame() {
           {ui.dockOpen ? <Dock /> : null}
         </div>
       </div>
-      <MobileNav counts={{ today: today.data?.decisions.length ?? 0, inbox: pending }} />
+      <MobileNav counts={{ today: today.data?.decisions.length ?? 0, process, interviews: today.data?.upcoming.length ?? 0, inbox: pending }} />
       <CommandPalette open={ui.paletteOpen} onClose={() => setUi({ paletteOpen: false })} />
       <AddUrlModal
         open={ui.addOpen}
@@ -134,6 +137,8 @@ function Frame() {
 const NAV = [
   { to: "/today", label: "Today", icon: Sun, key: "today" as const },
   { to: "/pipeline", label: "Pipeline", icon: Briefcase, key: "pipeline" as const },
+  { to: "/process", label: "Process", icon: ListTodo, key: "process" as const },
+  { to: "/interviews", label: "Interviews", icon: CalendarClock, key: "interviews" as const },
   { to: "/discovery", label: "Discovery", icon: Radar, key: null },
   { to: "/sources", label: "Sources", icon: Activity, key: null },
   { to: "/companies", label: "Companies", icon: Building2, key: null },
@@ -141,7 +146,15 @@ const NAV = [
   { to: "/ai-logs", label: "AI logs", icon: ScrollText, key: null },
 ];
 
-function Sidebar({ collapsed, counts, footer }: { collapsed: boolean; counts: { today: number; pipeline: number; inbox: number }; footer: { running: number; queued: number; llm24: number } }) {
+const MOBILE_NAV = [
+  { to: "/today", label: "Today", icon: Sun, key: "today" as const },
+  { to: "/pipeline", label: "Pipeline", icon: Briefcase, key: "pipeline" as const },
+  { to: "/process", label: "Process", icon: ListTodo, key: "process" as const },
+  { to: "/interviews", label: "Interviews", icon: CalendarClock, key: "interviews" as const },
+  { to: "/inbox", label: "Inbox", icon: Inbox, key: "inbox" as const },
+];
+
+function Sidebar({ collapsed, counts, footer }: { collapsed: boolean; counts: { today: number; pipeline: number; process: number; interviews: number; inbox: number }; footer: { running: number; queued: number; llm24: number } }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   return (
     <aside className={cn("hidden md:flex shrink-0 flex-col border-r border-border bg-surface transition-[width] duration-200", collapsed ? "w-[56px]" : "w-[208px]")}>
@@ -217,14 +230,14 @@ function Brand({ className }: { className?: string }) {
   );
 }
 
-function MobileNav({ counts }: { counts: { today: number; inbox: number } }) {
+function MobileNav({ counts }: { counts: { today: number; process: number; interviews: number; inbox: number } }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const items = [...NAV, { to: "/settings", label: "Settings", icon: Settings2, key: null }];
+  const items = [...MOBILE_NAV, { to: "/settings", label: "Settings", icon: Settings2, key: null }];
   return (
     <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-border bg-surface/95 backdrop-blur flex" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
       {items.map((n) => {
         const active = pathname === n.to || pathname.startsWith(n.to + "/");
-        const badge = n.key === "today" ? counts.today : n.key === "inbox" ? counts.inbox : 0;
+        const badge = n.key ? counts[n.key as keyof typeof counts] || 0 : 0;
         const Icon = n.icon;
         return (
           <Link key={n.to} to={n.to} className={cn("flex-1 flex flex-col items-center gap-0.5 py-2 text-[10px] relative", active ? "text-accent" : "text-muted")}>
@@ -316,7 +329,7 @@ function useCrumbs(): { label: string; to?: string }[] {
   const ui = useUi();
   const seg = pathname.split("/").filter(Boolean);
   const first = seg[0] || "today";
-  const names: Record<string, string> = { today: "Today", pipeline: "Pipeline", radar: "Radar", companies: "Companies", inbox: "Inbox", "ai-logs": "AI logs", settings: "Settings", positions: "Pipeline" };
+  const names: Record<string, string> = { today: "Today", pipeline: "Pipeline", process: "Process", interviews: "Interviews", radar: "Radar", companies: "Companies", inbox: "Inbox", "ai-logs": "AI logs", settings: "Settings", positions: "Pipeline" };
   const root = { label: names[first] || first, to: first === "positions" ? "/pipeline" : `/${first}` };
   if (seg.length === 1) return [{ label: root.label }];
   if (first === "positions" && ui.chatScope.scope === "position") return [root, { label: ui.chatScope.label }];

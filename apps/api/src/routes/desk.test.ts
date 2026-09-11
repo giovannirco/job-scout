@@ -162,6 +162,19 @@ describe("desk API on pglite", () => {
     expect(row.briefJobId).toBeNull();
     const one = await json<{ interviewerName: string }>(await app.request(`/api/v1/positions/${acmeId}/interviews/${row.id}`));
     expect(one.data.interviewerName).toBe("Ryan");
+
+    const desk = await json<{ interviewerName: string; companyName: string; positionSlug: string }[]>(await app.request("/api/v1/interviews?q=Ryan"));
+    expect(desk.data.some((r) => r.interviewerName === "Ryan" && r.companyName === "Acme")).toBe(true);
+  });
+
+  it("process desk lists live loops with rounds", async () => {
+    const { patchPosition } = await import("@job-scout/core");
+    await patchPosition(acmeId, { status: "interview", nextAction: "HM calendar" }, "test");
+    const listed = await json<{ id: string; status: string; roundCount: number; company: { name: string } }[]>(await app.request("/api/v1/processes"));
+    const row = listed.data.find((p) => p.id === acmeId);
+    expect(row?.status).toBe("interview");
+    expect(row?.company.name).toBe("Acme");
+    expect(row?.roundCount).toBeGreaterThanOrEqual(1);
   });
 
   it("today funnel counts last 30d by status and applied this week", async () => {

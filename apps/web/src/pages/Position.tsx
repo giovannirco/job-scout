@@ -4,6 +4,7 @@ import { Archive, Check, Eye, EyeOff, ExternalLink, FileText, MessageSquareText,
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { GeoChip, ListingBadge, ScoreMeter, STATUS_LABEL, STATUS_PATH, STATUS_TERMINAL, STATUS_TONE, verdictTone } from "@/components/badges";
+import { InterviewRoundBody } from "@/components/interview-round";
 import { Markdown } from "@/components/markdown";
 import { StatusMenu, useStatusChange } from "@/components/status-menu";
 import { openDock, useChatScope } from "@/frame/store";
@@ -841,48 +842,6 @@ function ContactsPanel({ positionId }: { positionId: string }) {
   );
 }
 
-function InterviewRoundBody({ positionId, row, onBrief }: { positionId: string; row: Interview; onBrief: () => void }) {
-  const q = useApi<Interview>(["interview", positionId, row.id], `/api/v1/positions/${positionId}/interviews/${row.id}`);
-  const i = q.data;
-  if (q.isLoading && !i) return <div className="mt-2 text-[11px] text-faint">Loading round…</div>;
-  if (!i) return <div className="mt-2 text-[11px] text-bad">Could not load round.</div>;
-  const transcriptChars = i.transcriptMarkdown?.length ?? row.transcriptChars ?? 0;
-  const canBrief = Boolean(i.transcriptMarkdown || i.notesMarkdown || i.notes);
-  return (
-    <div className="mt-2 space-y-2 text-[12px]">
-      {i.notesMarkdown || i.notes ? (
-        <div>
-          <div className="text-[10.5px] uppercase tracking-wide text-faint mb-1">Notes</div>
-          <Markdown compact>{i.notesMarkdown || i.notes || ""}</Markdown>
-        </div>
-      ) : null}
-      {i.reviewMarkdown ? (
-        <div>
-          <div className="text-[10.5px] uppercase tracking-wide text-faint mb-1">Review</div>
-          <Markdown compact>{i.reviewMarkdown}</Markdown>
-        </div>
-      ) : null}
-      {i.transcriptMarkdown ? (
-        <details>
-          <summary className="cursor-pointer text-muted">Transcript ({transcriptChars.toLocaleString()} chars)</summary>
-          <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap font-mono text-[11px] text-muted">{i.transcriptMarkdown}</pre>
-        </details>
-      ) : null}
-      {i.aiBriefMarkdown ? (
-        <div>
-          <div className="text-[10.5px] uppercase tracking-wide text-faint mb-1">AI brief {i.aiBriefModel ? `· ${i.aiBriefModel}` : ""}</div>
-          <Markdown compact>{i.aiBriefMarkdown}</Markdown>
-        </div>
-      ) : null}
-      <div className="flex justify-end">
-        <Btn size="xs" onClick={onBrief} disabled={!canBrief}>
-          <Sparkles className="h-3 w-3" /> {i.aiBriefMarkdown ? "Re-run AI brief" : "AI brief"}
-        </Btn>
-      </div>
-    </div>
-  );
-}
-
 function InterviewsPanel({ positionId }: { positionId: string }) {
   const qc = useQueryClient();
   const q = useApi<Interview[]>(["interviews", positionId], `/api/v1/positions/${positionId}/interviews`);
@@ -950,19 +909,18 @@ function InterviewsPanel({ positionId }: { positionId: string }) {
     refresh();
   }
 
-  async function brief(id: string) {
-    try {
-      await post(`/api/v1/positions/${positionId}/interviews/${id}/brief`);
-      toast("AI brief queued");
-      refresh();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed");
-    }
-  }
-
   const rows = q.data || [];
   return (
-    <Panel title="Interviews" meta={rows.length ? String(rows.length) : undefined} flush>
+    <Panel
+      title="Interviews"
+      meta={rows.length ? String(rows.length) : undefined}
+      actions={
+        <Link to="/interviews" className="text-[11.5px] text-muted hover:text-fg">
+          All rounds
+        </Link>
+      }
+      flush
+    >
       {rows.length ? (
         <div className="divide-y divide-border/60">
           {rows.map((i) => {
@@ -1000,7 +958,7 @@ function InterviewsPanel({ positionId }: { positionId: string }) {
                     <Trash2 className="h-3.5 w-3.5" />
                   </IconBtn>
                 </div>
-                {open ? <InterviewRoundBody positionId={positionId} row={i} onBrief={() => void brief(i.id)} /> : null}
+                {open ? <InterviewRoundBody positionId={positionId} row={i} onBrief={refresh} /> : null}
               </div>
             );
           })}

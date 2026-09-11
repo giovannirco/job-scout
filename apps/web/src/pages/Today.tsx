@@ -114,7 +114,16 @@ export function TodayPage() {
         </div>
 
         <div className="space-y-5 min-w-0">
-          <Panel title="Interviews" meta={d.upcoming.length ? `${d.upcoming.length}` : undefined} flush>
+          <Panel
+            title="Interviews"
+            meta={d.upcoming.length ? `${d.upcoming.length}` : undefined}
+            actions={
+              <Link to="/interviews" className="text-[11.5px] text-muted hover:text-fg inline-flex items-center gap-1">
+                All <ArrowRight className="h-3 w-3" />
+              </Link>
+            }
+            flush
+          >
             {d.upcoming.length === 0 ? (
               <div className="px-3 py-3 text-[12px] text-faint">None scheduled.</div>
             ) : (

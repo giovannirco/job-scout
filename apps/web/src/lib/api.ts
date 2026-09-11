@@ -255,6 +255,44 @@ export type Interview = {
   briefJobId?: string | null;
   createdAt: string;
   updatedAt: string;
+  positionTitle?: string;
+  positionSlug?: string;
+  positionStatus?: string;
+  companyName?: string;
+  companySlug?: string;
+};
+
+export type ProcessRound = {
+  id: string;
+  stage: string;
+  title: string | null;
+  interviewerName: string | null;
+  scheduledAt: string | null;
+  occurredAt: string | null;
+  status: string;
+  outcome: string | null;
+  transcriptChars: number;
+  aiBriefChars: number;
+  aiBriefedAt: string | null;
+};
+
+export type ProcessRow = {
+  id: string;
+  slug: string;
+  title: string;
+  status: string;
+  priority: string;
+  nextAction: string | null;
+  notes: string | null;
+  appliedAt: string | null;
+  updatedAt: string;
+  company: { id: string; slug: string; name: string };
+  roundCount: number;
+  pendingCount: number;
+  completedCount: number;
+  lastRound: ProcessRound | null;
+  nextRound: ProcessRound | null;
+  rounds: ProcessRound[];
 };
 
 export type ActivityRow = {

@@ -26,6 +26,13 @@ curl -H "Authorization: Bearer dev-agent-token" http://localhost:8080/api/v1/tod
 | GET | `/today` | decisions, follow-ups, changed, upcoming interviews, counts by status + last30d + appliedThisWeek, queue, LLM usage, pending approvals, recent activity |
 | GET | `/today/changes?since=&limit=` | positions/evaluations changed after an ISO time (default 24 h) |
 
+### Process / Interviews desk
+
+| method | path | notes |
+|--|--|--|
+| GET | `/interviews` | all rounds, slim. `lane` `all\|upcoming\|completed\|needs_brief`, `stage`, `q` (company/role/interviewer) |
+| GET | `/processes` | live loops (`applied` `screen` `interview` `offer`) with round timeline, next/last round, `nextAction` |
+
 ### Positions
 
 | method | path | notes |

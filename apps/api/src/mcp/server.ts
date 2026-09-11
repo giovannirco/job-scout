@@ -538,6 +538,34 @@ export function createJobScoutMcpServer() {
   );
 
   server.registerTool(
+    "list_processes",
+    {
+      title: "List live processes",
+      description: "Positions in applied/screen/interview/offer with round timeline, nextAction, last/next round. The process desk.",
+      inputSchema: {},
+      annotations: { readOnlyHint: true },
+    },
+    async () => {
+      const { listProcesses } = await import("@job-scout/core");
+      return text(await listProcesses());
+    },
+  );
+
+  server.registerTool(
+    "list_all_interviews",
+    {
+      title: "List all interview rounds",
+      description: "Desk of every round across positions. Slim (no transcript bodies). lane=upcoming|completed|needs_brief|all. Use get_interview for the corpus.",
+      inputSchema: { lane: z.string().optional(), q: z.string().optional(), stage: z.string().optional() },
+      annotations: { readOnlyHint: true },
+    },
+    async (a) => {
+      const { listAllInterviews } = await import("@job-scout/core");
+      return text(await listAllInterviews({ lane: a.lane, q: a.q, stage: a.stage }));
+    },
+  );
+
+  server.registerTool(
     "list_interviews",
     {
       title: "List interviews",

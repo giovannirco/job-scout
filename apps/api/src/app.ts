@@ -16,6 +16,7 @@ import { positionsRoutes } from "./routes/positions.js";
 import { radarRoutes } from "./routes/radar.js";
 import { settingsRoutes } from "./routes/settings.js";
 import { todayRoutes } from "./routes/today.js";
+import { interviewsDeskRoutes, processesRoutes } from "./routes/process.js";
 import { handleClip } from "./routes/clip.js";
 
 const log = rootLog.child({ scope: "http" });
@@ -84,6 +85,8 @@ export function createApp() {
   app.get("/api/v1/auth/status", authStatus);
 
   app.route("/api/v1/today", todayRoutes);
+  app.route("/api/v1/interviews", interviewsDeskRoutes);
+  app.route("/api/v1/processes", processesRoutes);
   app.route("/api/v1/positions", positionsRoutes);
   app.route("/api/v1/companies", companiesRoutes);
   app.route("/api/v1/radar", radarRoutes);

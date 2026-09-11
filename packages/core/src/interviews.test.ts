@@ -90,4 +90,25 @@ describe("interviews corpus", () => {
     expect(slim?.transcriptChars).toBeGreaterThan(0);
     expect("transcriptMarkdown" in (slim ?? {})).toBe(false);
   });
+
+  it("lists every round on the desk and live processes after a status bump", async () => {
+    const { addInterview, listAllInterviews, listProcesses } = await import("./interviews.js");
+    const { patchPosition } = await import("./positions.js");
+    await addInterview(positionId, {
+      stage: "screen",
+      title: "desk round",
+      interviewerName: "Ada",
+      status: "completed",
+      occurredAt: "2026-09-01T12:00:00.000Z",
+      skipBrief: true,
+    });
+    const all = await listAllInterviews({ q: "Ada" });
+    expect(all.some((r) => r.interviewerName === "Ada" && r.companyName === "Acme")).toBe(true);
+    await patchPosition(positionId, { status: "interview" }, "test");
+    const processes = await listProcesses();
+    const mine = processes.find((p) => p.id === positionId);
+    expect(mine?.status).toBe("interview");
+    expect(mine?.roundCount).toBeGreaterThanOrEqual(1);
+    expect(mine?.company.name).toBe("Acme");
+  });
 });

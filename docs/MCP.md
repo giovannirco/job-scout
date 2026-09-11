@@ -29,6 +29,8 @@ job-scout **is** the MCP server; there is no separate process. Every capability 
 | `get_profile` / `get_identity` | operator profile / identity + master resume + scout brief markdown |
 | `list_activity` | timeline events, optionally for one position |
 | `list_changes` | positions and evaluations updated after an ISO timestamp — the sync primitive |
+| `list_processes` | live loops (applied/screen/interview/offer) with round timeline |
+| `list_all_interviews` | every round across positions (`lane`, `q`, `stage`); slim |
 | `list_interviews` | rounds for a position (slim: metadata + char counts, not transcript bodies) |
 | `get_interview` | one round with notes, review, transcript, AI brief |
 

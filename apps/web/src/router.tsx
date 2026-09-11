@@ -9,6 +9,8 @@ import { PositionPage } from "./pages/Position";
 import { RadarPage } from "./pages/Radar";
 import { SettingsPage } from "./pages/Settings";
 import { TodayPage } from "./pages/Today";
+import { InterviewsPage } from "./pages/Interviews";
+import { ProcessPage } from "./pages/Process";
 
 const rootRoute = createRootRoute({ component: RootLayout });
 
@@ -21,6 +23,29 @@ const indexRoute = createRoute({
 });
 
 const todayRoute = createRoute({ getParentRoute: () => rootRoute, path: "/today", component: TodayPage });
+
+export type InterviewsSearch = { lane?: string; q?: string; stage?: string; id?: string };
+const interviewsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/interviews",
+  component: InterviewsPage,
+  validateSearch: (s: Record<string, unknown>): InterviewsSearch => ({
+    lane: typeof s.lane === "string" && s.lane ? s.lane : undefined,
+    q: typeof s.q === "string" && s.q ? s.q : undefined,
+    stage: typeof s.stage === "string" && s.stage ? s.stage : undefined,
+    id: typeof s.id === "string" && s.id ? s.id : undefined,
+  }),
+});
+
+export type ProcessSearch = { id?: string };
+const processRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/process",
+  component: ProcessPage,
+  validateSearch: (s: Record<string, unknown>): ProcessSearch => ({
+    id: typeof s.id === "string" && s.id ? s.id : undefined,
+  }),
+});
 
 export type PipelineSearch = {
   q?: string;
@@ -146,6 +171,8 @@ const settingsRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   indexRoute,
   todayRoute,
+  processRoute,
+  interviewsRoute,
   pipelineRoute,
   radarRoute,
   discoveryRoute,
