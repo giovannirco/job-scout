@@ -267,6 +267,8 @@ export const Settings = z.object({
   usPlaceGeoVersion: z.string().nullable().optional(),
   /** One-shot: discovery rows for an archived filing leave the passed lane. */
   archivedDiscoveryVersion: z.string().nullable().optional(),
+  /** One-shot: a hyphen glued to a word gets a space, as in "Engineer- Money". */
+  titleHyphenVersion: z.string().nullable().optional(),
 });
 export type Settings = z.infer<typeof Settings>;
 

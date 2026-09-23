@@ -101,6 +101,15 @@ export async function bootstrap(opts: { seedBoards?: boolean } = {}) {
         })
         .catch((e) => log.error("bootstrap.blank-greenhouse.failed", { err: e }));
     }
+    if (stored.titleHyphenVersion !== "1") {
+      const { trimStoredTitles } = await import("./positions.js");
+      await trimStoredTitles()
+        .then(async (r) => {
+          await updateSettings({ titleHyphenVersion: "1" });
+          if (r.updated) log.info("bootstrap.title-hyphen", r);
+        })
+        .catch((e) => log.error("bootstrap.title-hyphen.failed", { err: e }));
+    }
     if (stored.junkPlaceVersion !== "1") {
       const { refetchJunkPlaceFilings } = await import("./scan.js");
       await refetchJunkPlaceFilings()
