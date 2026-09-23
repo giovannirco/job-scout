@@ -105,6 +105,7 @@ export function CompanyPage() {
                     <Th>Title</Th>
                     <Th w={110}>Signal</Th>
                     <Th>Status</Th>
+                    <Th right>Posted</Th>
                     <Th right>Seen</Th>
                   </tr>
                 </thead>
@@ -180,6 +181,9 @@ function PositionRow({ p, muted, onOpen }: { p: CompanyDetail["positions"][numbe
           <StatusBadge status={p.status} />
           <ListingBadge status={p.listingStatus} />
         </span>
+      </Td>
+      <Td right mono className="text-muted" title={p.postedAt || undefined}>
+        {p.postedAt ? ago(p.postedAt) : <span className="text-faint">—</span>}
       </Td>
       <Td right mono className="text-muted">
         {p.firstSeenAt ? ago(p.firstSeenAt) : <span className="text-faint">—</span>}

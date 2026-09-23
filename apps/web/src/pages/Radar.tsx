@@ -179,6 +179,9 @@ function Discovery({ search, set, summary }: { search: RadarSearch; set: (p: Par
               <Th>{lane === "filtered" ? "Gate reason" : "Craft"}</Th>
               <Th>In pipeline</Th>
               <Th right>
+                <SortHead label="Posted" field="posted" sort={search.sort} onSort={(n) => set({ sort: n })} />
+              </Th>
+              <Th right>
                 <SortHead label="Seen" field="observed" sort={search.sort} onSort={(n) => set({ sort: n })} />
               </Th>
               <Th w={110} />
@@ -221,6 +224,9 @@ function Discovery({ search, set, summary }: { search: RadarSearch; set: (p: Par
                   ) : (
                     <span className="text-faint">—</span>
                   )}
+                </Td>
+                <Td right mono className="text-muted" title={r.postedAt || undefined}>
+                  {r.postedAt ? ago(r.postedAt) : <span className="text-faint">—</span>}
                 </Td>
                 <Td right mono className="text-muted">
                   {ago(r.observedAt)}

@@ -33,7 +33,7 @@ export async function listDiscovery(q: {
     if (!Number.isNaN(d.getTime())) conds.push(sql`${discoveryFeed.observedAt} < ${d}`);
   }
   const where = conds.length ? and(...conds) : undefined;
-  const { field, dir } = parseListSort(q.sort, ["observed", "title", "company", "location", "lane"], "observed", "desc");
+  const { field, dir } = parseListSort(q.sort, ["observed", "posted", "title", "company", "location", "lane"], "observed", "desc");
   const ranked = db
     .select({
       id: discoveryFeed.id,
@@ -48,6 +48,7 @@ export async function listDiscovery(q: {
       gateReason: discoveryFeed.gateReason,
       provider: discoveryFeed.provider,
       observedAt: discoveryFeed.observedAt,
+      postedAt: discoveryFeed.postedAt,
       positionId: discoveryFeed.positionId,
       positionSlug: positions.slug,
       positionStatus: positions.status,
@@ -73,7 +74,14 @@ export async function listDiscovery(q: {
           ? [d(ranked.locationRaw), desc(ranked.id)]
           : field === "lane"
             ? [d(ranked.lane), desc(ranked.observedAt)]
-            : [d(ranked.observedAt), desc(ranked.id)];
+            : field === "posted"
+              ? [
+                  dir === "asc"
+                    ? sql`${ranked.postedAt} ASC NULLS LAST`
+                    : sql`${ranked.postedAt} DESC NULLS LAST`,
+                  desc(ranked.id),
+                ]
+              : [d(ranked.observedAt), desc(ranked.id)];
   const rows = await db
     .select()
     .from(ranked)
