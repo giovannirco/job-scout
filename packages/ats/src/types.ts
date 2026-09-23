@@ -36,6 +36,8 @@ export type AtsJob = {
   updatedAt?: string;
   /** Application form question prompts when available */
   questions?: string[];
+  /** Structured prompts when the ATS named required, type, and choices. */
+  questionPrompts?: Array<{ question: string; required: boolean; inputType: string; options?: string[] }>;
   /** Set when the ATS form scrape ran and returned nothing usable */
   formHarvestError?: string;
   listingStatus: "open" | "closed" | "unknown";

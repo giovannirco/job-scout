@@ -9,6 +9,16 @@ export type { QuestionPrompt };
 export { parseApplicationQuestions, normalizeQuestion };
 
 export function promptsFromJob(job: AtsJob): QuestionPrompt[] {
+  if (job.questionPrompts?.length) {
+    return job.questionPrompts
+      .map((q) => ({
+        question: normalizeQuestion(q.question),
+        required: q.required,
+        inputType: q.inputType || "unknown",
+        ...(q.options?.length ? { options: q.options } : {}),
+      }))
+      .filter((p) => p.question);
+  }
   return (job.questions || []).map((q) => {
     const required = /\*\s*$/.test(q.trim());
     return { question: normalizeQuestion(q), required, inputType: "unknown" };
@@ -37,11 +47,15 @@ export async function harvestQuestions(positionId: string, prompts: QuestionProm
         inputType: p.inputType,
         status: "open",
         source: "ats",
+        metadata: p.options?.length ? { options: p.options } : {},
       });
       upserted++;
       continue;
     }
-    const set: Record<string, unknown> = { sortOrder: i, required: p.required, inputType: p.inputType, updatedAt: new Date() };
+    const prevMeta = { ...((prev.metadata || {}) as Record<string, unknown>) };
+    if (p.options?.length) prevMeta.options = p.options;
+    else delete prevMeta.options;
+    const set: Record<string, unknown> = { sortOrder: i, required: p.required, inputType: p.inputType, metadata: prevMeta, updatedAt: new Date() };
     if (prev.status !== "open") {
       /* keep answer */
     }
@@ -67,6 +81,30 @@ export async function listQuestions(positionId: string, q: { sort?: string } = {
     field === "question" ? applicationQuestions.question : field === "status" ? applicationQuestions.status : applicationQuestions.sortOrder;
   const order = dir === "asc" ? asc(col) : desc(col);
   return db.select().from(applicationQuestions).where(eq(applicationQuestions.positionId, positionId)).orderBy(order, applicationQuestions.id);
+}
+
+/** Re-read Greenhouse forms already on file. Does not write a new JD revision. */
+export async function repairGreenhouseForms(): Promise<{ checked: number; updated: number; failed: number }> {
+  const db = await getDb();
+  const rows = await db
+    .select({ id: positions.id, token: positions.atsBoardToken, jobId: positions.atsJobId, status: positions.status })
+    .from(positions)
+    .where(eq(positions.atsProvider, "greenhouse"));
+  const open = rows.filter((row) => row.status !== "archived" && row.token && row.jobId);
+  const { fetchGreenhouseJob } = await import("@job-scout/ats");
+  let updated = 0;
+  let failed = 0;
+  for (const row of open) {
+    try {
+      const job = await fetchGreenhouseJob(row.token!, row.jobId!);
+      if (!job.questionPrompts?.length) continue;
+      await harvestFromJob(row.id, job);
+      updated++;
+    } catch {
+      failed++;
+    }
+  }
+  return { checked: open.length, updated, failed };
 }
 
 export async function harvestFromJob(positionId: string, job: AtsJob): Promise<{ upserted: number }> {

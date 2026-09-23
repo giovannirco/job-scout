@@ -6,7 +6,7 @@ import {
   isPlaceholderJobId,
 } from "./detect.js";
 import type { AtsJob, BoardJobSummary, DetectedAts } from "./types.js";
-import { parseApplicationQuestions } from "./application-form.js";
+import { greenhouseQuestionPrompts, parseApplicationQuestions } from "./application-form.js";
 
 const UA =
   process.env.ATS_USER_AGENT ||
@@ -261,11 +261,8 @@ export async function fetchGreenhouseJob(
   };
   const html = data.content || "";
   const text = stripHtml(html);
-  const questions = (data.questions || [])
-    .map((q) => q.label || q.description || "")
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .slice(0, 40);
+  const questionPrompts = greenhouseQuestionPrompts(data.questions || []).slice(0, 40);
+  const questions = questionPrompts.map((q) => q.question);
   const offices = (data.offices || [])
     .map((o) => o.name || o.location || "")
     .filter(Boolean);
@@ -290,6 +287,7 @@ export async function fetchGreenhouseJob(
     postedAt: data.first_published,
     updatedAt: data.updated_at,
     questions,
+    questionPrompts,
     listingStatus: "open",
     rawPayload: {
       provider: "greenhouse",
@@ -418,11 +416,15 @@ export async function fetchAshbyJob(org: string, jobId: string, opts: { render?:
         const locationsJoined = ashbyListingLocation(job.location, job.secondaryLocations, job.address);
         const applyUrl = job.applyUrl || job.jobUrl || pageUrl;
         let questions: string[] | undefined;
+        let questionPrompts: ReturnType<typeof parseApplicationQuestions> | undefined;
         try {
           const form = await fetchText(applyUrl, { accept: "text/html" });
           if (form.ok) {
             const parsed = parseApplicationQuestions(form.body);
-            if (parsed.length) questions = parsed.map((p) => (p.required ? `${p.question}*` : p.question));
+            if (parsed.length) {
+              questions = parsed.map((p) => p.question);
+              questionPrompts = parsed;
+            }
           }
         } catch {
           /* SPA shell */
@@ -433,7 +435,10 @@ export async function fetchAshbyJob(org: string, jobId: string, opts: { render?:
             const html = rendered?.html;
             if (html) {
               const parsed = parseApplicationQuestions(html);
-              if (parsed.length) questions = parsed.map((p) => (p.required ? `${p.question}*` : p.question));
+              if (parsed.length) {
+                questions = parsed.map((p) => p.question);
+                questionPrompts = parsed;
+              }
             }
           } catch {
             /* harvest stays empty; Forms shows retry copy */
@@ -458,6 +463,7 @@ export async function fetchAshbyJob(org: string, jobId: string, opts: { render?:
           postedAt: job.publishedAt,
           listingStatus: job.isListed === false ? "closed" : "open",
           questions,
+          questionPrompts,
           formHarvestError: questions?.length ? undefined : "could not fetch form",
           rawPayload: {
             provider: "ashby",
