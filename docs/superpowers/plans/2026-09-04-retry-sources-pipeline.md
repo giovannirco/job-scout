@@ -1,5 +1,7 @@
 # Retry, sources, Pipeline timestamps Implementation Plan
 
+> Historical implementation plan from 2026-09-04. Current behavior is in `README.md` and `docs/`. This file is not kept in sync.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Ship 2.3.9: bulk retry of failed LLM ops, Remotive + crypto/remote ATS sources, Pipeline first-seen/changed columns.

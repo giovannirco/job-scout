@@ -34,13 +34,13 @@ Everything the model does is one of `triage`, `evaluate`, `materials`, `company_
 
 ## What the gate uses
 
-Saving **target roles** replaces the title include list and rechecks listings from the last 7 days. A specialty word such as `java` is its own term, so it does not match JavaScript. `engineer` and `developer` match each other. `junior` also excludes new grad and early career.
+Saving **target roles** replaces the title include list and rechecks listings from the last 7 days. A specialty word such as `java` is its own term, so it does not match JavaScript. `engineer` and `developer` match each other. A phrase such as `backend engineer` also matches `Backend/API Engineer` and `Engineer, Backend`. `junior` also excludes new grad, early career, and graduate.
 
-A **named office** (a city or country, with no remote wording) does not pass, even when unknown geo is allowed. A list of countries is not one office. A board that marks the job remote still passes.
+A **named office** (a city or country, with no remote wording) does not pass, even when unknown geo is allowed. A list of countries is not one office. A location that starts with remote or distributed stays remote even when later segments name cities. A board that marks the job remote still passes.
 
-A **US city** on the profile drops a remote role that requires another country, and it keeps a posting that says “Remote - US only”. A **Brazil** city drops US-only roles. Any other city does not filter. Clearing the location does not restore archived filings. The pipeline chip says **home** when a place restriction matches that city.
+A **US city** on the profile drops a remote role that requires another country, and it keeps a posting that says “Remote - US only”. A **Brazil** city drops US-only roles. Any other city does not filter. Clearing the location does not restore archived filings. The pipeline chip says **home** when the listing fits that market, or when the location names the profile city. A location that is only “Remote” is not home.
 
-The north star is for the model, once a key exists. The sentence “not infrastructure” also excludes infrastructure, Kubernetes, and DevOps titles with no key.
+The north star is for the model, once a key exists. The same paragraph also changes the title gate, and only through a fixed list of phrases. “Not infrastructure” excludes infrastructure, Kubernetes, DevOps, SRE, Linux, embedded, kernel, and the related words in `titleExcludesFromNorthStar` (OpenStack, Ceph, Ubuntu, container image, data platform, and the rest of that list). A paragraph that asks for backend and does not ask for frontend also excludes frontend. The same pattern excludes data engineer, and l3 support, solutions engineer, and quality engineer, unless the paragraph asks for those. Settings says when the paragraph uses none of those phrases, so it is not filtering listings.
 
 A job the board is still listing is not dropped because its first-published date is old. The 14-day age rule still applies when the listing was not just seen on a board.
 
@@ -48,11 +48,17 @@ An untouched scan filing that misses the gate is archived. A URL pasted by hand,
 
 ## Families
 
-The same company, role, and requisition collapse to one pipeline row. A country stuck on the end of the title (`| UK | Remote`) does not split them. Senior and Staff stay separate. The location cell shows the first open place and a count (`Germany (Remote) +4`); the full list is the tooltip. Archived copies are not part of that count. When every known salary uses one currency, the comp cell spans the low and the high across those places.
+The same company, role, and requisition collapse to one pipeline row. A country stuck on the end of the title (`| UK | Remote`) does not split them. Senior and Staff stay separate. The location cell shows the first open place and a count (`Germany (Remote) +4`); the full list is the tooltip. Archived copies are not part of that count. When every known salary uses one currency, the comp cell spans the low and the high across those places. When the family is posted in more than one currency, each currency is shown.
 
-Pay written as `$143,800.00 to $231,900.00` is read. A top amount that got glued to the next number (`$179,300,152`) is cut back to the band. A `$500` stipend is not a salary. Titles are trimmed. A board that cannot be listed, such as Bitso on BambooHR, stays off and the sources page says why.
+Pay written as `$143,800.00 to $231,900.00` is read. A top amount that got glued to the next number (`$179,300,152`) is cut back to the band. A `$500` stipend is not a salary. Titles are trimmed. Search matches the title, the company, the location, and a team stored on the listing (`metadata.ats.departments`).
 
-**Sources.** Discovery scans Greenhouse, Ashby, and Lever company boards plus the Remote OK public JSON feed (`https://remoteok.com/api`) and the We Work Remotely DevOps/Sysadmin RSS (`https://weworkremotely.com/categories/remote-devops-sysadmin-jobs.rss`), craft-filtered with `isCraftMatch`. Remote OK `sys admin` / `infosec` tags keep only when the title is craft. Other market indexes stay manual watches. A Settings bookmarklet POSTs the current tab (`url`, `title`, `body.innerText`) so LinkedIn/Indeed JDs survive login walls — stay on the listing; it does not log in or apply for you.
+**Sources.** Discovery scans Greenhouse, Ashby, Lever, and BambooHR company boards. Bitso is the BambooHR board `bitso` (`https://bitso.bamboohr.com/careers`); the old Greenhouse token is not scanned. Market list scans are the Remote OK public JSON feed (`https://remoteok.com/api`), the We Work Remotely DevOps/Sysadmin RSS (`https://weworkremotely.com/categories/remote-devops-sysadmin-jobs.rss`), and Remotive software-dev JSON (`https://remotive.com/api/remote-jobs?category=software-dev`), title-filtered with `isCraftMatch`. Remote OK `sys admin` / `infosec` tags keep only when the title is craft. Other market indexes stay manual watches. A Settings bookmarklet POSTs the current tab (`url`, `title`, `body.innerText`) so LinkedIn/Indeed JDs survive login walls — stay on the listing; it does not log in or apply for you.
+
+A `noise_rebase` revision is this app rewriting stored text. The JD tab labels it **rewritten here** and groups those snapshots apart from employer edits. When the board description is cut off mid-sentence, the JD tab says so and does not invent the rest.
+
+Leave the scout brief empty until you write one. A stored brief that still says “fill this in under settings” is treated as empty and is not sent to the model.
+
+Greenhouse and Ashby application questions are stored with required, input type, and choices. The Forms tab shows a menu, a checklist, or a note to upload the file on the employer site. Drafted answers stay here. The app does not submit the application.
 
 ## Autopilot
 
@@ -77,10 +83,14 @@ Dark/light. `⌘K` palette for positions, companies and actions. A right-hand do
 | page | what it is for |
 |--|--|
 | **Today** | funnel, unscored filings or PASS verdicts, approvals, JD changes, interviews, follow-ups, model usage and budget |
-| **Pipeline** | every position as a table (`j`/`k`/`Enter`/`o`) or a board; filters on status, verdict, workplace, geo |
-| **Discovery** | what the scanners saw: passed, filtered, board deltas, sources, watches |
-| **Companies** | grid or table, with research and positions per company. The careers link is the board, not one opening |
+| **Pipeline** | every position as a table (`j`/`k`/`Enter`/`o`) or a board; filters on status, verdict, workplace, geo (including home). Opens on the employer posted date |
+| **Process** | live loops (`applied`, `screen`, `interview`, `offer`) |
+| **Interviews** | rounds across positions: transcripts, reviews, AI briefs |
+| **Discovery** | what the scanners saw: passed, filtered, board deltas. Opens on the employer posted date |
+| **Sources** | boards and watches |
+| **Companies** | grid or table, with research and positions per company. The careers link is the board, not one opening. A company with no website links the careers host when that host is not the ATS |
 | **Inbox** | autopilot suggestions and drafts to approve or dismiss |
+| **AI logs** | recent model calls |
 | **Position** | status stepper · Brief · Evaluation · JD · Materials · Forms · Company · History |
 | **Settings** | Profile · Gate · AI models · Autopilot · **Notifications** (WhatsApp groups) · Appearance · System (queue, retention, tokens, job-scout Steel health) |
 
@@ -114,7 +124,7 @@ pnpm db:generate             # drizzle-kit: new migration from schema.ts
 ## Layout
 
 ```text
-apps/api/          Hono routes by resource · auth · mcp/ (29 tools) · serves the web bundle
+apps/api/          Hono routes by resource · auth · mcp/ (39 tools) · serves the web bundle
 apps/worker/       loop.ts (job types, retries, stale requeue) · once.ts (cron entry)
 apps/web/          React app — ui/kit.tsx primitives · frame/ (sidebar, dock, chat, palette) · pages/
 packages/core/     services shared by api + worker: positions, scan, triage, evaluate, materials,
@@ -122,7 +132,7 @@ packages/core/     services shared by api + worker: positions, scan, triage, eva
 packages/llm/      OpenAI-compatible client (json_schema, document, streaming tool calls) · prompts · scout brief
 packages/db/       drizzle schema + migrations · Postgres or PGlite client
 packages/shared/   gate · settings schema · classify · salary · hash · types
-packages/ats/      Greenhouse / Ashby / Lever / Remote OK JSON / generic HTML fetchers, optional browser renderer
+packages/ats/      Greenhouse / Ashby / Lever / BambooHR / Remote OK / Remotive / We Work Remotely / generic HTML fetchers, optional browser renderer
 packages/desk-ui/  vendored @desk-ui/api-client (fetch envelope + React Query hooks)
 deploy/            Dockerfile · compose · helm/job-scout (chart + dashboards/job-scout.json)
 scripts/           one-off importers (previous-generation database → current schema), model benchmark (`pnpm bench:models`, results in docs/benchmarks/)

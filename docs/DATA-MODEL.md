@@ -25,21 +25,21 @@ Schema: `packages/db/src/schema.ts` (drizzle). Migrations: `packages/db/migratio
 |--|--|
 | `companies` | slug, name, website, careers URL, industry tags, metadata (aliases, ATS tokens) |
 | `positions` | the CRM row — see below |
-| `jd_revisions` | append-only JD history per position: `revision`, `observed_at`, `content_hash`, `change_kind` (`first_seen` `content` `title` `comp` `geo` `status` `closed` `reopened` `noise_rebase` `manual`), `material`, full JD fields, `field_diffs`, `diff_summary`. One `closed` revision per closing; later checks only bump `positions.last_checked_at` |
+| `jd_revisions` | append-only JD history per position: `revision`, `observed_at`, `content_hash`, `change_kind` (`first_seen` `content` `title` `comp` `geo` `status` `closed` `reopened` `noise_rebase` `manual`), `material`, full JD fields, `field_diffs`, `diff_summary`. The UI labels `noise_rebase` **rewritten here** and groups those rows apart from employer edits. One `closed` revision per closing; later checks only bump `positions.last_checked_at` |
 | `timeline_events` | notes, status changes, applied, LLM results, approvals — everything History shows |
 | `evaluations` | one row per LLM report: `kind`, `model`, `markdown`, `summary` JSON, score/verdict; `position_id` or `company_id` |
 | `application_materials` | `kind` resume / cover, `version`, markdown, surface + keyword coverage in metadata |
-| `application_questions` | Q&A drafts for application forms |
+| `application_questions` | Q&A drafts for application forms: `question`, `answer`, `required`, `input_type` (`text` `textarea` `select` `multi` `file`), `status` (`open` `answered` `skipped`; `open` is unanswered), choices in `metadata.options`. Greenhouse and Ashby populate these. Drafts are not submitted |
 | `people`, `interviews`, `outreach_events` | contacts; interview rounds (stage, interviewer, outcome, transcript, same-day review, AI brief vs JD/company pack); outreach log |
 
 ### Radar
 
 | table | what |
 |--|--|
-| `board_sources` | one row per board: provider (greenhouse / ashby / lever / remoteok / market / html), token/URL, enabled, capability (`list_api` is scanned: ATS + RemoteOK JSON + WWR DevOps RSS), last scan |
+| `board_sources` | one row per board: provider (`greenhouse` / `ashby` / `lever` / `bamboohr` / `remoteok` / `market` / `html`), token/URL, enabled, capability. `list_api` is scanned: those ATS boards, Remote OK JSON, Remotive software-dev JSON, and the WWR DevOps RSS. `manual_watch` is not scanned |
 | `board_snapshots` | listings seen per scan (retention keeps the last 3 per board) |
 | `board_deltas` | new / changed / closed listings between snapshots |
-| `discovery_feed` | every listing observed in the window, with `lane` (`passed` / `filtered`) and `gate_reason`. Archiving a filing for the gate moves its row to `filtered` |
+| `discovery_feed` | every listing observed in the window, with `lane` (`passed` / `filtered` / `marginal`), `gate_reason`, and `posted_at` (the employer date, when the board sent one). Archiving a filing for the gate moves its row to `filtered` |
 | `watches` | standalone URL watches not tied to a board |
 
 ### Machine
@@ -52,7 +52,7 @@ Schema: `packages/db/src/schema.ts` (drizzle). Migrations: `packages/db/migratio
 | `approvals` | autopilot inbox: `kind`, `status`, position/company, title/body, `payload` (e.g. `toStatus`, `materialIds`, `reason`), resolved by/at |
 | `chat_threads` | `scope`, position/company, model, `messages` JSON (user / assistant with tool calls / tool results, tokens). WhatsApp desk chat uses one global thread titled `WhatsApp · job-scout chat` |
 | `notification_outbox` | WhatsApp sends: `channel`, `event`, `chat_id`, `body`, `status` (`pending` `sent` `failed` `cancelled`), unique `dedupe_key`, `scheduled_for` (quiet hours), `provider_ref` |
-| `profiles` | you: identity, master resume, resume surfaces (`ai` / `sre` / `platform`), scout brief |
+| `profiles` | you: identity, master resume, resume surfaces (`ai` / `sre` / `platform`), scout brief. A new profile stores an empty brief. A stored brief that still says “fill this in under settings” is cleared and is not sent to the model |
 | `api_tokens` | hashed Bearer tokens with scopes |
 
 ## `positions`
@@ -61,7 +61,7 @@ Schema: `packages/db/src/schema.ts` (drizzle). Migrations: `packages/db/migratio
 |--|--|
 | identity | `id`, `company_id`, `slug` (unique), `title`, `primary_url`, `ats_provider`, `ats_job_id`, `ats_board_token`, `external_identity` (`provider:token:jobId`), `source` |
 | pipeline | `status`, `priority`, `applied_at`, `next_action`, `notes`, `resume_surface`, `archive_reason` |
-| classification | `craft_family`, `geo_class`, `remote_class`, `geo_notes`, `employment_type` |
+| classification | `craft_family`, `geo_class`, `remote_class`, `workplace` (`remote` `hybrid` `onsite` `unknown`), `geo_notes`, `employment_type` |
 | triage | `triage_score` (1–5), `triage_verdict`, `triage_json`, `triaged_at`, `triage_model` |
 | comp | `salary_min/max/currency/period/raw`, `equity_notes` |
 | listing | `content_hash`, `listing_status`, `first_seen_at`, `last_checked_at`, `last_changed_at`, `closed_at`, `watch_enabled` |
@@ -71,4 +71,4 @@ Evaluations, materials and JD text are not on the row; they hang off it by `posi
 
 ## Retention
 
-`Settings › System` / `RetentionConfig`: `snapshotsKeep` 3 per board · `jobsDays` 7 · `discoveryDays` 30 · `deltasDays` 30 · `llmRunsDays` 90. Positions, revisions, evaluations, materials and timeline are never pruned.
+`Settings › System` / `RetentionConfig`: `snapshotsKeep` 3 per board · `jobsDays` 7 · `discoveryDays` 30 · `deltasDays` 30 · `llmRunsDays` 90 · `llmTranscriptDays` 14. Positions, revisions, evaluations, materials and timeline are never pruned.

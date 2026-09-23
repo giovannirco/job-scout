@@ -7,7 +7,7 @@ Base `/api/v1`. Every response is an envelope:
 { "ok": false, "error": { "code": "NOT_FOUND", "message": "…", "details": {} }, "meta": { "requestId": "…" } }
 ```
 
-Codes: `UNAUTHORIZED` `NOT_FOUND` `VALIDATION_ERROR` `INTERNAL`. Long-running actions return `202` with a `jobId`.
+Codes: `UNAUTHORIZED` `NOT_FOUND` `VALIDATION_ERROR` `LLM_GATE` `INTERNAL`. Long-running actions return `202` with a `jobId`. `LLM_GATE` is a model call refused before it runs (no key, disabled, cap, or budget).
 
 ## Auth
 
@@ -37,14 +37,16 @@ curl -H "Authorization: Bearer dev-agent-token" http://localhost:8080/api/v1/tod
 
 | method | path | notes |
 |--|--|--|
-| GET | `/positions` | `status` (`hot` · `active` · `all` · comma list), `verdict`, `minScore`, `q`, `company`, `geoClass`, `listingStatus`, `watch`, `sort` (`updated_desc` `score_desc` `company` `status` `first_seen_desc` `posted_desc` `posted_asc` `last_changed_desc`), `page`/`pageSize` or `cursor`. Slim rows. The desk opens an unscored list on `posted_desc` |
+| GET | `/positions` | `status` (`hot` · `active` · `all` · comma list), `verdict` (`none` is unscored), `minScore`, `q` (title, company, location, team), `company`, `geoClass` (`home` keeps a listing that fits the profile market or names the profile city), `workplace`, `listingStatus`, `watch`, `sort` (`updated_desc` `score_desc` `company` `status` `first_seen_desc` `posted_desc` `posted_asc` `last_changed_desc` `title` `workplace` `geo` `location`), `page`/`pageSize` or `cursor`. Slim rows. The desk opens an unscored list on `posted_desc` |
 | POST | `/positions` | `{url, companyName?, status?}` — fetch the JD, create or refresh, enqueue triage. `201` when created |
 | GET | `/positions/:idOrSlug` | full detail: company, JD text, revisions, evaluations, materials, careerOps stamp |
 | PATCH | `/positions/:idOrSlug` | `title status priority primaryUrl resumeSurface nextAction notes watchEnabled appliedAt equityNotes archiveReason geoNotes metadata` — status changes write a timeline event; `applied` stamps `appliedAt` |
 | POST | `/positions/:idOrSlug/archive` | `{reason?}` |
 | POST | `/positions/:idOrSlug/refresh` | re-fetch the JD now (revision if changed) |
 | POST | `/positions/:idOrSlug/notes` | `{title?, body?}` → timeline note |
-| POST | `/positions/:idOrSlug/actions/:action` | `action` ∈ `triage evaluate materials company_research jd_review`; body `{force?, surface?}`; enqueues (`202`) or runs inline with `?sync=1` |
+| POST | `/positions/:idOrSlug/actions/:action` | `action` ∈ `triage evaluate materials company_research jd_review form_answers listing_classify`; body `{force?, surface?}`; enqueues (`202`) or runs inline with `?sync=1`. No model key returns `VALIDATION_ERROR`. A synchronous run the model gate refuses returns `LLM_GATE` |
+| GET | `/positions/:idOrSlug/questions?sort=` | application prompts and drafted answers |
+| PATCH | `/positions/:idOrSlug/questions/:qid` | `{answer?, status?}` `open` `answered` `skipped`. An empty answer is stored as null |
 | GET | `/positions/:idOrSlug/timeline?limit=` | |
 | GET | `/positions/:idOrSlug/revisions/:rev` | one JD revision with diffs |
 | GET | `/positions/:idOrSlug/evaluations/:kind` | latest `evaluate` / `jd_review` / `company_research` |
@@ -53,6 +55,7 @@ curl -H "Authorization: Bearer dev-agent-token" http://localhost:8080/api/v1/tod
 | POST | `/positions/:idOrSlug/materials` | `{kind, bodyMarkdown, title?, notes?, pdfBase64?, pdfFileName?}` — store a hand-edited version |
 | GET | `/positions/materials/:materialId` | |
 | PUT | `/positions/:idOrSlug/career-ops` | merge a career-ops stamp into `metadata.careerOps` |
+| POST | `/positions/reconcile-career-ops` | bulk URL-first reconciliation. Dry run unless the body says otherwise |
 | GET / POST | `/positions/:idOrSlug/people` | company-scoped contacts `{name, title?, linkedinUrl?, email?, notes?}` |
 | DELETE | `/positions/:idOrSlug/people/:personId` | 404 if the person is not on this company |
 | GET / POST | `/positions/:idOrSlug/interviews` | list is slim (metadata + char counts). POST body: `stage`, `title`, interviewer, `scheduledAt`/`occurredAt`, `status` `pending\|completed\|cancelled`, `outcome` `advanced\|hold\|rejected\|cancelled\|unclear`, notes/review/transcript markdown. A transcript queues `interview_brief` unless `skipBrief` |
@@ -114,6 +117,8 @@ curl -H "Authorization: Bearer dev-agent-token" http://localhost:8080/api/v1/tod
 | GET | `/settings/llm/models?refresh=1` | `/v1/models` catalog (cached) |
 | GET | `/settings/llm/status` | per-operation model, enabled, cap, calls today |
 | GET | `/settings/llm/runs?limit=` | recent `llm_runs` |
+| GET | `/settings/llm/runs/facets` | filter values for the AI logs page |
+| GET | `/settings/llm/runs/:id` | one run |
 | POST | `/settings/llm/retry` | `{hours?, scope?: failed\|failed_and_missing, operations?, limit?}` — re-enqueue latest failed LLM ops (202). `failed_and_missing` also triages opens with no successful triage. Does not re-run successful evaluate/materials |
 | POST | `/settings/llm/test` | `{model}` smoke prompt |
 | GET | `/settings/autopilot` | config + preset definitions |

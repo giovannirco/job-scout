@@ -13,10 +13,12 @@ job-scout talks to one OpenAI-compatible gateway (`OPENAI_BASE_URL`, `OPENAI_API
 | `materials` | you, autopilot, MCP | strong | tailored resume + cover markdown → `application_materials` (surface: ai / sre / platform) |
 | `chat` | the dock chat | strong, streaming, tool calls | thread messages → `chat_threads` |
 | `interview_brief` | transcript (or notes) stored on a round; Position › Interviews › AI brief; MCP `brief_interview` | same class as evaluate (inherits that model if unset) | markdown debrief + JSON (jd hits/misses, signals, next-round prep) → `interviews.ai_brief_*` |
+| `listing_classify` | a messy ATS location; you; MCP `run_llm` | cheap | tightens geo. It does not weaken a hard block |
+| `form_answers` | you; the Autopilot preset after evaluate; MCP `run_llm` | mid | drafted answers on `application_questions`. Nothing is submitted |
 
 Settings › AI: per operation a **model** (from the cached `/v1/models` catalog, refreshable), **enabled**, **daily cap** (0 = none), optional **temperature**. `POST /settings/llm/test` runs a smoke prompt on any model. Settings › AI also lists recent runs with latency, tokens and status. **Retry failed** (`POST /settings/llm/retry`) re-enqueues the latest failed ops in a window; `scope=failed_and_missing` also triages open positions with no successful triage. It does not re-run successful evaluate/materials. Daily caps still apply.
 
-Prompt inputs are bounded (`triage.jdMaxChars`, default 6000) and every prompt includes the **scout brief** (`packages/llm/src/brief.ts`, editable in Profile) so the model scores against your actual constraints rather than a generic résumé.
+Prompt inputs are bounded (`triage.jdMaxChars`, default 6000) and every prompt includes the **scout brief** when one is written (Profile). Leave it empty until then. A stored brief that still says “fill this in under settings” is treated as empty and is not sent. `packages/llm/src/brief.ts` still holds that old starter text; new profiles do not insert it.
 
 ## The gate (free)
 
@@ -24,10 +26,10 @@ Before any model call, `packages/shared/src/gate.ts` rejects listings with no mo
 
 | check | what it does |
 |--|--|
-| Title include | Profile **target roles** replace this list. `java` does not match JavaScript. `engineer` and `developer` match each other. |
-| Title exclude | `junior` also excludes new grad and early career. A north star that says “not infrastructure” also excludes infrastructure, Kubernetes, and DevOps. |
-| Named office | A city or single country with no remote wording does not pass, even when unknown geo is allowed. A country list is not one office. |
-| Home location | A US city drops a remote role that requires another country, and keeps “Remote - US only”. A Brazil city drops US-only roles. Other cities do not filter. Clearing the location does not restore archives. |
+| Title include | Profile **target roles** replace this list. `java` does not match JavaScript. `engineer` and `developer` match each other. `backend engineer` also matches `Backend/API Engineer` and `Engineer, Backend`. |
+| Title exclude | `junior` also excludes new grad, early career, and graduate. A north star that says “not infrastructure” also excludes infrastructure, Kubernetes, DevOps, SRE, Linux, embedded, kernel, and the rest of `titleExcludesFromNorthStar`. A paragraph that asks for backend and does not ask for frontend, data engineer, or support/solutions/quality also excludes those titles. A paragraph that uses none of those phrases does not filter titles. |
+| Named office | A city or single country with no remote wording does not pass, even when unknown geo is allowed. A country list is not one office. A location that starts with remote or distributed stays remote. |
+| Home location | A US city drops a remote role that requires another country, and keeps “Remote - US only”. A Brazil city drops US-only roles. Other cities do not filter. The pipeline chip says **home** when the listing fits that market, or when the location names the profile city. A location that is only “Remote” is not home. Clearing the location does not restore archives. |
 | Geo allow / block | Word lists. A block wins when both match, except `us only` / `usa only` when the profile is in the US. |
 | Posting age | Default 14 days when a date is known. A job the board is still listing skips this check. |
 

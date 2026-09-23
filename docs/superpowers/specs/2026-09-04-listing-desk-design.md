@@ -1,5 +1,7 @@
 # job-scout listing truth and desk IA
 
+> Historical design record from 2026-09-04. Current behavior is in `README.md` and `docs/`. This file is not kept in sync.
+
 Status: implemented on `v2` (2.3.0)  
 Date: 2026-09-04  
 Branch: `v2`
