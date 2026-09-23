@@ -30,6 +30,7 @@ import {
   totalsToday,
   regateRecentDiscovery,
   repairHomeMarketFilings,
+  repairProfileGateFilings,
   syncGateFromTargetRoles,
   titleIncludesFromRoles,
 } from "@job-scout/core";
@@ -73,10 +74,13 @@ settingsRoutes.patch("/profile", async (c) => {
     JSON.stringify(titleIncludesFromRoles(before.targetRoles)) !== JSON.stringify(titleIncludesFromRoles(next.targetRoles));
   const synced = rolesChanged ? await syncGateFromTargetRoles(next.targetRoles) : null;
   const locationChanged = (before.location || "") !== (next.location || "");
+  const northStarChanged = (before.northStar || "") !== (next.northStar || "");
   const home = locationChanged ? await repairHomeMarketFilings() : null;
+  const profileGate = northStarChanged ? await repairProfileGateFilings() : null;
   return ok(c, next, {
     ...(synced ? { regate: synced.regate, titleInclude: synced.titleInclude } : {}),
     ...(home ? { home } : {}),
+    ...(profileGate ? { profileGate } : {}),
   });
 });
 

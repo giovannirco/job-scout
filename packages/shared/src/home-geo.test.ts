@@ -4,8 +4,9 @@ import { fitsHomeMarket, homeMarket, missesHomeMarket } from "./home-geo.js";
 describe("home market", () => {
   it("reads a US city and ignores a blank or foreign profile", () => {
     expect(homeMarket("Austin, TX")).toBe("us");
+    expect(homeMarket("São Paulo")).toBe("br");
     expect(homeMarket("")).toBeNull();
-    expect(homeMarket("São Paulo")).toBeNull();
+    expect(homeMarket("London")).toBeNull();
   });
 
   it("drops a country-locked remote role for Austin and keeps a US or open one", () => {
@@ -23,6 +24,11 @@ describe("home market", () => {
     expect(missesHomeMarket("Remote - Americas or EU", home)).toBe(false);
     expect(missesHomeMarket("Remote - EU - LATAM - NA", home)).toBe(false);
     expect(missesHomeMarket("Remote, Poland", "")).toBe(false);
+    expect(missesHomeMarket("Remote - USA", "São Paulo")).toBe(true);
+    expect(missesHomeMarket("Remote, Poland", "São Paulo")).toBe(true);
+    expect(missesHomeMarket("Brazil (Remote)", "São Paulo")).toBe(false);
+    expect(missesHomeMarket("Remote", "São Paulo")).toBe(false);
+    expect(missesHomeMarket("Remote, Poland", "London")).toBe(false);
   });
 
   it("treats a US restriction as a fit for Austin and a foreign one as not", () => {
