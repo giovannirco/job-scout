@@ -257,6 +257,8 @@ export const Settings = z.object({
   entityDecodeVersion: z.string().nullable().optional(),
   /** One-shot: a backend north star drops frontend, SRE, data engineering, support, solutions, and QA titles. */
   craftGateVersion: z.string().nullable().optional(),
+  /** One-shot: software titles get a craft, and aggregator rows show the employer. */
+  labelVersion: z.string().nullable().optional(),
 });
 export type Settings = z.infer<typeof Settings>;
 

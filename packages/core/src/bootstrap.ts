@@ -119,6 +119,15 @@ export async function bootstrap(opts: { seedBoards?: boolean } = {}) {
         })
         .catch((e) => log.error("bootstrap.craft-gate.failed", { err: e }));
     }
+    if (stored.labelVersion !== "1") {
+      const { refreshListingLabels } = await import("./scan.js");
+      await refreshListingLabels()
+        .then(async (r) => {
+          await updateSettings({ labelVersion: "1" });
+          if (r.craft || r.company) log.info("bootstrap.labels", r);
+        })
+        .catch((e) => log.error("bootstrap.labels.failed", { err: e }));
+    }
     if (stored.entityDecodeVersion !== "1") {
       const { decodeStoredJdEntities } = await import("./positions.js");
       await decodeStoredJdEntities()

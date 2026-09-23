@@ -2,7 +2,7 @@ import { and, desc, eq, gte, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { boardDeltas, boardSnapshots, boardSources, companies, discoveryFeed, getDb, id, jdRevisions, positions } from "@job-scout/db";
 import { detectAts, externalIdentityFromDetect, fetchGreenhouseJob, greenhouseBoardToken, greenhouseListingNeedsBoardFetch, listBoard, type AtsJob, type BoardJobSummary } from "@job-scout/ats";
 import { fetchJob as fetchJobFromUrl } from "./fetch-job.js";
-import { applyProfileToGate, classifyListing, cleanJobTitle, craftFamily, gateListing, geoClass, homeMarket, isNoiseJobTitle, missesHomeMarket, parseClipListing, type GateConfig, type GateVerdict } from "@job-scout/shared";
+import { applyProfileToGate, classifyListing, cleanJobTitle, craftFamily, gateListing, geoClass, homeMarket, isNoiseJobTitle, listingCompany, missesHomeMarket, parseClipListing, unresolvedCompany, type GateConfig, type GateVerdict } from "@job-scout/shared";
 import { enqueueJob } from "./jobs.js";
 import { llmConfigured } from "./llm.js";
 import { archivePosition, trimStoredTitles, upsertFromJob } from "./positions.js";
@@ -87,7 +87,7 @@ export async function scanBoard(boardId: string, opts: { force?: boolean } = {})
         id: id("df"),
         externalIdentity: j.externalIdentity,
         boardSourceId: board.id,
-        company: board.company,
+        company: listingCompany(j.company, board.company),
         title: j.title,
         url: j.url,
         locationRaw: j.locationRaw || null,
@@ -103,6 +103,7 @@ export async function scanBoard(boardId: string, opts: { force?: boolean } = {})
       .onConflictDoUpdate({
         target: discoveryFeed.externalIdentity,
         set: {
+          company: listingCompany(j.company, board.company),
           title: j.title,
           url: j.url,
           locationRaw: j.locationRaw || null,
@@ -122,7 +123,7 @@ export async function scanBoard(boardId: string, opts: { force?: boolean } = {})
         event: "new",
         externalIdentity: j.externalIdentity,
         title: j.title,
-        company: board.company,
+        company: listingCompany(j.company, board.company),
         url: j.url,
         locationRaw: j.locationRaw || null,
         craftFamily: craftFamily(j.title),
@@ -640,6 +641,45 @@ export async function followUpIntake(
     });
   }
   return { triageJobId: null };
+}
+
+/** Software and backend titles are a craft, and an aggregator board should show the employer. */
+export async function refreshListingLabels(): Promise<{ craft: number; company: number }> {
+  const db = await getDb();
+  const posRows = await db.select({ id: positions.id, title: positions.title, craftFamily: positions.craftFamily }).from(positions);
+  let craft = 0;
+  for (const row of posRows) {
+    const next = craftFamily(row.title);
+    if (next === row.craftFamily) continue;
+    await db.update(positions).set({ craftFamily: next }).where(eq(positions.id, row.id));
+    craft++;
+  }
+  const feedRows = await db
+    .select({
+      id: discoveryFeed.id,
+      title: discoveryFeed.title,
+      craftFamily: discoveryFeed.craftFamily,
+      company: discoveryFeed.company,
+      positionId: discoveryFeed.positionId,
+    })
+    .from(discoveryFeed);
+  const names = new Map<string, string>();
+  const linked = await db
+    .select({ id: positions.id, name: companies.name })
+    .from(positions)
+    .innerJoin(companies, eq(positions.companyId, companies.id));
+  for (const row of linked) names.set(row.id, row.name);
+  let company = 0;
+  for (const row of feedRows) {
+    const nextCraft = craftFamily(row.title);
+    const linkedName = row.positionId ? names.get(row.positionId) : undefined;
+    const nextCompany = linkedName && unresolvedCompany(row.company) && !unresolvedCompany(linkedName) ? linkedName : row.company;
+    if (nextCraft === row.craftFamily && nextCompany === row.company) continue;
+    await db.update(discoveryFeed).set({ craftFamily: nextCraft, company: nextCompany }).where(eq(discoveryFeed.id, row.id));
+    if (nextCraft !== row.craftFamily) craft++;
+    if (nextCompany !== row.company) company++;
+  }
+  return { craft, company };
 }
 
 /** A gh_jid careers URL has no board token. The company board has the location and the JD. */

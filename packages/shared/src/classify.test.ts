@@ -42,6 +42,9 @@ describe("classify craft", () => {
     expect(craftFamily("Observability Engineer")).toBe("observability");
     expect(craftFamily("AI Platform Engineer")).toBe("ai_infra");
     expect(craftFamily("Account Executive")).toBe("noise");
+    expect(craftFamily("Staff Software Engineer")).toBe("software");
+    expect(craftFamily("Senior Backend Engineer")).toBe("software");
+    expect(craftFamily("Software Engineer, Observability")).toBe("observability");
   });
 });
 

@@ -39,6 +39,7 @@ export const CraftFamily = z.enum([
   "infra",
   "release",
   "platform_adjacent",
+  "software",
   "noise",
   "other",
   "unknown",

@@ -82,6 +82,7 @@ export function craftFamily(title: string): CraftFamily {
   if (/\b(infrastructure|infra|kubernetes|k8s|compute|bare\s*metal|network\s*engineer)\b/i.test(t))
     return "infra";
   if (/\b(release\s*engineer|gitops)\b/i.test(t)) return "release";
+  if (/\b((software|backend|java)\s*(engineer|developer))\b/i.test(t)) return "software";
   if (isCraftMatch(t)) return "platform_adjacent";
   return "other";
 }
