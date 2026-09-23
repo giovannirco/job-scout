@@ -67,6 +67,7 @@ export async function scanBoard(boardId: string, opts: { force?: boolean } = {})
   const isBaseline = !prev;
 
   const passedJobs: Array<{ j: BoardJobSummary; verdict: GateVerdict }> = [];
+  const failedNow: Array<{ externalIdentity: string; reason: string }> = [];
   const nowIso = new Date();
   const profile = await profileGate();
   for (const j of list) {
@@ -78,7 +79,10 @@ export async function scanBoard(boardId: string, opts: { force?: boolean } = {})
     if (verdict.pass) {
       res.passed++;
       passedJobs.push({ j, verdict });
-    } else res.filtered++;
+    } else {
+      res.filtered++;
+      failedNow.push({ externalIdentity: j.externalIdentity, reason: verdict.reason || "filtered" });
+    }
 
     // Everything lands in discovery_feed (upsert by external identity) so Radar can show the filtered lane.
     await db
@@ -130,6 +134,19 @@ export async function scanBoard(boardId: string, opts: { force?: boolean } = {})
         geoClass: geoClass(j.locationRaw || ""),
         metadata: { gate: lane, reason: verdict.reason },
       });
+    }
+  }
+
+  if (failedNow.length) {
+    const failedIds = failedNow.map((row) => row.externalIdentity);
+    const linked = await db
+      .select({ id: positions.id, externalIdentity: positions.externalIdentity })
+      .from(positions)
+      .where(and(eq(positions.status, "triaged"), inArray(positions.externalIdentity, failedIds)));
+    const reasonByIdentity = new Map(failedNow.map((row) => [row.externalIdentity, row.reason]));
+    for (const row of linked) {
+      if (!row.externalIdentity) continue;
+      await withdrawUntouchedScanPosition(row.id, settings.gate, { reason: reasonByIdentity.get(row.externalIdentity) });
     }
   }
 
