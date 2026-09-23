@@ -1052,4 +1052,25 @@ describe("core on pglite", () => {
     expect(r.items.some((i) => i.positionId === open.position.id && i.operation === "triage")).toBe(true);
     expect(r.items.some((i) => i.positionId === dead.position.id)).toBe(false);
   });
+
+  it("lists a company only while it has an open role", async () => {
+    const { upsertFromJob, archivePosition } = await import("./positions.js");
+    const { listCompanies } = await import("./companies.js");
+    const row = await upsertFromJob(
+      job({
+        jobId: "archived-only",
+        externalIdentity: "greenhouse:shelved:archived-only",
+        url: "https://boards.greenhouse.io/shelved/jobs/archived-only",
+        title: "Software Engineer",
+        company: "Shelved Co",
+      }),
+      { source: "test", companyName: "Shelved Co" },
+    );
+    await archivePosition(row.position.id, "test", "test");
+    expect((await listCompanies({ q: "Shelved", withPositions: "true" })).items).toHaveLength(0);
+    const all = await listCompanies({ q: "Shelved" });
+    expect(all.items).toHaveLength(1);
+    expect(all.items[0]?.positionsOpen).toBe(0);
+    expect(all.items[0]?.positionsTotal).toBe(1);
+  });
 });

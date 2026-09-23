@@ -466,6 +466,7 @@ export type CompanyRow = {
   industryTags: string[] | null;
   updatedAt: string;
   positionsTotal: number;
+  positionsOpen: number;
   positionsHot: number;
   positionsPass: number;
 };

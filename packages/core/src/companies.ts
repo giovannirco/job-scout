@@ -131,6 +131,7 @@ export async function listCompanies(q: { q?: string; page?: string; pageSize?: s
     .select({
       companyId: positions.companyId,
       total: sql<number>`count(*)::int`.as("total"),
+      open: sql<number>`count(*) filter (where ${positions.status} <> 'archived')::int`.as("open"),
       hot: sql<number>`count(*) filter (where ${positions.status} in ('review','materials','applied','screen','interview','offer'))::int`.as("hot"),
       pass: sql<number>`count(*) filter (where ${positions.triageVerdict} = 'pass' and ${positions.status} <> 'archived')::int`.as("pass"),
     })
@@ -147,12 +148,13 @@ export async function listCompanies(q: { q?: string; page?: string; pageSize?: s
       industryTags: companies.industryTags,
       updatedAt: companies.updatedAt,
       positionsTotal: sql<number>`coalesce(${counts.total}, 0)`,
+      positionsOpen: sql<number>`coalesce(${counts.open}, 0)`,
       positionsHot: sql<number>`coalesce(${counts.hot}, 0)`,
       positionsPass: sql<number>`coalesce(${counts.pass}, 0)`,
     })
     .from(companies)
     .leftJoin(counts, eq(counts.companyId, companies.id));
-  const { field, dir } = parseListSort(q.sort, ["name", "hot", "pass", "total", "updated"], "hot", "desc");
+  const { field, dir } = parseListSort(q.sort, ["name", "hot", "pass", "total", "open", "updated"], "hot", "desc");
   const d = <T>(col: T) => (dir === "asc" ? asc(col as never) : desc(col as never));
   const order =
     field === "name"
@@ -161,11 +163,14 @@ export async function listCompanies(q: { q?: string; page?: string; pageSize?: s
         ? [d(sql`coalesce(${counts.pass},0)`), asc(companies.name)]
         : field === "total"
           ? [d(sql`coalesce(${counts.total},0)`), asc(companies.name)]
+          : field === "open"
+            ? [d(sql`coalesce(${counts.open},0)`), asc(companies.name)]
           : field === "updated"
             ? [d(companies.updatedAt), asc(companies.name)]
             : [d(sql`coalesce(${counts.hot},0)`), desc(sql`coalesce(${counts.pass},0)`), asc(companies.name)];
+  const openOnly = sql`coalesce(${counts.open},0) > 0`;
   const rows = await (q.withPositions === "true"
-    ? base.where(and(where, sql`coalesce(${counts.total},0) > 0`))
+    ? base.where(and(where, openOnly))
     : base.where(where)
   )
     .orderBy(...order)
@@ -177,7 +182,7 @@ export async function listCompanies(q: { q?: string; page?: string; pageSize?: s
         .select({ c: sql<number>`count(*)::int` })
         .from(companies)
         .leftJoin(counts, eq(counts.companyId, companies.id))
-        .where(q.withPositions === "true" ? and(where, sql`coalesce(${counts.total},0) > 0`) : where)
+        .where(q.withPositions === "true" ? and(where, sql`coalesce(${counts.open},0) > 0`) : where)
     )[0]?.c ?? 0;
   return { items: rows, page, pageSize, total };
 }
