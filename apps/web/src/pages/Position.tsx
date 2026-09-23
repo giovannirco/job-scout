@@ -154,7 +154,7 @@ export function PositionPage() {
               <Btn disabled={noKey} onClick={() => runAction("materials")} title={noKey ? "Add a model key in Settings" : "Tailored resume + cover for this position"}>
                 <FileText className="h-3.5 w-3.5" /> Materials
               </Btn>
-              <IconBtn label="Chat about this position" onClick={() => openDock("chat")}>
+              <IconBtn label="Chat about this position" disabled={noKey} title={noKey ? "Add a model key in Settings" : "Chat about this position"} onClick={() => openDock("chat")}>
                 <MessageSquareText className="h-4 w-4" />
               </IconBtn>
               <IconBtn label="Fetch the JD again" onClick={refreshJd}>

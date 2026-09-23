@@ -210,7 +210,7 @@ function ProfileTab() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <Input label="Display name" value={f.displayName || ""} onChange={(e) => set("displayName", e.target.value)} />
           <Input label="Email" value={f.email || ""} onChange={(e) => set("email", e.target.value)} />
-          <Input label="Location" hint="A US city drops remote roles that require another country. Leave this blank to keep them." value={f.location || ""} onChange={(e) => set("location", e.target.value)} />
+          <Input label="Location" hint="A US city drops roles that require another country, and keeps “Remote - US only”. A Brazil city drops US-only roles. Other cities do not filter. Clearing this does not restore archived filings." value={f.location || ""} onChange={(e) => set("location", e.target.value)} />
           <Input label="Last title" value={f.lastTitle || ""} onChange={(e) => set("lastTitle", e.target.value)} />
           <Input label="Last company" value={f.lastCompany || ""} onChange={(e) => set("lastCompany", e.target.value)} />
           <Input label="Cash floor (USD / yr)" type="number" value={f.cashFloorUsd ?? 0} onChange={(e) => set("cashFloorUsd", Number(e.target.value))} />
@@ -221,7 +221,7 @@ function ProfileTab() {
       </Panel>
       <Panel title="What the models read">
         <div className="space-y-3">
-          <Textarea label="North star — one paragraph on what you want next" value={f.northStar || ""} onChange={(e) => set("northStar", e.target.value)} className="min-h-[60px]" />
+          <Textarea label="North star — one paragraph on what you want next" hint="The model reads this after a key is set. The sentence “not infrastructure” also excludes infrastructure, Kubernetes, and DevOps titles before any model runs." value={f.northStar || ""} onChange={(e) => set("northStar", e.target.value)} className="min-h-[60px]" />
           <Textarea label="Scout brief (triage prompt: archetypes, hard DQs, comp floor, location rules)" value={f.scoutBrief || ""} onChange={(e) => set("scoutBrief", e.target.value)} className="min-h-[220px] font-mono text-[12px]" />
           <Textarea label="Identity (who you are, proof points; used by evaluate)" value={f.identityMarkdown || ""} onChange={(e) => set("identityMarkdown", e.target.value)} className="min-h-[160px] font-mono text-[12px]" />
           <Textarea label="Master resume (markdown)" value={f.masterResumeMarkdown || ""} onChange={(e) => set("masterResumeMarkdown", e.target.value)} className="min-h-[320px] font-mono text-[12px]" />

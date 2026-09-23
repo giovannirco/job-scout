@@ -89,6 +89,11 @@ export function titleFromSlug(slug?: string | null, companySlug?: string | null)
   return words.join(" ");
 }
 
+/** Collapse whitespace. Boards sometimes send a trailing space or a cut-off line. */
+export function cleanJobTitle(title?: string | null): string {
+  return (title || "").replace(/\s+/g, " ").trim();
+}
+
 /** Prefer a real title over scrape/closed placeholders. */
 export function preferJobTitle(
   incoming?: string | null,
