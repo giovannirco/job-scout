@@ -112,6 +112,16 @@ describe("formatting-only description (F-23)", () => {
     expect(m.change_kind).toBe("noise_rebase");
   });
 
+  it("replacing a careers-page bullet run with the board JD is not an employer edit", () => {
+    const vanity = `${"• ".repeat(20)}\n\nPrincipal Software Engineer\n\n${"• ".repeat(20)}\n\nVanity page boilerplate that is not the job description.`;
+    const board = "Elastic, the Search AI Company, enables everyone to find the answers they need in real time.";
+    const m = classifyMateriality([
+      { path: "listing_status", before: "changed", after: "open" },
+      { path: "description_text", before: vanity, after: board },
+    ]);
+    expect(m.material).toBe(false);
+  });
+
   it("a real JD edit stays material beside a badge flip", () => {
     const m = classifyMateriality([
       { path: "listing_status", before: "changed", after: "open" },

@@ -127,6 +127,11 @@ function descriptionProse(text: string): string {
   return stripMarkupForCompare(stripCareersChrome(text)).replace(/[^a-z0-9]+/g, " ").trim();
 }
 
+/** A careers page dumps a long run of bullets. A real JD uses them as list markers. */
+function hasBulletRun(text: string): boolean {
+  return /(?:[•·●▪◦]\s*){8,}/.test(text || "");
+}
+
 /**
  * A diff that completes a bad first snapshot: our own "changed" badge flipping
  * back to the board's open status, a trailing space, an empty location filling
@@ -139,6 +144,7 @@ export function isSnapshotCompletionDiff(d: FieldDiff): boolean {
   if (d.path === "description_text") {
     const before = descriptionProse(d.before || "");
     const after = descriptionProse(d.after || "");
+    if (hasBulletRun(d.before || "") && !hasBulletRun(d.after || "")) return true;
     if (!before || before === after) return true;
     const bulletHeavy = ((d.before || "").match(/•/g) || []).length >= 4;
     if (bulletHeavy && before.length < 80) return true;
