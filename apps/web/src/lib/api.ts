@@ -62,6 +62,7 @@ export type PositionRow = {
   triageStale?: boolean;
   duplicateCount?: number;
   siblingCount?: number;
+  familySalarySpan?: boolean;
   locations?: string[];
   siblings?: Array<{ id: string; title: string; status: string; location: string | null; url: string | null }>;
   repostOfId?: string | null;
