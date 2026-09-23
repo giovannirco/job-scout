@@ -4,6 +4,7 @@ import { detectAts, externalIdentityFromDetect, listBoard, type AtsJob, type Boa
 import { fetchJob as fetchJobFromUrl } from "./fetch-job.js";
 import { craftFamily, gateListing, geoClass, isNoiseJobTitle, parseClipListing, type GateVerdict } from "@job-scout/shared";
 import { enqueueJob } from "./jobs.js";
+import { llmConfigured } from "./llm.js";
 import { upsertFromJob } from "./positions.js";
 import { getSettings } from "./settings.js";
 import { boardErrorKind, type BoardErrorKind } from "./board-reconcile.js";
@@ -170,7 +171,7 @@ export async function scanBoard(boardId: string, opts: { force?: boolean } = {})
     if (existing && !opts.force) {
       await db.update(discoveryFeed).set({ positionId: existing.id }).where(eq(discoveryFeed.externalIdentity, j.externalIdentity));
       // Known position: watch_check refreshes JDs on its own schedule. Enqueue triage if never run.
-      if (!existing.triagedAt && settings.autopilot.triageNew && existing.status === "triaged") {
+      if (!existing.triagedAt && settings.autopilot.triageNew && existing.status === "triaged" && llmConfigured()) {
         const q = await enqueueJob("triage", { positionId: existing.id }, { dedupeKey: `triage:${existing.id}`, priority: 60 });
         if (!q.deduped) res.triageEnqueued++;
       }
@@ -187,7 +188,7 @@ export async function scanBoard(boardId: string, opts: { force?: boolean } = {})
       if (created) res.created++;
       else res.updated++;
       await db.update(discoveryFeed).set({ positionId: position.id }).where(eq(discoveryFeed.externalIdentity, j.externalIdentity));
-      if (settings.autopilot.triageNew && (created || !position.triagedAt)) {
+      if (settings.autopilot.triageNew && llmConfigured() && (created || !position.triagedAt)) {
         const q = await enqueueJob("triage", { positionId: position.id }, { dedupeKey: `triage:${position.id}`, priority: 60 });
         if (!q.deduped) res.triageEnqueued++;
       }
@@ -255,6 +256,7 @@ export async function followUpIntake(
 ): Promise<{ triageJobId: string | null }> {
   const settings = await getSettings();
   if (!settings.autopilot.triageNew) return { triageJobId: null };
+  if (!position.triagedAt && !llmConfigured()) return { triageJobId: null };
   if (!position.triagedAt) {
     const q = await enqueueJob("triage", { positionId: position.id }, { dedupeKey: `triage:${position.id}`, priority: 20 });
     return { triageJobId: q.id };

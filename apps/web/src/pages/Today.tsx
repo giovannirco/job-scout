@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { ScoreMeter, STATUS_LABEL, STATUS_PATH, STATUS_TONE, StatusBadge } from "@/components/badges";
 import { InboxPanel } from "@/frame/Dock";
 import { openDock, useChatScope } from "@/frame/store";
-import { patch, post, useAction, useApi, type AutopilotState, type PipelineStatus, type TodayData, type TodaySlim } from "@/lib/api";
+import { patch, post, useAction, useApi, type AutopilotState, type PipelineStatus, type SystemInfo, type TodayData, type TodaySlim } from "@/lib/api";
 import { ago, compact, dateTime } from "@/lib/format";
 import { Btn, Empty, ErrorNote, Loading, Monogram, Page, PageHeader, Panel, TONE_DOT, TONE_TEXT, cn } from "@/ui/kit";
 
@@ -15,6 +15,7 @@ export function TodayPage() {
   const qc = useQueryClient();
   const q = useApi<TodayData>(["today"], "/api/v1/today", { refetchInterval: 30_000 });
   const auto = useApi<AutopilotState>(["autopilot"], "/api/v1/settings/autopilot", { staleTime: 60_000 });
+  const sys = useApi<SystemInfo>(["system"], "/api/v1/settings/system", { staleTime: 30_000 });
   const d = q.data;
 
   if (q.isLoading) return <Page><Loading rows={6} /></Page>;
@@ -62,6 +63,13 @@ export function TodayPage() {
         }
       >
         <Funnel byStatus={byStatus} untriaged={d.counts.untriaged} last30d={d.counts.last30d} appliedThisWeek={d.counts.appliedThisWeek} />
+        {sys.data && !sys.data.llmConfigured ? (
+          <p className="text-[12.5px] text-muted">
+            No model key is set, so discovery files listings without scoring them.{" "}
+            <Link to="/settings" search={{ tab: "ai" }} className="text-accent hover:underline">Add a key in Settings</Link>
+            {" "}when you want triage.
+          </p>
+        ) : null}
       </PageHeader>
 
       <div className="grid lg:grid-cols-[1fr_340px] gap-5 items-start">
