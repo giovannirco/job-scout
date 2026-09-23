@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ScoreMeter, StatusBadge } from "@/components/badges";
 import { api, post, type CompanyRow, type PositionRow } from "@/lib/api";
+import { discoveryQueuedMessage } from "@/lib/discovery-toast";
 import { Kbd, Monogram, cn } from "@/ui/kit";
 import { setUi, toggleDock } from "./store";
 
@@ -55,7 +56,9 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         hint: "scan boards that are due",
         run: async () => {
           const r = await post<{ enqueued: number }>("/api/v1/radar/boards/scan-all");
-          toast.success(`Discovery queued for ${r.enqueued} boards`);
+          const text = discoveryQueuedMessage(r);
+          if (r.enqueued > 0) toast.success(text);
+          else toast.message(text);
           void qc.invalidateQueries({ queryKey: ["today"] });
         },
       },
