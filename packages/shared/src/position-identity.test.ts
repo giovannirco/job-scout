@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canonicalExternalIdentity, cleanLocation, decisionTitle, employerFromPosting, isJobPostingUrl, normalizePostingUrl, requisitionId } from "./position-identity.js";
+import { canonicalExternalIdentity, cleanLocation, decisionTitle, employerFromPosting, isJobPostingUrl, listingCompany, normalizePostingUrl, requisitionId } from "./position-identity.js";
 import { geoClass } from "./classify.js";
 import { isNoiseJobTitle, isPlaceholderAtsUrl } from "./listing-title.js";
 
@@ -37,6 +37,12 @@ describe("posting identity and eligibility", () => {
     expect(requisitionId("Requisition ID: 1524")).toBe("1524");
     expect(requisitionId("We require 5 years")).toBeNull();
   });
+  it("keeps the employer when the board is an aggregator", () => {
+    expect(listingCompany("Evolve", "Remote OK")).toBe("Evolve");
+    expect(listingCompany("Remote OK", "Remote OK")).toBe("Remote OK");
+    expect(listingCompany("", "Datadog")).toBe("Datadog");
+  });
+
   it("rejects fixtures and junk while accepting SRE", () => {
     for (const url of ["https://jobs.ashbyhq.com/railway/example", "https://linkedin.com/jobs/view/clip-gauntlet-demo", "https://linkedin.com/jobs/view/critic-unparsed-20260904", "https://example.com/jobs/123"]) expect(isPlaceholderAtsUrl(url)).toBe(true);
     for (const title of ["", "Okau", "Qzuh", "Msi3"]) expect(isNoiseJobTitle(title)).toBe(true);

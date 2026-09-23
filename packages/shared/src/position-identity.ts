@@ -75,6 +75,13 @@ export function cleanLocation(value?: string | null): string {
   return (value || "").split(/\s*[·•;|]\s*/).map(p => p.replace(/\[object Object\]/g, "").trim()).filter(Boolean).join(" · ");
 }
 
+/** The employer on the posting, unless that name is the job board itself. */
+export function listingCompany(jobCompany: string | null | undefined, boardCompany: string): string {
+  const job = (jobCompany || "").trim();
+  if (job && !unresolvedCompany(job)) return job;
+  return boardCompany;
+}
+
 /** Recover only where the host's slug format and the exact title make the boundary deterministic. */
 export function employerFromPosting(url: string, title: string): string | null {
   try {
