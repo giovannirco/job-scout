@@ -22,6 +22,8 @@ describe("gateListing", () => {
     expect(gateListing({ title: "Software Engineer, New Grad 2027", locationRaw: "Remote" }, gate).reason).toBe("title_exclude:new grad");
     expect(gateListing({ title: "Software Engineer, Early Career — Immediate Start", locationRaw: "Remote" }, gate).reason).toBe("title_exclude:early career");
     expect(gateListing({ title: "New Graduate Software Engineer", locationRaw: "Remote" }, gate).reason).toBe("title_exclude:new graduate");
+    expect(gateListing({ title: "Graduate Software Engineer, Open Source and Linux", locationRaw: "Remote" }, gate).reason).toBe("title_exclude:graduate");
+    expect(gateListing({ title: "Software Engineer - Python - Cloud - graduate level", locationRaw: "Remote" }, gate).reason).toBe("title_exclude:graduate");
     expect(gateListing({ title: "Senior Software Engineer", locationRaw: "Remote" }, gate).pass).toBe(true);
   });
 

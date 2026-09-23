@@ -169,8 +169,8 @@ export async function runListingClassify(positionId: string) {
 }
 
 export async function backfillListingFacts(opts: { force?: boolean } = {}) {
-  // v10: AMER/EMEA region codes are remote. N/A and HQ are not places.
-  const BACKFILL_VERSION = "10";
+  // v11: a city office is not remote, and #LI-Remote fills a blank location.
+  const BACKFILL_VERSION = "11";
   const s = await getSettings({ fresh: true });
   if (!opts.force && s.listingFactsBackfillVersion === BACKFILL_VERSION) {
     return { skipped: true as const, archivedSkipped: 0, updated: 0, enqueued: 0 };
@@ -213,6 +213,7 @@ export async function backfillListingFacts(opts: { force?: boolean } = {}) {
       isRemote: ats?.isRemote,
       company: row.companyName,
       title: row.title,
+      descriptionText: rev?.descriptionText,
     });
     const salary = parseSalary(extractSalaryRaw(rev?.descriptionText || ""));
     const fillSalary = Boolean(salary.min && (row.salaryMin == null || (row.salaryMin === salary.min && row.salaryCurrency !== salary.currency)));

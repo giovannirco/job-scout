@@ -247,7 +247,7 @@ export const Settings = z.object({
   homeGateVersion: z.string().nullable().optional(),
   /** One-shot: north star excludes, US-only wording, and age on jobs the board still lists. */
   profileGateVersion: z.string().nullable().optional(),
-  /** One-shot: re-gate after bullet offices and home-based locations classify correctly. */
+  /** One-shot: re-gate after city offices and graduate titles classify correctly. */
   placeSplitVersion: z.string().nullable().optional(),
 });
 export type Settings = z.infer<typeof Settings>;

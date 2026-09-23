@@ -30,7 +30,7 @@ function has(blob: string, term: string): boolean {
 
 /** Phrases that mean the same thing as a configured exclude, so a saved gate keeps working. */
 const EXCLUDE_ALIASES: Record<string, string[]> = {
-  junior: ["new graduate", "new grad", "early career"],
+  junior: ["new graduate", "new grad", "early career", "graduate"],
   intern: ["internship"],
 };
 
