@@ -18,9 +18,9 @@ describe("pipeline default", () => {
     expect(pipelineSortFallback({ verdict: "pass", status: "triaged" })).toBe("score_desc");
   });
 
-  it("sorts open filings by first seen", () => {
-    expect(pipelineSortFallback({ status: "active" })).toBe("first_seen_desc");
-    expect(pipelineSortFallback({ verdict: "none", status: "triaged" })).toBe("first_seen_desc");
+  it("sorts open filings by when the employer posted them", () => {
+    expect(pipelineSortFallback({ status: "active" })).toBe("posted_desc");
+    expect(pipelineSortFallback({ verdict: "none", status: "triaged" })).toBe("posted_desc");
   });
 
   it("keeps an oldest-posted sort visible in the menu", () => {

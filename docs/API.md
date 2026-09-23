@@ -37,7 +37,7 @@ curl -H "Authorization: Bearer dev-agent-token" http://localhost:8080/api/v1/tod
 
 | method | path | notes |
 |--|--|--|
-| GET | `/positions` | `status` (`hot` · `active` · `all` · comma list), `verdict`, `minScore`, `q`, `company`, `geoClass`, `listingStatus`, `watch`, `sort` (`updated_desc` `score_desc` `company` `status` `first_seen_desc` `last_changed_desc`), `page`/`pageSize` or `cursor`. Slim rows |
+| GET | `/positions` | `status` (`hot` · `active` · `all` · comma list), `verdict`, `minScore`, `q`, `company`, `geoClass`, `listingStatus`, `watch`, `sort` (`updated_desc` `score_desc` `company` `status` `first_seen_desc` `posted_desc` `posted_asc` `last_changed_desc`), `page`/`pageSize` or `cursor`. Slim rows. The desk opens an unscored list on `posted_desc` |
 | POST | `/positions` | `{url, companyName?, status?}` — fetch the JD, create or refresh, enqueue triage. `201` when created |
 | GET | `/positions/:idOrSlug` | full detail: company, JD text, revisions, evaluations, materials, careerOps stamp |
 | PATCH | `/positions/:idOrSlug` | `title status priority primaryUrl resumeSurface nextAction notes watchEnabled appliedAt equityNotes archiveReason geoNotes metadata` — status changes write a timeline event; `applied` stamps `appliedAt` |
@@ -73,7 +73,7 @@ curl -H "Authorization: Bearer dev-agent-token" http://localhost:8080/api/v1/tod
 
 | method | path | notes |
 |--|--|--|
-| GET | `/radar/discovery` | `lane` (`passed` `marginal` `filtered` `all`), `hours`, `q`, `reason`, cursor pagination |
+| GET | `/radar/discovery` | `lane` (`passed` `marginal` `filtered` `all`), `hours`, `q`, `reason`, `sort` (`observed_desc` `posted_desc` `posted_asc` `title` `location`), cursor pagination. The desk opens on `posted_desc` |
 | GET | `/radar/discovery/summary?hours=` | seen / passed / marginal / sources |
 | POST | `/radar/discovery/:id/promote` | create a position from a discovery row and triage it |
 | GET | `/radar/deltas?hours=` | board deltas |

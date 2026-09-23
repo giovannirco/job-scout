@@ -109,7 +109,7 @@ export async function getCompany(idOrSlug: string) {
     })
     .from(positions)
     .where(eq(positions.companyId, row.id))
-    .orderBy(desc(positions.firstSeenAt))
+    .orderBy(sql`nullif(${positions.metadata}->'ats'->>'postedAt', '') desc nulls last`, desc(positions.firstSeenAt))
     .limit(100);
   const research = (
     await db

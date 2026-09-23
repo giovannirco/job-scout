@@ -111,7 +111,8 @@ function Discovery({ search, set, summary }: { search: RadarSearch; set: (p: Par
   useEffect(() => setQ(search.q || ""), [search.q]);
   const qc = useQueryClient();
 
-  const list = useApiMeta<DiscoveryRow[]>(["radar", "discovery", lane, page, hours, search.q, search.sort], `/api/v1/radar/discovery${qs({ lane: lane === "all" ? undefined : lane, page, pageSize: PAGE_SIZE, hours, q: search.q, sort: search.sort || "observed_desc" })}`, {
+  const sort = search.sort || "posted_desc";
+  const list = useApiMeta<DiscoveryRow[]>(["radar", "discovery", lane, page, hours, search.q, sort], `/api/v1/radar/discovery${qs({ lane: lane === "all" ? undefined : lane, page, pageSize: PAGE_SIZE, hours, q: search.q, sort })}`, {
     placeholderData: (prev) => prev,
   });
   const rows = list.data?.data || [];
@@ -171,18 +172,18 @@ function Discovery({ search, set, summary }: { search: RadarSearch; set: (p: Par
             <tr>
               <Th w={44} />
               <Th>
-                <SortHead label="Listing" field="title" sort={search.sort} onSort={(n) => set({ sort: n })} />
+                <SortHead label="Listing" field="title" sort={sort} onSort={(n) => set({ sort: n })} />
               </Th>
               <Th>
-                <SortHead label="Location" field="location" sort={search.sort} onSort={(n) => set({ sort: n })} />
+                <SortHead label="Location" field="location" sort={sort} onSort={(n) => set({ sort: n })} />
               </Th>
               <Th>{lane === "filtered" ? "Gate reason" : "Craft"}</Th>
               <Th>In pipeline</Th>
               <Th right>
-                <SortHead label="Posted" field="posted" sort={search.sort} onSort={(n) => set({ sort: n })} />
+                <SortHead label="Posted" field="posted" sort={sort} onSort={(n) => set({ sort: n })} />
               </Th>
               <Th right>
-                <SortHead label="Seen" field="observed" sort={search.sort} onSort={(n) => set({ sort: n })} />
+                <SortHead label="Seen" field="observed" sort={sort} onSort={(n) => set({ sort: n })} />
               </Th>
               <Th w={110} />
             </tr>

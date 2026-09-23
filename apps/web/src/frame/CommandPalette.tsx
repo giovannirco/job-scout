@@ -69,7 +69,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       { kind: "nav", id: "process", label: "Process", to: "/process", hint: "live loops" },
       { kind: "nav", id: "interviews", label: "Interviews", to: "/interviews", hint: "transcripts and briefs" },
       noKey
-        ? { kind: "nav", id: "unscored", label: "Pipeline · not scored", to: "/pipeline", search: { verdict: "none", status: "triaged", sort: "first_seen_desc" } }
+        ? { kind: "nav", id: "unscored", label: "Pipeline · not scored", to: "/pipeline", search: { verdict: "none", status: "triaged", sort: "posted_desc" } }
         : { kind: "nav", id: "pass", label: "Pipeline · PASS awaiting decision", to: "/pipeline", search: { verdict: "pass", status: "triaged", sort: "score_desc" } },
       { kind: "nav", id: "board", label: "Pipeline · board view", to: "/pipeline", search: { view: "board" } },
       { kind: "nav", id: "radar", label: "Radar", to: "/radar" },
