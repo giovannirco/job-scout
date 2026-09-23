@@ -7,6 +7,7 @@ import { StatusMenu, useStatusChange } from "@/components/status-menu";
 import { useChatScope } from "@/frame/store";
 import { qs, STATUSES, useApi, useApiMeta, type PipelineStatus, type PositionRow, type SystemInfo } from "@/lib/api";
 import { defaultPipelinePreset } from "./pipeline-defaults";
+import { familyLocationLabel } from "./pipeline-location";
 import { ago, money } from "@/lib/format";
 import type { PipelineSearch } from "@/router";
 import { Btn, Card, Dot, Empty, Loading, Monogram, Page, PageHeader, Pager, Seg, SortHead, Table, Td, Th, Tr, cn, ErrorNote } from "@/ui/kit";
@@ -248,7 +249,9 @@ function PositionsTable({ rows }: { rows: PositionRow[] }) {
         </tr>
       </thead>
       <tbody>
-        {rows.map((r, i) => (
+        {rows.map((r, i) => {
+          const loc = familyLocationLabel(r.locations, r.locationRaw);
+          return (
           <Tr key={r.id} selected={i === cursor} onClick={() => navigate({ to: "/positions/$id", params: { id: r.slug } })}>
             <Td className="pr-0">
               <Monogram name={r.company.name} size={26} />
@@ -274,8 +277,8 @@ function PositionsTable({ rows }: { rows: PositionRow[] }) {
               <WorkplaceChip workplace={r.workplace} />
             </Td>
             <Td className="max-w-[220px]">
-              <div className="truncate text-[12px]" title={r.locationRaw || undefined}>
-                {r.locationRaw || <span className="text-faint">—</span>}
+              <div className="truncate text-[12px]" title={loc?.title}>
+                {loc ? loc.text : <span className="text-faint">—</span>}
               </div>
             </Td>
             <Td>
@@ -306,7 +309,8 @@ function PositionsTable({ rows }: { rows: PositionRow[] }) {
               ) : null}
             </Td>
           </Tr>
-        ))}
+          );
+        })}
       </tbody>
     </Table>
   );
