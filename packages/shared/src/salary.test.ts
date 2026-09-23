@@ -42,6 +42,10 @@ describe("parseSalary", () => {
     expect(s.max).toBe(106000);
     expect(s.currency).toBe("EUR");
     expect(extractSalaryRaw("A USD$500 Home office setup if you’re a remote employee.")).toBeUndefined();
+    const cad = parseSalary(extractSalaryRaw("The typical starting salary range for this role is: $154,000 &mdash; $243,600 CAD"));
+    expect(cad.currency).toBe("CAD");
+    expect(cad.min).toBe(154000);
+    expect(cad.max).toBe(243600);
   });
 
   it("returns nulls when unknown", () => {

@@ -55,6 +55,7 @@ export function parseSalary(raw: string | null | undefined): SalaryParse {
 
   let currency: string | null = null;
   if (/\bbrl\b|r\$/i.test(text)) currency = "BRL";
+  else if (/\bcad\b|c\$/i.test(text)) currency = "CAD";
   else if (/\$|usd|us\$/i.test(text)) currency = "USD";
   else if (/\beur\b|€/i.test(text)) currency = "EUR";
   else if (/\bgbp\b|£/i.test(text)) currency = "GBP";
