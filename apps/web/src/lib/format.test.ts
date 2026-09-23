@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ago, countLabel, createdFromLabel, employmentLabel, jdChangedAt, money, questionStatusLabel, readableJd, sourceLabel } from "./format.js";
+import { ago, countLabel, createdFromLabel, departmentLabel, employmentLabel, jdChangedAt, money, questionStatusLabel, readableJd, sourceLabel } from "./format.js";
 
 describe("ago", () => {
   it("uses years once a date is at least two years old", () => {
@@ -56,6 +56,14 @@ describe("questionStatusLabel", () => {
     expect(questionStatusLabel("open")).toBe("unanswered");
     expect(questionStatusLabel("answered")).toBe("answered");
     expect(questionStatusLabel("skipped")).toBe("skipped");
+  });
+});
+
+describe("departmentLabel", () => {
+  it("keeps a team name and drops a generic engineering label", () => {
+    expect(departmentLabel(["Engineering"])).toBeNull();
+    expect(departmentLabel(["Enterprise Applications"])).toBe("Enterprise Applications");
+    expect(departmentLabel(["Engineering", "Engineering - Security"])).toBe("Engineering - Security");
   });
 });
 

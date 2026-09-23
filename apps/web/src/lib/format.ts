@@ -129,6 +129,17 @@ export function questionStatusLabel(status: string | null | undefined): string {
   return status.replace(/_/g, " ");
 }
 
+const GENERIC_DEPARTMENT = /^(engineering|software engineering|r\s*&\s*d|product|products)$/i;
+
+/** A department named only Engineering does not tell two roles apart. */
+export function departmentLabel(departments: string[] | null | undefined): string | null {
+  for (const raw of departments || []) {
+    const text = raw.trim();
+    if (text && !GENERIC_DEPARTMENT.test(text)) return text;
+  }
+  return null;
+}
+
 /** Collapse the blank runs some boards leave between JD sections. */
 export function readableJd(text: string | null | undefined): string {
   return (text || "").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();

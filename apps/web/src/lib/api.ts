@@ -57,6 +57,7 @@ export type PositionRow = {
   appliedAt: string | null;
   firstSeenAt: string | null;
   postedAt?: string | null;
+  departments?: string[] | null;
   lastChangedAt: string | null;
   triagedAt: string | null;
   updatedAt: string;

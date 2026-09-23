@@ -75,6 +75,7 @@ const LIST_ROW = {
   appliedAt: positions.appliedAt,
   firstSeenAt: positions.firstSeenAt,
   postedAt: sql<string | null>`nullif(${positions.metadata}->'ats'->>'postedAt', '')`,
+  departments: sql<string[]>`coalesce((select array_agg(value) from jsonb_array_elements_text(coalesce(${positions.metadata}->'ats'->'departments', '[]'::jsonb)) as value), '{}')`,
   lastChangedAt: positions.lastChangedAt,
   triagedAt: positions.triagedAt,
   triageProfileHash: sql<string | null>`${positions.triageJson}->>'profileHash'`,
