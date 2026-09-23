@@ -35,8 +35,9 @@ export async function resolveCompanyForName(
         careersUrl,
         overview: extras?.overview || null,
         metadata: {},
-      });
-      company = (await db.select().from(companies).where(eq(companies.id, cid)).limit(1))[0]!;
+      }).onConflictDoNothing({ target: companies.slug });
+      company = (await db.select().from(companies).where(eq(companies.slug, slug)).limit(1))[0];
+      if (!company) throw new Error("company insert failed");
     } catch (err) {
       if (!isUniqueViolation(err)) throw err;
       company = (await db.select().from(companies).where(eq(companies.slug, slug)).limit(1))[0];

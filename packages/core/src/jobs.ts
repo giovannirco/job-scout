@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, inArray, lte, sql } from "drizzle-orm";
-import { getDb, id, jobs, type JobType } from "@job-scout/db";
+import { getDb, id, jobs, positions, type JobType } from "@job-scout/db";
 
 export type JobRow = typeof jobs.$inferSelect;
 
@@ -74,6 +74,33 @@ function camelJob(r: Record<string, unknown>): JobRow {
     finishedAt: r.finished_at ? new Date(r.finished_at as string) : null,
     createdAt: new Date(r.created_at as string),
   };
+}
+
+/** A missing model key, or a company-insert race whose filing already exists, is not a broken queue. */
+export async function settleExpectedQueueFailures(): Promise<{ cleared: number }> {
+  const db = await getDb();
+  const rows = await db
+    .select({ id: jobs.id, type: jobs.type, error: jobs.error, payload: jobs.payload })
+    .from(jobs)
+    .where(eq(jobs.status, "failed"));
+  let cleared = 0;
+  for (const row of rows) {
+    const err = row.error || "";
+    if (err.includes("OPENAI_API_KEY is not set")) {
+      await completeJob(row.id, { skipped: "not_configured" });
+      cleared++;
+      continue;
+    }
+    if (row.type === "scan_url" && /insert into "companies"/i.test(err)) {
+      const url = String((row.payload as { url?: string } | null)?.url || "");
+      if (!url) continue;
+      const filed = (await db.select({ id: positions.id }).from(positions).where(eq(positions.primaryUrl, url)).limit(1))[0];
+      if (!filed) continue;
+      await completeJob(row.id, { skipped: "company_race" });
+      cleared++;
+    }
+  }
+  return { cleared };
 }
 
 export async function completeJob(jobId: string, result: Record<string, unknown> = {}) {

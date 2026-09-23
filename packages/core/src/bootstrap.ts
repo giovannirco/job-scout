@@ -197,6 +197,10 @@ export async function bootstrap(opts: { seedBoards?: boolean } = {}) {
       .catch((e) => log.error("bootstrap.boards.reconcile.failed", { err: e }));
     const n = (await db.select({ c: sql<number>`count(*)::int` }).from(boardSources))[0]?.c ?? 0;
     log.info("bootstrap.boards.synced", { catalog: FULL_CATALOG.length, boards: n });
+    const { settleExpectedQueueFailures } = await import("./jobs.js");
+    await settleExpectedQueueFailures()
+      .then((r) => { if (r.cleared) log.info("bootstrap.queue", r); })
+      .catch((e) => log.error("bootstrap.queue.failed", { err: e }));
     const { clearRepairedChangedBadges } = await import("./positions.js");
     await clearRepairedChangedBadges()
       .then((r) => { if (r.cleared) log.info("bootstrap.changed-badges", r); })
