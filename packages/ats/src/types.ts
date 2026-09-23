@@ -51,6 +51,8 @@ export type BoardJobSummary = {
   title: string;
   url?: string;
   locationRaw?: string;
+  workplaceType?: string;
+  isRemote?: boolean;
   company: string;
   /** Original publication time, never the last edit or observation time. */
   postedAt?: string;

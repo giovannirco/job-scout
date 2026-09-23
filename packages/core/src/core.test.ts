@@ -407,6 +407,63 @@ describe("core on pglite", () => {
     expect((await regateRecentDiscovery()).withdrawn).toBe(0);
   });
 
+  it("archives an untouched office filing and keeps a remote one", async () => {
+    const { regateRecentDiscovery, repairOfficeDiscoveryFilings } = await import("./scan.js");
+    const { updateSettings } = await import("./settings.js");
+    const { upsertFromJob, getPosition } = await import("./positions.js");
+    const { getDb, discoveryFeed, id } = await import("@job-scout/db");
+    const db = await getDb();
+    const office = await upsertFromJob(job({
+      jobId: "office-spain",
+      externalIdentity: "greenhouse:elastic:office-spain",
+      url: "https://boards.greenhouse.io/elastic/jobs/office-spain",
+      title: "Senior Software Engineer",
+      locationRaw: "Spain",
+    }), { source: "scan:greenhouse" });
+    const remote = await upsertFromJob(job({
+      jobId: "remote-spain",
+      externalIdentity: "ashby:clickhouse:remote-spain",
+      url: "https://jobs.ashbyhq.com/clickhouse/remote-spain",
+      title: "Senior Software Engineer",
+      locationRaw: "Spain",
+      workplaceType: "Remote",
+      isRemote: true,
+    }), { source: "scan:ashby" });
+    const pasted = await upsertFromJob(job({
+      jobId: "manual-spain",
+      externalIdentity: "greenhouse:elastic:manual-spain",
+      url: "https://boards.greenhouse.io/elastic/jobs/manual-spain",
+      title: "Senior Software Engineer",
+      locationRaw: "Spain",
+    }), { source: "manual" });
+    const observedAt = new Date();
+    await db.insert(discoveryFeed).values([
+      { id: id("df"), externalIdentity: "greenhouse:elastic:office-spain", company: "Elastic", title: office.position.title, url: office.position.primaryUrl, locationRaw: "Spain", lane: "passed", positionId: office.position.id, observedAt },
+      { id: id("df"), externalIdentity: "ashby:clickhouse:remote-spain", company: "ClickHouse", title: remote.position.title, url: remote.position.primaryUrl, locationRaw: "Spain", lane: "passed", positionId: remote.position.id, observedAt },
+      { id: id("df"), externalIdentity: "greenhouse:elastic:manual-spain", company: "Elastic", title: pasted.position.title, url: pasted.position.primaryUrl, locationRaw: "Spain", lane: "passed", positionId: pasted.position.id, observedAt },
+    ]);
+    await updateSettings({
+      gate: {
+        titleInclude: ["software engineer"],
+        titleExclude: [],
+        geoAllow: ["remote"],
+        geoBlock: ["onsite", "hybrid"],
+        maxPostingAgeDays: 0,
+        allowUnknownGeo: true,
+      },
+    });
+    const result = await regateRecentDiscovery();
+    expect(result.withdrawn).toBeGreaterThanOrEqual(1);
+    expect((await getPosition(office.position.id))?.status).toBe("archived");
+    expect((await getPosition(office.position.id))?.archiveReason).toBe("left the location gate (geo_block:onsite)");
+    expect((await getPosition(remote.position.id))?.status).toBe("triaged");
+    expect((await getPosition(pasted.position.id))?.status).toBe("triaged");
+    const repaired = await repairOfficeDiscoveryFilings();
+    expect(repaired.withdrawn).toBeGreaterThanOrEqual(1);
+    expect((await getPosition(pasted.position.id))?.status).toBe("archived");
+    expect((await getPosition(remote.position.id))?.status).toBe("triaged");
+  });
+
   it("repairs discovery promotions that were stored as manual and now miss the title gate", async () => {
     const { repairMisstampedDiscoveryFilings, regateRecentDiscovery } = await import("./scan.js");
     const { updateSettings } = await import("./settings.js");

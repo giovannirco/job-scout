@@ -1,8 +1,8 @@
-import { and, desc, eq, gte, isNull, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { boardDeltas, boardSnapshots, boardSources, discoveryFeed, getDb, id, positions } from "@job-scout/db";
 import { detectAts, externalIdentityFromDetect, fetchGreenhouseJob, greenhouseListingNeedsBoardFetch, listBoard, type AtsJob, type BoardJobSummary } from "@job-scout/ats";
 import { fetchJob as fetchJobFromUrl } from "./fetch-job.js";
-import { craftFamily, gateListing, geoClass, isNoiseJobTitle, parseClipListing, type GateConfig, type GateVerdict } from "@job-scout/shared";
+import { classifyListing, craftFamily, gateListing, geoClass, isNoiseJobTitle, parseClipListing, type GateConfig, type GateVerdict } from "@job-scout/shared";
 import { enqueueJob } from "./jobs.js";
 import { llmConfigured } from "./llm.js";
 import { archivePosition, upsertFromJob } from "./positions.js";
@@ -70,7 +70,7 @@ export async function scanBoard(boardId: string, opts: { force?: boolean } = {})
   for (const j of list) {
     const verdict: GateVerdict = isNoiseJobTitle(j.title)
       ? { pass: false, reason: "junk_title", matchedInclude: null }
-      : gateListing({ title: j.title, locationRaw: j.locationRaw, postedAt: j.postedAt }, settings.gate);
+      : listingGate(j, settings.gate);
     const lane = verdict.pass ? "passed" : "filtered";
     if (verdict.pass) {
       res.passed++;
@@ -264,6 +264,26 @@ export async function enqueueDueBoardScans(opts: { limit?: number; all?: boolean
   return { due: due.length, enqueued };
 }
 
+function listingGate(
+  input: { title: string; locationRaw?: string | null; postedAt?: string | Date | null; workplaceType?: string | null; isRemote?: boolean | null },
+  gate: GateConfig,
+): GateVerdict {
+  if (isNoiseJobTitle(input.title)) return { pass: false, reason: "junk_title", matchedInclude: null };
+  const facts = classifyListing({
+    locationRaw: input.locationRaw,
+    workplaceType: input.workplaceType,
+    isRemote: input.isRemote,
+    title: input.title,
+  });
+  const workplaceType = input.workplaceType || (facts.workplace !== "unknown" ? facts.workplace : undefined);
+  return gateListing({
+    title: input.title,
+    locationRaw: input.locationRaw,
+    postedAt: input.postedAt,
+    workplaceType,
+  }, gate);
+}
+
 function titleGateMiss(title: string, gate: GateConfig): string | null {
   const verdict = gateListing(
     { title, locationRaw: "Remote" },
@@ -274,11 +294,18 @@ function titleGateMiss(title: string, gate: GateConfig): string | null {
   return null;
 }
 
+function filingMiss(verdict: GateVerdict): string | null {
+  if (verdict.pass || !verdict.reason) return null;
+  if (verdict.reason === "title_no_include" || verdict.reason.startsWith("title_exclude:")) return verdict.reason;
+  if (verdict.reason.startsWith("geo_block:") || verdict.reason === "geo_unlisted") return verdict.reason;
+  return null;
+}
+
 /** Archive a scan filing the operator has not touched when its title no longer matches. */
 async function withdrawUntouchedScanPosition(
   positionId: string,
   gate: GateConfig,
-  opts?: { allowManual?: boolean },
+  opts?: { allowManual?: boolean; reason?: string },
 ): Promise<boolean> {
   const db = await getDb();
   const pos = (
@@ -302,9 +329,10 @@ async function withdrawUntouchedScanPosition(
   const fromScan = Boolean(pos.source?.startsWith("scan:"));
   const misstampedManual = Boolean(opts?.allowManual && pos.source === "manual");
   if ((!fromScan && !misstampedManual) || pos.notes?.trim() || pos.priority !== "P2" || pos.watchEnabled) return false;
-  const reason = titleGateMiss(pos.title, gate);
+  const reason = opts?.reason ?? titleGateMiss(pos.title, gate);
   if (!reason) return false;
-  await archivePosition(pos.id, `left the title gate (${reason})`, "scan");
+  const label = reason.startsWith("geo_") ? "left the location gate" : "left the title gate";
+  await archivePosition(pos.id, `${label} (${reason})`, "scan");
   return true;
 }
 
@@ -340,15 +368,25 @@ export async function regateRecentDiscovery(hours = 24 * 7): Promise<{
   let promoted = 0;
   let withdrawn = 0;
   const considered = new Set<string>();
+  const positionIds = [...new Set(rows.map((r) => r.positionId).filter((id): id is string => Boolean(id)))];
+  const storedWorkplace = new Map<string, string | null>();
+  if (positionIds.length) {
+    const places = await db.select({ id: positions.id, workplace: positions.workplace }).from(positions).where(inArray(positions.id, positionIds));
+    for (const place of places) storedWorkplace.set(place.id, place.workplace);
+  }
   for (const row of rows) {
-    const verdict: GateVerdict = isNoiseJobTitle(row.title)
-      ? { pass: false, reason: "junk_title", matchedInclude: null }
-      : gateListing({ title: row.title, locationRaw: row.locationRaw, postedAt: row.postedAt }, settings.gate);
+    const workplaceType = row.positionId ? storedWorkplace.get(row.positionId) : undefined;
+    const verdict = listingGate({
+      title: row.title,
+      locationRaw: row.locationRaw,
+      postedAt: row.postedAt,
+      workplaceType: workplaceType && workplaceType !== "unknown" ? workplaceType : undefined,
+    }, settings.gate);
     const lane = verdict.pass ? "passed" : "filtered";
-    const titleMiss = !verdict.pass && (verdict.reason === "title_no_include" || verdict.reason?.startsWith("title_exclude:"));
-    if (titleMiss && row.positionId && !considered.has(row.positionId)) {
+    const miss = filingMiss(verdict);
+    if (miss && row.positionId && !considered.has(row.positionId)) {
       considered.add(row.positionId);
-      if (await withdrawUntouchedScanPosition(row.positionId, settings.gate)) withdrawn++;
+      if (await withdrawUntouchedScanPosition(row.positionId, settings.gate, { reason: miss })) withdrawn++;
     }
     if (lane === row.lane && (verdict.reason ?? null) === (row.gateReason ?? null)) continue;
     await db
@@ -403,6 +441,46 @@ export async function repairMisstampedDiscoveryFilings(): Promise<{ withdrawn: n
     if (!titleMiss) continue;
     seen.add(row.positionId);
     if (await withdrawUntouchedScanPosition(row.positionId, settings.gate, { allowManual: true })) withdrawn++;
+  }
+  return { withdrawn };
+}
+
+/**
+ * Office listings promoted before the gate could see a city. Ordinary regate
+ * withdraws scan sources. This one-shot also withdraws a discovery promotion
+ * that was stored as manual. A URL pasted by hand, with no discovery row, stays.
+ */
+export async function repairOfficeDiscoveryFilings(): Promise<{ withdrawn: number }> {
+  const db = await getDb();
+  const settings = await getSettings({ fresh: true });
+  const rows = await db
+    .select({
+      id: positions.id,
+      title: positions.title,
+      workplace: positions.workplace,
+      source: positions.source,
+    })
+    .from(positions)
+    .where(and(eq(positions.status, "triaged"), inArray(positions.workplace, ["onsite", "hybrid"])));
+  let withdrawn = 0;
+  for (const row of rows) {
+    const feed = (
+      await db
+        .select({ locationRaw: discoveryFeed.locationRaw, postedAt: discoveryFeed.postedAt })
+        .from(discoveryFeed)
+        .where(eq(discoveryFeed.positionId, row.id))
+        .limit(1)
+    )[0];
+    if (row.source === "manual" && !feed) continue;
+    const verdict = listingGate({
+      title: row.title,
+      locationRaw: feed?.locationRaw,
+      postedAt: feed?.postedAt,
+      workplaceType: row.workplace,
+    }, settings.gate);
+    const miss = filingMiss(verdict);
+    if (!miss?.startsWith("geo_")) continue;
+    if (await withdrawUntouchedScanPosition(row.id, settings.gate, { allowManual: row.source === "manual", reason: miss })) withdrawn++;
   }
   return { withdrawn };
 }

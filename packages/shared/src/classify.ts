@@ -107,6 +107,24 @@ function specificPlace(location: string): boolean {
   return FOREIGN_REGION.test(location) || HARD_CITY.test(location) || locationSegments(location).some(segmentIsUsState);
 }
 
+/** Three or more places, and not only cities, is a country list rather than one office. */
+function isCountryList(location: string): boolean {
+  if (!isTzOverlapLocation(location)) return false;
+  const segs = locationSegments(location);
+  if (!segs.length) return false;
+  const cityOrState = segs.filter((s) => HARD_CITY.test(s) || segmentIsUsState(s)).length;
+  return cityOrState < segs.length;
+}
+
+/** A single city, country, or office list. Remote wording and country lists are not offices. */
+export function isNamedOffice(location = ""): boolean {
+  const loc = location.trim();
+  if (!loc || FRIENDLY_PLACE.test(loc)) return false;
+  if (/\b(remote|remoto|hybrid|on[\s-]*site|worldwide|global|anywhere|distributed)\b/i.test(loc)) return false;
+  if (isCountryList(loc)) return false;
+  return specificPlace(loc);
+}
+
 export function geoClass(
   location = "",
   workplace = "",
@@ -181,8 +199,8 @@ export function classifyListing(input: {
   const locationDiscarded = isCompanyNameLocation(raw, company);
   const locationClean = locationDiscarded ? "" : raw;
   let workplace = workplaceOf(input.workplaceType, input.isRemote, [locationClean, input.title || ""].filter(Boolean).join(" "));
-  // A named city or country, with no remote or hybrid marker, is an office. Unknown was hiding these from both filters.
-  if (workplace === "unknown" && specificPlace(locationClean) && !FRIENDLY_PLACE.test(locationClean)) workplace = "onsite";
+  // A named city or country, with no remote or hybrid marker, is an office. A list of countries is not one office.
+  if (workplace === "unknown" && isNamedOffice(locationClean)) workplace = "onsite";
   const workplaceBlob = workplace === "remote" ? "remote" : input.workplaceType || "";
   let g = geoClass(locationClean, workplaceBlob);
   const noPlace = !locationClean || /^\s*remote\s*$/i.test(locationClean);
