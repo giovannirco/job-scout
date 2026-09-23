@@ -220,6 +220,34 @@ describe("core on pglite", () => {
     if (claimed) await completeJob(claimed.id, { ok: true });
   });
 
+  it("does not queue triage when no model key is configured", async () => {
+    const { followUpIntake } = await import("./scan.js");
+    const { upsertFromJob } = await import("./positions.js");
+    const { coreEnv } = await import("./env.js");
+    const { getDb, jobs } = await import("@job-scout/db");
+    const { eq } = await import("drizzle-orm");
+    const prev = coreEnv.openaiApiKey;
+    coreEnv.openaiApiKey = "";
+    try {
+      const { position } = await upsertFromJob(
+        job({
+          jobId: "nokey",
+          externalIdentity: "greenhouse:acme:nokey",
+          url: "https://boards.greenhouse.io/acme/jobs/nokey",
+          title: "Platform Engineer",
+        }),
+        { source: "test" },
+      );
+      const follow = await followUpIntake(position, { created: true, revived: false });
+      expect(follow.triageJobId).toBeNull();
+      const db = await getDb();
+      const mine = await db.select({ payload: jobs.payload }).from(jobs).where(eq(jobs.type, "triage"));
+      expect(mine.some((r) => (r.payload as { positionId?: string }).positionId === position.id)).toBe(false);
+    } finally {
+      coreEnv.openaiApiKey = prev;
+    }
+  });
+
   it("does not revive archived positions on a board-scan upsert", async () => {
     const { upsertFromJob, archivePosition } = await import("./positions.js");
     const j = job({
