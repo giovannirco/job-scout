@@ -9,6 +9,14 @@ describe("gateListing", () => {
     expect(v.matchedInclude).toBe("platform engineer");
   });
 
+  it("treats new grad and early career as junior", () => {
+    const gate = { ...DEFAULT_GATE, titleInclude: ["software engineer"], titleExclude: ["junior", "intern"] };
+    expect(gateListing({ title: "Software Engineer, New Grad 2027", locationRaw: "Remote" }, gate).reason).toBe("title_exclude:new grad");
+    expect(gateListing({ title: "Software Engineer, Early Career — Immediate Start", locationRaw: "Remote" }, gate).reason).toBe("title_exclude:early career");
+    expect(gateListing({ title: "New Graduate Software Engineer", locationRaw: "Remote" }, gate).reason).toBe("title_exclude:new graduate");
+    expect(gateListing({ title: "Senior Software Engineer", locationRaw: "Remote" }, gate).pass).toBe(true);
+  });
+
   it("rejects excluded titles before anything else", () => {
     const v = gateListing({ title: "Engineering Manager, Platform", locationRaw: "Remote" }, DEFAULT_GATE);
     expect(v.pass).toBe(false);
