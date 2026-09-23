@@ -269,7 +269,7 @@ function PositionsTable({ rows, home }: { rows: PositionRow[]; home?: string | n
               </div>
               {r.triageOneLiner ? <div className="text-[11.5px] text-muted truncate">{r.triageOneLiner}</div> : null}
               {r.status === "archived" && r.archiveReason ? <div className="text-[11px] text-faint truncate" title={r.archiveReason}>{archiveReasonLabel(r.archiveReason)}</div> : null}
-              {(r.siblingCount || 0) > 1 ? <div className="text-[11px] text-muted">{r.siblingCount} related postings</div> : null}
+              {(r.siblingCount || 0) > 1 ? <div className="text-[11px] text-muted">{new Set((r.locations || []).filter(Boolean)).size <= 1 ? `${r.siblingCount} copies of this posting` : `${r.siblingCount} related postings`}</div> : null}
               {r.repostOfId ? <div className="text-[11px] text-amber-500">Possible repost · prior {r.repost?.status || "history"}</div> : null}
             </Td>
             <Td>
