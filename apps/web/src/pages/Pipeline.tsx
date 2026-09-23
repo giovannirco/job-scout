@@ -172,7 +172,7 @@ export function PipelinePage() {
       ) : s.view === "board" ? (
         <Board rows={rows} />
       ) : (
-        <PositionsTable rows={rows} />
+        <PositionsTable rows={rows} home={profile.data?.location} />
       )}
       {total > PAGE_SIZE && s.view !== "board" ? <Pager page={page} pageSize={PAGE_SIZE} total={total} onPage={(p) => navigate({ search: (prev) => ({ ...prev, page: p > 1 ? p : undefined }) })} /> : null}
     </Page>
@@ -191,7 +191,7 @@ function stripUndefined<T extends object>(o: T): T {
   return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T;
 }
 
-function PositionsTable({ rows }: { rows: PositionRow[] }) {
+function PositionsTable({ rows, home }: { rows: PositionRow[]; home?: string | null }) {
   const navigate = useNavigate({ from: "/pipeline" });
   const search = useSearch({ from: "/pipeline" });
   const [cursor, setCursor] = useState<number>(-1);
@@ -283,7 +283,7 @@ function PositionsTable({ rows }: { rows: PositionRow[] }) {
               </div>
             </Td>
             <Td>
-              <GeoChip geo={r.geoClass} location={r.locationRaw} home={profile.data?.location} />
+              <GeoChip geo={r.geoClass} location={r.locationRaw} home={home} />
             </Td>
             <Td mono title={r.familySalarySpan ? "Lowest to highest posted band across the related locations" : undefined}>{money(r.salaryMin, r.salaryMax, r.salaryCurrency) || <span className="text-faint">—</span>}</Td>
             <Td>
