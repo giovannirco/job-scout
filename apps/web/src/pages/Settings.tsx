@@ -107,7 +107,8 @@ function NotificationsTab() {
           <Switch checked={f.enabled} onChange={(v) => setF({ ...f, enabled: v })} label="Send product alerts" />
           <div className="flex items-center gap-2 text-[12.5px] text-muted">
             <MessageCircle className="h-3.5 w-3.5" />
-            Desk chat model <span className="text-fg">{f.chat.model}</span> · group job-scout chat
+            Desk chat model <span className="text-fg">{f.chat.model}</span>
+            {f.channels.chat.chatId.trim() ? " · replies go to the chat group" : " · add a chat group id to receive replies"}
           </div>
           <div className="grid grid-cols-2 gap-2">
             <label className="text-[12px] text-muted">
@@ -127,7 +128,13 @@ function NotificationsTab() {
             <div key={ch} className="p-3 flex flex-wrap items-center gap-2">
               <Switch checked={f.channels[ch].enabled} onChange={(v) => setF({ ...f, channels: { ...f.channels, [ch]: { ...f.channels[ch], enabled: v } } })} label={ch} />
               <Input className="flex-1 min-w-[12rem]" value={f.channels[ch].chatId} onChange={(e) => setF({ ...f, channels: { ...f.channels, [ch]: { ...f.channels[ch], chatId: e.target.value } } })} />
-              <Btn onClick={() => void test(ch)}>Test</Btn>
+              <Btn
+                disabled={!q.data.wahaConfigured || !f.channels[ch].chatId.trim()}
+                title={q.data.wahaConfigured ? (f.channels[ch].chatId.trim() ? "Send a test message" : "Add a chat id first") : "Set WAHA_API_KEY before sending a test"}
+                onClick={() => void test(ch)}
+              >
+                Test
+              </Btn>
             </div>
           ))}
         </div>

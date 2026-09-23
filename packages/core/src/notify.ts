@@ -8,7 +8,7 @@ import {
 } from "@job-scout/shared";
 import { coreEnv } from "./env.js";
 import { getSettings, updateSettings } from "./settings.js";
-import { getWahaSender } from "./waha.js";
+import { getWahaSender, wahaConfigured } from "./waha.js";
 import { log as rootLog } from "@job-scout/shared";
 import { notifyEnqueued, notifySent } from "./metrics.js";
 
@@ -158,6 +158,7 @@ export async function retryFailedNotifications(limit = 20): Promise<number> {
 }
 
 export async function sendTestNotify(channel: string): Promise<{ ok: boolean; error?: string; chatId: string }> {
+  if (!wahaConfigured()) return { ok: false, error: "WAHA is not configured", chatId: "" };
   const settings = await getSettings();
   const ch = settings.notifications.channels[channel as keyof typeof settings.notifications.channels];
   if (!ch.chatId) return { ok: false, error: "channel has no chatId", chatId: "" };

@@ -1110,4 +1110,11 @@ describe("core on pglite", () => {
     expect(ids).toContain(us.position.id);
     expect(ids).not.toContain(poland.position.id);
   });
+
+  it("refuses a notification test when WhatsApp is not configured", async () => {
+    const { sendTestNotify } = await import("./notify.js");
+    const result = await sendTestNotify("desk");
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/not configured/i);
+  });
 });
