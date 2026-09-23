@@ -20,18 +20,38 @@ export async function resolveCompanyForName(
   }
   if (!company) {
     const cid = id("co");
-    await db.insert(companies).values({
-      id: cid,
-      slug: companySlug || slugify(name) || cid,
-      name: displayName,
-      website: extras?.website || null,
-      careersUrl: extras?.careersUrl || null,
-      overview: extras?.overview || null,
-      metadata: {},
-    });
-    company = (await db.select().from(companies).where(eq(companies.id, cid)).limit(1))[0]!;
+    const slug = companySlug || slugify(name) || cid;
+    try {
+      await db.insert(companies).values({
+        id: cid,
+        slug,
+        name: displayName,
+        website: extras?.website || null,
+        careersUrl: extras?.careersUrl || null,
+        overview: extras?.overview || null,
+        metadata: {},
+      });
+      company = (await db.select().from(companies).where(eq(companies.id, cid)).limit(1))[0]!;
+    } catch (err) {
+      if (!isUniqueViolation(err)) throw err;
+      company = (await db.select().from(companies).where(eq(companies.slug, slug)).limit(1))[0];
+      if (!company) throw err;
+    }
   }
   return company;
+}
+
+function isUniqueViolation(err: unknown): boolean {
+  const seen = new Set<unknown>();
+  let cur: unknown = err;
+  while (cur && typeof cur === "object" && !seen.has(cur)) {
+    seen.add(cur);
+    const o = cur as { code?: unknown; message?: unknown; cause?: unknown };
+    if (o.code === "23505") return true;
+    if (typeof o.message === "string" && /duplicate key|unique constraint|already exists/i.test(o.message)) return true;
+    cur = o.cause;
+  }
+  return false;
 }
 
 export async function getCompany(idOrSlug: string) {

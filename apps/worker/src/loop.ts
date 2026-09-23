@@ -45,7 +45,7 @@ export async function processJob(job: JobRow): Promise<Record<string, unknown>> 
       if (p.watchId) return (await checkWatch(String(p.watchId))) as unknown as Record<string, unknown>;
       return (await checkPosition(String(p.positionId))) as unknown as Record<string, unknown>;
     case "scan_url": {
-      const r = await intakeUrl(String(p.url), { companyName: p.companyName ? String(p.companyName) : undefined });
+      const r = await intakeUrl(String(p.url), { companyName: p.companyName ? String(p.companyName) : undefined, source: "scan:discovery" });
       return { positionId: r.position.id, created: r.created, triageJobId: r.triageJobId };
     }
     case "triage":
