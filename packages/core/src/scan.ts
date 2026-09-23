@@ -2,7 +2,7 @@ import { and, desc, eq, gte, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { boardDeltas, boardSnapshots, boardSources, discoveryFeed, getDb, id, positions } from "@job-scout/db";
 import { detectAts, externalIdentityFromDetect, fetchGreenhouseJob, greenhouseListingNeedsBoardFetch, listBoard, type AtsJob, type BoardJobSummary } from "@job-scout/ats";
 import { fetchJob as fetchJobFromUrl } from "./fetch-job.js";
-import { classifyListing, craftFamily, gateListing, geoClass, isNoiseJobTitle, parseClipListing, type GateConfig, type GateVerdict } from "@job-scout/shared";
+import { classifyListing, craftFamily, gateListing, geoClass, homeMarket, isNoiseJobTitle, missesHomeMarket, parseClipListing, type GateConfig, type GateVerdict } from "@job-scout/shared";
 import { enqueueJob } from "./jobs.js";
 import { llmConfigured } from "./llm.js";
 import { archivePosition, upsertFromJob } from "./positions.js";
@@ -67,10 +67,11 @@ export async function scanBoard(boardId: string, opts: { force?: boolean } = {})
 
   const passedJobs: Array<{ j: BoardJobSummary; verdict: GateVerdict }> = [];
   const nowIso = new Date();
+  const home = await profileLocation();
   for (const j of list) {
     const verdict: GateVerdict = isNoiseJobTitle(j.title)
       ? { pass: false, reason: "junk_title", matchedInclude: null }
-      : listingGate(j, settings.gate);
+      : listingGate(j, settings.gate, home);
     const lane = verdict.pass ? "passed" : "filtered";
     if (verdict.pass) {
       res.passed++;
@@ -264,9 +265,15 @@ export async function enqueueDueBoardScans(opts: { limit?: number; all?: boolean
   return { due: due.length, enqueued };
 }
 
+async function profileLocation(): Promise<string> {
+  const { getProfile } = await import("./profile.js");
+  return (await getProfile()).location || "";
+}
+
 function listingGate(
   input: { title: string; locationRaw?: string | null; postedAt?: string | Date | null; workplaceType?: string | null; isRemote?: boolean | null },
   gate: GateConfig,
+  home = "",
 ): GateVerdict {
   if (isNoiseJobTitle(input.title)) return { pass: false, reason: "junk_title", matchedInclude: null };
   const facts = classifyListing({
@@ -276,12 +283,16 @@ function listingGate(
     title: input.title,
   });
   const workplaceType = input.workplaceType || (facts.workplace !== "unknown" ? facts.workplace : undefined);
-  return gateListing({
+  const verdict = gateListing({
     title: input.title,
     locationRaw: input.locationRaw,
     postedAt: input.postedAt,
     workplaceType,
   }, gate);
+  if (verdict.pass && missesHomeMarket(input.locationRaw || "", home)) {
+    return { pass: false, reason: "geo_home", matchedInclude: verdict.matchedInclude };
+  }
+  return verdict;
 }
 
 function titleGateMiss(title: string, gate: GateConfig): string | null {
@@ -297,7 +308,7 @@ function titleGateMiss(title: string, gate: GateConfig): string | null {
 function filingMiss(verdict: GateVerdict): string | null {
   if (verdict.pass || !verdict.reason) return null;
   if (verdict.reason === "title_no_include" || verdict.reason.startsWith("title_exclude:")) return verdict.reason;
-  if (verdict.reason.startsWith("geo_block:") || verdict.reason === "geo_unlisted") return verdict.reason;
+  if (verdict.reason.startsWith("geo_block:") || verdict.reason === "geo_unlisted" || verdict.reason === "geo_home") return verdict.reason;
   return null;
 }
 
@@ -369,6 +380,7 @@ export async function regateRecentDiscovery(hours = 24 * 7): Promise<{
   let promoted = 0;
   let withdrawn = 0;
   const considered = new Set<string>();
+  const home = await profileLocation();
   const positionIds = [...new Set(rows.map((r) => r.positionId).filter((id): id is string => Boolean(id)))];
   const storedWorkplace = new Map<string, string | null>();
   if (positionIds.length) {
@@ -382,7 +394,7 @@ export async function regateRecentDiscovery(hours = 24 * 7): Promise<{
       locationRaw: row.locationRaw,
       postedAt: row.postedAt,
       workplaceType: workplaceType && workplaceType !== "unknown" ? workplaceType : undefined,
-    }, settings.gate);
+    }, settings.gate, home);
     const lane = verdict.pass ? "passed" : "filtered";
     const miss = filingMiss(verdict);
     if (miss && row.positionId && !considered.has(row.positionId)) {
@@ -485,6 +497,7 @@ export async function repairOfficeDiscoveryFilings(): Promise<{ withdrawn: numbe
     .from(positions)
     .where(and(eq(positions.status, "triaged"), inArray(positions.workplace, ["onsite", "hybrid"])));
   let withdrawn = 0;
+  const home = await profileLocation();
   for (const row of rows) {
     const feed = (
       await db
@@ -499,10 +512,50 @@ export async function repairOfficeDiscoveryFilings(): Promise<{ withdrawn: numbe
       locationRaw: feed?.locationRaw,
       postedAt: feed?.postedAt,
       workplaceType: row.workplace,
-    }, settings.gate);
+    }, settings.gate, home);
     const miss = filingMiss(verdict);
     if (!miss?.startsWith("geo_")) continue;
     if (await withdrawUntouchedScanPosition(row.id, settings.gate, { allowManual: row.source === "manual", reason: miss })) withdrawn++;
+  }
+  return { withdrawn };
+}
+
+/**
+ * A US profile location cannot take a role that requires another country.
+ * Scan filings and discovery promotions are withdrawn. A hand-pasted URL with no discovery row stays.
+ */
+export async function repairHomeMarketFilings(): Promise<{ withdrawn: number }> {
+  const db = await getDb();
+  const settings = await getSettings({ fresh: true });
+  const home = await profileLocation();
+  if (!homeMarket(home)) return { withdrawn: 0 };
+  const rows = await db
+    .select({
+      id: positions.id,
+      title: positions.title,
+      workplace: positions.workplace,
+      source: positions.source,
+    })
+    .from(positions)
+    .where(eq(positions.status, "triaged"));
+  let withdrawn = 0;
+  for (const row of rows) {
+    const feed = (
+      await db
+        .select({ locationRaw: discoveryFeed.locationRaw, postedAt: discoveryFeed.postedAt })
+        .from(discoveryFeed)
+        .where(eq(discoveryFeed.positionId, row.id))
+        .limit(1)
+    )[0];
+    if (row.source === "manual" && !feed) continue;
+    const verdict = listingGate({
+      title: row.title,
+      locationRaw: feed?.locationRaw,
+      postedAt: feed?.postedAt,
+      workplaceType: row.workplace && row.workplace !== "unknown" ? row.workplace : undefined,
+    }, settings.gate, home);
+    if (verdict.reason !== "geo_home") continue;
+    if (await withdrawUntouchedScanPosition(row.id, settings.gate, { allowManual: row.source === "manual", reason: "geo_home" })) withdrawn++;
   }
   return { withdrawn };
 }

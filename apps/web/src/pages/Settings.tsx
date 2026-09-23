@@ -182,6 +182,7 @@ function ProfileTab() {
 
   async function save() {
     const rolesChanged = JSON.stringify(f.targetRoles || []) !== JSON.stringify(q.data?.targetRoles || []);
+    const locationChanged = (f.location || "") !== (q.data?.location || "");
     const { id: _id, ...rest } = f as Profile;
     void _id;
     await patch("/api/v1/settings/profile", rest);
@@ -189,7 +190,13 @@ function ProfileTab() {
     void qc.invalidateQueries({ queryKey: ["settings"] });
     void qc.invalidateQueries({ queryKey: ["radar"] });
     void qc.invalidateQueries({ queryKey: ["today"] });
-    toast.success(rolesChanged ? "Profile saved. Target roles now filter listings, and untouched filings that miss the title are archived." : "Profile saved");
+    toast.success(
+      rolesChanged
+        ? "Profile saved. Target roles now filter listings, and untouched filings that miss the title are archived."
+        : locationChanged
+          ? "Profile saved. Remote roles that require another country were archived."
+          : "Profile saved",
+    );
   }
   if (q.isLoading || !q.data) return <Loading rows={6} />;
   const set = <K extends keyof Profile>(k: K, v: Profile[K]) => setF((prev) => ({ ...prev, [k]: v }));
@@ -203,7 +210,7 @@ function ProfileTab() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <Input label="Display name" value={f.displayName || ""} onChange={(e) => set("displayName", e.target.value)} />
           <Input label="Email" value={f.email || ""} onChange={(e) => set("email", e.target.value)} />
-          <Input label="Location" value={f.location || ""} onChange={(e) => set("location", e.target.value)} />
+          <Input label="Location" hint="A US city drops remote roles that require another country. Leave this blank to keep them." value={f.location || ""} onChange={(e) => set("location", e.target.value)} />
           <Input label="Last title" value={f.lastTitle || ""} onChange={(e) => set("lastTitle", e.target.value)} />
           <Input label="Last company" value={f.lastCompany || ""} onChange={(e) => set("lastCompany", e.target.value)} />
           <Input label="Cash floor (USD / yr)" type="number" value={f.cashFloorUsd ?? 0} onChange={(e) => set("cashFloorUsd", Number(e.target.value))} />

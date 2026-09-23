@@ -29,6 +29,7 @@ import {
   browserStatus,
   totalsToday,
   regateRecentDiscovery,
+  repairHomeMarketFilings,
   syncGateFromTargetRoles,
   titleIncludesFromRoles,
 } from "@job-scout/core";
@@ -71,7 +72,12 @@ settingsRoutes.patch("/profile", async (c) => {
     Array.isArray(patch.targetRoles) &&
     JSON.stringify(titleIncludesFromRoles(before.targetRoles)) !== JSON.stringify(titleIncludesFromRoles(next.targetRoles));
   const synced = rolesChanged ? await syncGateFromTargetRoles(next.targetRoles) : null;
-  return ok(c, next, synced ? { regate: synced.regate, titleInclude: synced.titleInclude } : {});
+  const locationChanged = (before.location || "") !== (next.location || "");
+  const home = locationChanged ? await repairHomeMarketFilings() : null;
+  return ok(c, next, {
+    ...(synced ? { regate: synced.regate, titleInclude: synced.titleInclude } : {}),
+    ...(home ? { home } : {}),
+  });
 });
 
 /** Settings > AI */
