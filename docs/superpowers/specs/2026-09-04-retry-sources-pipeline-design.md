@@ -1,5 +1,7 @@
 # job-scout 2.3.9 — retry, sources, positions panel
 
+> Historical design record from 2026-09-04. Current behavior is in `README.md` and `docs/`. This file is not kept in sync.
+
 Status: accepted (unattended; operator asked to lock decisions and ship)  
 Date: 2026-09-04  
 Branch: `v2` → image `2.3.9`  

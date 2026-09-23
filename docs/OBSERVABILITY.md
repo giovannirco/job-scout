@@ -37,6 +37,7 @@ The dashboard lives in the repo at `deploy/helm/job-scout/dashboards/job-scout.j
 | `job_scout_scheduler_runs_total` | `task status` | In-process ticks (`requeue-stale` always; others only with `WORKER_SCHEDULER=1`) |
 | `job_scout_board_scans_total` | `provider status` | Board scans |
 | `job_scout_scan_listings_total` | `provider outcome` | `seen` `gate_pass` `gate_fail` `created` `updated` `closed` |
+| `job_scout_ingest_quality_total` | `reason` | Ingest rejected or repaired (`placeholder_url`, `unresolved_company`, `junk_title`, `triage_zero_score`) |
 | `job_scout_jd_changes_total` | `change_kind material` | JD revisions written |
 | `job_scout_watch_checks_total` | `outcome` | `unchanged` `changed` `closed` `first_seen` |
 | `job_scout_autopilot_actions_total` | `hook action` | `enqueue_evaluate`, `enqueue_company_research`, `enqueue_materials`, `enqueue_jd_review`, `approval`, `noop` |
@@ -91,7 +92,7 @@ Declare it in `packages/core/src/metrics.ts` (all names are prefixed `job_scout_
 Shape:
 
 ```json
-{"ts":"2026-09-03T21:28:32.626Z","level":"info","component":"worker","version":"2.2.0","scope":"worker",
+{"ts":"2026-09-03T21:28:32.626Z","level":"info","component":"worker","version":"2.8.4","scope":"worker",
  "msg":"job.ok","jobId":"job_YNy_9tr9vrwt","type":"triage","attempt":1,"positionId":"pos_bk_o9LPC1cTL","ms":1779,"verdict":"fail","score":2.8}
 ```
 

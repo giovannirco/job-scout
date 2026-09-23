@@ -8,7 +8,7 @@ flowchart LR
   Agents[MCP clients<br/>career-ops · Grok · Cursor] -->|/mcp| API
   API --> PG[(Postgres)]
   Worker --> PG
-  Worker --> ATS[Greenhouse · Ashby · Lever · RemoteOK · WWR RSS · HTML]
+  Worker --> ATS[Greenhouse · Ashby · Lever · BambooHR · RemoteOK · Remotive · WWR RSS · HTML]
   Worker --> LLM[OpenAI-compatible gateway]
   Worker -->|sendText| WAHA[a WAHA server]
   WAHA -->|webhook message| API
@@ -39,6 +39,9 @@ Both api and worker import `@job-scout/core`; there is no HTTP between them, the
 | `company_research` | you, autopilot | company dossier → `evaluations(kind=company_research)` |
 | `jd_review` | material JD change, you | what changed and whether it matters → `evaluations(kind=jd_review)` |
 | `materials` | you, autopilot | tailored resume + cover → `application_materials` |
+| `listing_classify` | messy ATS location, you, MCP | tighten geo from the JD. It does not weaken an existing hard block |
+| `form_answers` | you, Autopilot preset after evaluate | draft answers on `application_questions`. Nothing is submitted |
+| `interview_brief` | a stored transcript, you, MCP | markdown debrief → `interviews.ai_brief_*`. Skipped when no model key is set |
 | `retention` | scheduler / CronJob | prune snapshots, jobs, discovery rows, deltas, LLM runs per Settings › System |
 
 ## Packages
@@ -47,7 +50,7 @@ Both api and worker import `@job-scout/core`; there is no HTTP between them, the
 |--|--|
 | `packages/shared` | pure code: gate, settings schema + defaults, notify routing/allowlist/quiet hours, classify (craft/geo/remote), salary parsing, hashing, types, the JSON logger (`log.ts`) |
 | `packages/db` | drizzle schema, migrations, client (Postgres via `pg`, or PGlite when `DATABASE_URL` is unset); includes `notification_outbox` |
-| `packages/ats` | URL detection and fetchers; `fetchJobFromUrl(url, { render })` accepts a renderer for JS-only pages |
+| `packages/ats` | URL detection and fetchers for Greenhouse, Ashby, Lever, BambooHR, Remote OK, Remotive, and We Work Remotely; `fetchJobFromUrl(url, { render })` accepts a renderer for JS-only pages. BambooHR reads the public `careers/list` and `careers/{id}/detail` JSON |
 | `packages/llm` | OpenAI-compatible client: `chatJson` (json_schema with lenient fallback), `chatDocument` (markdown + trailing JSON), `chatStream` (tool calls); prompts as code; the scout brief |
 | `packages/core` | everything with a database: positions, companies, scan/watch, triage/evaluate/materials, autopilot hooks, approvals, chat agent, WAHA sender + notify outbox + WhatsApp inbox, browser client, settings, retention, radar; `metrics.ts` is the Prometheus registry every module increments |
 | `apps/api` | routes by resource, auth, envelope, MCP server |

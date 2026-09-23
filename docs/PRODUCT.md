@@ -8,14 +8,14 @@ job-scout is a personal career control plane for an engineer who runs a real job
 2. **Filter first, model second.** Deterministic gates run on everything. With no model key, passes sit in the pipeline unscored and the model is never called. Rejections stay visible under Discovery › Filtered.
 3. **One model call, one row.** Every operation has a model, a switch and a cap; every call is logged with tokens and latency. There is no hidden AI activity.
 4. **Append-only JD history.** Postings change quietly — comp, location, scope, closure. Each observation is a revision with a diff; nothing is overwritten.
-5. **Honest data.** Null salary when unknown, never invented. Scores are 1–5 from a documented brief, shown with the reason.
+5. **Honest data.** Null salary when unknown, never invented. Scores are 1–5 from the scout brief you wrote, shown with the reason. An empty brief is sent as empty. A board description cut off mid-sentence is labeled, and the missing words are not filled in. A revision this app rewrote is labeled **rewritten here**, apart from an employer edit.
 6. **The operator owns the truth.** Settings, profile and scout brief are editable; presets are starting points. career-ops (markdown in git) can hold the same pipeline and the two reconcile.
 
 ## Who talks to it
 
 | actor | through |
 |--|--|
-| you | the web UI (Today, Pipeline, Radar, Companies, Inbox, Position, Settings), the dock chat, the API, WhatsApp **job-scout chat** |
+| you | the web UI (Today, Pipeline, Process, Interviews, Discovery, Sources, Companies, Inbox, AI logs, Position, Settings), the dock chat, the API, WhatsApp **job-scout chat** |
 | the worker | the queue — scans, checks, model operations, retention, WhatsApp outbox flush |
 | agents (career-ops sync, Grok, Cursor, Claude Code) | MCP at `/mcp` with a scoped token |
 | the chat agent | local tools plus, when configured, a headless browser through Playwright MCP; WhatsApp **job-scout chat** uses the same agent on grok-4.6 via a ClusterIP webhook |
@@ -30,6 +30,6 @@ WhatsApp is a second surface for the same desk: Settings › Notifications route
 
 ## Non-goals
 
-- Submitting applications, filling forms, or messaging recruiters.
+- Submitting applications or messaging recruiters. Greenhouse and Ashby questions can be stored and drafted here. The employer site is where the form is sent.
 - Being a general job board. Sources are the boards and companies you add.
 - Multi-tenant SaaS. One operator, one profile, one database.
