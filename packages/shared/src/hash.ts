@@ -114,6 +114,57 @@ const MATERIAL_PATHS = new Set([
   "listing_status",
 ]);
 
+/** Drop careers-page chrome: bullet-only lines and long bullet runs. */
+export function stripCareersChrome(text: string): string {
+  const lines = (text || "").split(/\n/).filter((line) => {
+    const t = line.trim();
+    return t.length > 0 && !/^[•·●▪◦|\s]+$/.test(t);
+  });
+  return lines.join("\n").replace(/(?:[•·●▪◦]\s*){3,}/g, " ").replace(/[ \t]{2,}/g, " ").trim();
+}
+
+function descriptionProse(text: string): string {
+  return stripMarkupForCompare(stripCareersChrome(text)).replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+/** A careers page dumps a long run of bullets. A real JD uses them as list markers. */
+function hasBulletRun(text: string): boolean {
+  return /(?:[•·●▪◦]\s*){8,}/.test(text || "");
+}
+
+/**
+ * A diff that completes a bad first snapshot: our own "changed" badge flipping
+ * back to the board's open status, a trailing space, an empty location filling
+ * in, or careers-page chrome giving way to the same JD.
+ */
+export function isSnapshotCompletionDiff(d: FieldDiff): boolean {
+  if (d.path === "listing_status" && d.before === "changed" && d.after === "open") return true;
+  if (d.path === "title" && (d.before || "").trim() === (d.after || "").trim()) return true;
+  if (d.path === "location_raw" && !(d.before || "").trim()) return true;
+  if (d.path === "description_text") {
+    const before = descriptionProse(d.before || "");
+    const after = descriptionProse(d.after || "");
+    if (hasBulletRun(d.before || "") && !hasBulletRun(d.after || "")) return true;
+    if (!before || before === after) return true;
+    const bulletHeavy = ((d.before || "").match(/•/g) || []).length >= 4;
+    if (bulletHeavy && before.length < 80) return true;
+    const [shorter, longer] = before.length <= after.length ? [before, after] : [after, before];
+    const at = shorter ? longer.indexOf(shorter) : -1;
+    if (at >= 0) {
+      const extra = `${longer.slice(0, at)} ${longer.slice(at + shorter.length)}`.trim();
+      if (extra.length > 0 && extra.length < 80) return true;
+    }
+  }
+  return false;
+}
+
+/** Badge flips and trim-only titles are not a new snapshot. */
+export function isBadgeBookkeepingDiff(d: FieldDiff): boolean {
+  if (d.path === "listing_status" && d.before === "changed" && d.after === "open") return true;
+  if (d.path === "title" && (d.before || "").trim() === (d.after || "").trim()) return true;
+  return false;
+}
+
 /** Heuristic: title/comp/geo/requirements changes are material; tiny body churn is noise. */
 export function classifyMateriality(
   diffs: FieldDiff[],
@@ -129,11 +180,12 @@ export function classifyMateriality(
     return { material: true, change_kind: "closed" };
   }
 
-  if (!diffs.length) {
+  const meaningful = diffs.filter((d) => !isSnapshotCompletionDiff(d));
+  if (!meaningful.length) {
     return { material: false, change_kind: "noise_rebase" };
   }
 
-  const paths = new Set(diffs.map((d) => d.path));
+  const paths = new Set(meaningful.map((d) => d.path));
   if (paths.has("title")) return { material: true, change_kind: "title" };
   if (
     paths.has("salary_raw") ||
@@ -147,7 +199,7 @@ export function classifyMateriality(
     return { material: true, change_kind: "geo" };
   }
   if (paths.has("listing_status")) {
-    const d = diffs.find((x) => x.path === "listing_status");
+    const d = meaningful.find((x) => x.path === "listing_status");
     if (d?.after === "closed") return { material: true, change_kind: "closed" };
     if (d?.before === "closed" && d?.after === "open")
       return { material: true, change_kind: "reopened" };
@@ -157,7 +209,7 @@ export function classifyMateriality(
     return { material: true, change_kind: "content" };
   }
   if (paths.has("description_text")) {
-    const d = diffs.find((x) => x.path === "description_text");
+    const d = meaningful.find((x) => x.path === "description_text");
     const before = d?.before || "";
     const after = d?.after || "";
     if (isFormattingOnlyTextChange(before, after)) {
@@ -173,7 +225,7 @@ export function classifyMateriality(
     return { material: true, change_kind: "content" };
   }
 
-  const anyMaterial = diffs.some((d) => MATERIAL_PATHS.has(d.path));
+  const anyMaterial = meaningful.some((d) => MATERIAL_PATHS.has(d.path));
   return {
     material: anyMaterial,
     change_kind: anyMaterial ? "content" : "noise_rebase",

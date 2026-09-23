@@ -16,6 +16,7 @@ import { fetchJob as fetchJobFromUrl } from "./fetch-job.js";
 import {
   classifyMateriality,
   contentHash,
+  isBadgeBookkeepingDiff,
   craftFamily,
   fieldDiffs,
   classifyListing,
@@ -546,10 +547,13 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
     listing_status: observedStatus,
   };
   const diffs = fieldDiffs(before, after, ["title", "location_raw", "salary_raw", "description_text", "listing_status"]).filter(
-    (d) => !(d.path === "title" && isShellJobTitle(String(d.after ?? "")) && !isShellJobTitle(String(d.before ?? ""))),
+    (d) => !(d.path === "title" && isShellJobTitle(String(d.after ?? "")) && !isShellJobTitle(String(d.before ?? ""))) && !isBadgeBookkeepingDiff(d),
   );
   if (!diffs.length && nextRev > 1) {
-    await touch({ contentHash: hash });
+    await touch({
+      contentHash: hash,
+      ...(pos.listingStatus === "changed" && !listingClosed ? { listingStatus: "open" } : {}),
+    });
     watchChecks.labels({ outcome: "unchanged" }).inc();
     return { changed: false as const, revision: null };
   }
@@ -668,6 +672,24 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
     }
   }
   return { changed: true as const, revision: nextRev, material, changeKind: change_kind };
+}
+
+/** Drop "changed" when every later revision only completed a bad first snapshot. */
+export async function clearRepairedChangedBadges(): Promise<{ cleared: number }> {
+  const db = await getDb();
+  const rows = await db.select({ id: positions.id }).from(positions).where(eq(positions.listingStatus, "changed"));
+  let cleared = 0;
+  for (const row of rows) {
+    const revs = await db
+      .select({ revision: jdRevisions.revision, fieldDiffs: jdRevisions.fieldDiffs })
+      .from(jdRevisions)
+      .where(eq(jdRevisions.positionId, row.id));
+    const genuine = revs.some((rev) => rev.revision > 1 && classifyMateriality(rev.fieldDiffs || []).material);
+    if (genuine) continue;
+    await db.update(positions).set({ listingStatus: "open", updatedAt: new Date() }).where(eq(positions.id, row.id));
+    cleared++;
+  }
+  return { cleared };
 }
 
 /** Create-or-update a position from an ATS job. New positions start as `triaged` (untriaged until the LLM runs). */
