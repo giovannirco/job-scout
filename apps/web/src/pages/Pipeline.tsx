@@ -9,6 +9,7 @@ import { qs, STATUSES, useApi, useApiMeta, type PipelineStatus, type PositionRow
 import { defaultPipelinePreset } from "./pipeline-defaults";
 import { familyLocationLabel } from "./pipeline-location";
 import { ago, money } from "@/lib/format";
+import { archiveReasonLabel } from "@/lib/gate-reason";
 import type { PipelineSearch } from "@/router";
 import { Btn, Card, Dot, Empty, Loading, Monogram, Page, PageHeader, Pager, Seg, SortHead, Table, Td, Th, Tr, cn, ErrorNote } from "@/ui/kit";
 
@@ -267,6 +268,7 @@ function PositionsTable({ rows, home }: { rows: PositionRow[]; home?: string | n
                 </Link>
               </div>
               {r.triageOneLiner ? <div className="text-[11.5px] text-muted truncate">{r.triageOneLiner}</div> : null}
+              {r.status === "archived" && r.archiveReason ? <div className="text-[11px] text-faint truncate" title={r.archiveReason}>{archiveReasonLabel(r.archiveReason)}</div> : null}
               {(r.siblingCount || 0) > 1 ? <div className="text-[11px] text-muted">{r.siblingCount} related postings</div> : null}
               {r.repostOfId ? <div className="text-[11px] text-amber-500">Possible repost · prior {r.repost?.status || "history"}</div> : null}
             </Td>

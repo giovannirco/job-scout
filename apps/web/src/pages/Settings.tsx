@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { Bot, Copy, Globe, Hand, MessageCircle, Play, RefreshCw, Sparkles, Trash2, Zap } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { clipBookmarklet } from "@job-scout/shared";
+import { clipBookmarklet, titleExcludesFromNorthStar } from "@job-scout/shared";
 import { useChatScope, useTheme, type ThemePref } from "@/frame/store";
 import { api, del, patch, post, qs, useApi, type ApiToken, type AutopilotConfig, type AutopilotState, type Job, type LlmStatus, type ModelsCatalog, type NotificationsConfig, type NotifyChannel, type Profile, type Settings, type SystemInfo } from "@/lib/api";
 import { ago, compact, dateTime } from "@/lib/format";
@@ -200,6 +200,7 @@ function ProfileTab() {
   }
   if (q.isLoading || !q.data) return <Loading rows={6} />;
   const set = <K extends keyof Profile>(k: K, v: Profile[K]) => setF((prev) => ({ ...prev, [k]: v }));
+  const northStarExcludes = titleExcludesFromNorthStar(f.northStar || "");
 
   return (
     <div className="space-y-4 max-w-4xl">
@@ -221,7 +222,10 @@ function ProfileTab() {
       </Panel>
       <Panel title="What the models read">
         <div className="space-y-3">
-          <Textarea label="North star — one paragraph on what you want next" hint="The model reads this after a key is set. The sentence “not infrastructure” also excludes infrastructure, Kubernetes, and DevOps titles before any model runs." value={f.northStar || ""} onChange={(e) => set("northStar", e.target.value)} className="min-h-[60px]" />
+          <Textarea label="North star — one paragraph on what you want next" hint="The model reads this after a key is set. Some sentences also exclude titles before any model runs. Saving the profile applies that list." value={f.northStar || ""} onChange={(e) => set("northStar", e.target.value)} className="min-h-[60px]" />
+          {northStarExcludes.length ? (
+            <p className="text-[12px] text-muted">Also excluded from this paragraph: {northStarExcludes.join(", ")}.</p>
+          ) : null}
           <Textarea label="Scout brief (triage prompt: archetypes, hard DQs, comp floor, location rules)" value={f.scoutBrief || ""} onChange={(e) => set("scoutBrief", e.target.value)} className="min-h-[220px] font-mono text-[12px]" />
           <Textarea label="Identity (who you are, proof points; used by evaluate)" value={f.identityMarkdown || ""} onChange={(e) => set("identityMarkdown", e.target.value)} className="min-h-[160px] font-mono text-[12px]" />
           <Textarea label="Master resume (markdown)" value={f.masterResumeMarkdown || ""} onChange={(e) => set("masterResumeMarkdown", e.target.value)} className="min-h-[320px] font-mono text-[12px]" />
@@ -266,6 +270,8 @@ function GateTab() {
       setScan(q.data.scan);
     }
   }, [q.data]);
+  const profile = useApi<Profile>(["profile"], "/api/v1/settings/profile");
+  const northStarExcludes = titleExcludesFromNorthStar(profile.data?.northStar || "");
   if (!gate || !triage || !scan) return <Loading rows={6} />;
   const dirty = JSON.stringify({ gate, triage, scan }) !== JSON.stringify({ gate: q.data?.gate, triage: q.data?.triage, scan: q.data?.scan });
 
@@ -288,6 +294,7 @@ function GateTab() {
         </Panel>
         <Panel title="Title exclude">
           <ListEditor label="One per line" value={gate.titleExclude} onChange={(v) => setGate({ ...gate, titleExclude: v })} />
+          {northStarExcludes.length ? <p className="text-[12px] text-muted mt-2">The north star also excludes: {northStarExcludes.join(", ")}. Edit that on Profile.</p> : null}
         </Panel>
         <Panel title="Geo allow">
           <ListEditor label="One per line" value={gate.geoAllow} onChange={(v) => setGate({ ...gate, geoAllow: v })} hint="Location strings containing any of these pass." />

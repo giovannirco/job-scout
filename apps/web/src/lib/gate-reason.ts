@@ -4,9 +4,19 @@ export function gateReasonLabel(reason: string | null | undefined): string {
   if (reason === "title_no_include") return "title not in your roles";
   if (reason === "junk_title") return "unreadable title";
   if (reason === "geo_unknown") return "no location";
+  if (reason === "geo_home") return "outside your home market";
   if (reason === "geo_unlisted") return "location not allowed";
   if (reason.startsWith("title_exclude:")) return `excluded: ${reason.slice("title_exclude:".length)}`;
   if (reason.startsWith("stale:")) return `older than the age limit (${reason.slice("stale:".length)})`;
   if (reason.startsWith("geo_block:")) return `location blocked: ${reason.slice("geo_block:".length)}`;
   return reason;
+}
+
+/** Archive notes store a sentence plus the gate code in parentheses. */
+export function archiveReasonLabel(reason: string | null | undefined): string {
+  if (!reason) return "";
+  const code = reason.match(/\(([^)]+)\)\s*$/)?.[1];
+  if (!code) return reason;
+  const label = gateReasonLabel(code);
+  return label === code ? reason : label;
 }
