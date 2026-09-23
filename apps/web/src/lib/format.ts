@@ -122,6 +122,19 @@ export function createdFromLabel(title: string | null | undefined): string {
   return `Created from ${label}`;
 }
 
+/** Multi-select answers are one choice per line so a label can contain a comma. */
+export function multiAnswerValues(answer: string | null | undefined): string[] {
+  return (answer || "").split("\n").map((s) => s.trim()).filter(Boolean);
+}
+
+export function toggleMultiAnswer(answer: string | null | undefined, option: string, options: string[]): string {
+  const selected = new Set(multiAnswerValues(answer));
+  if (selected.has(option)) selected.delete(option);
+  else selected.add(option);
+  const ordered = [...options.filter((item) => selected.has(item)), ...[...selected].filter((item) => !options.includes(item))];
+  return ordered.join("\n");
+}
+
 /** A question with status open has not been answered yet. */
 export function questionStatusLabel(status: string | null | undefined): string {
   if (status === "open") return "unanswered";

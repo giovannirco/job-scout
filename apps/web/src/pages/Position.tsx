@@ -10,7 +10,7 @@ import { StatusMenu, useStatusChange } from "@/components/status-menu";
 import { openDock, useChatScope } from "@/frame/store";
 import { INTERVIEW_OUTCOMES, INTERVIEW_STAGES, INTERVIEW_STATUSES, changeKindLabel, fitsHomeMarket, humanDiffSummary, isCompanyNameLocation } from "@job-scout/shared";
 import { api, del, patch, post, qs, useApi, type Evaluation, type Interview, type Material, type Person, type PipelineStatus, type PositionDetail, type Profile, type Revision, type SystemInfo, type TimelineEvent, type TriageJson } from "@/lib/api";
-import { ago, createdFromLabel, dateShort, dateTime, employmentLabel, host, jdChangedAt, money, questionStatusLabel, readableJd, sourceLabel, titleCase } from "@/lib/format";
+import { ago, createdFromLabel, dateShort, dateTime, employmentLabel, host, jdChangedAt, money, multiAnswerValues, questionStatusLabel, readableJd, sourceLabel, titleCase, toggleMultiAnswer } from "@/lib/format";
 import { Btn, Card, Chip, Dot, Empty, ErrorNote, Field, IconBtn, Input, Loading, Monogram, Page, Panel, Select, SortHead, Tabs, Textarea, TONE_DOT, TONE_TEXT, cn } from "@/ui/kit";
 
 type Tab = "brief" | "evaluation" | "jd" | "materials" | "forms" | "company" | "history";
@@ -136,6 +136,7 @@ export function PositionPage() {
               {p.employmentType ? <span>{employmentLabel(p.employmentType)}</span> : null}
               {p.craftFamily ? <span>{titleCase(p.craftFamily)}</span> : null}
               <span className="font-mono text-[11px] text-faint tabular">
+                {p.postedAt ? `posted ${ago(p.postedAt)} · ` : ""}
                 seen {ago(p.firstSeenAt)}
                 {jdChangedAt(p.firstSeenAt, p.lastChangedAt) ? ` · changed ${ago(p.lastChangedAt)}` : ""}
                 {p.appliedAt ? ` · applied ${ago(p.appliedAt)}` : ""}
@@ -713,10 +714,50 @@ function questionOptions(row: FormQuestion): string[] {
   return Array.isArray(raw) ? raw.filter((option) => option.trim()) : [];
 }
 
+function MultiAnswer({
+  row,
+  options,
+  onChange,
+  onCommit,
+}: {
+  row: FormQuestion;
+  options: string[];
+  onChange: (value: string) => void;
+  onCommit: (value: string) => Promise<void>;
+}) {
+  const [filter, setFilter] = useState("");
+  const selected = new Set(multiAnswerValues(row.answer));
+  const needle = filter.trim().toLowerCase();
+  const shown = needle ? options.filter((option) => option.toLowerCase().includes(needle)) : options;
+  function toggle(option: string) {
+    const value = toggleMultiAnswer(row.answer, option, options);
+    onChange(value);
+    void onCommit(value);
+  }
+  return (
+    <div className="space-y-2">
+      {options.length > 12 ? <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={`Filter ${options.length} choices`} /> : null}
+      <div className="max-h-48 overflow-auto rounded-md border border-border divide-y divide-border/60">
+        {shown.length === 0 ? <div className="px-2 py-1.5 text-[12px] text-faint">No matching choice.</div> : null}
+        {shown.map((option) => (
+          <label key={option} className="flex items-start gap-2 px-2 py-1.5 text-[12.5px]">
+            <input type="checkbox" className="mt-0.5" checked={selected.has(option)} onChange={() => toggle(option)} />
+            <span>{option}</span>
+          </label>
+        ))}
+      </div>
+      {selected.size ? <div className="text-[11px] text-faint">{selected.size} selected</div> : null}
+    </div>
+  );
+}
+
 function QuestionAnswer({ row, onChange, onCommit }: { row: FormQuestion; onChange: (value: string) => void; onCommit: (value: string) => Promise<void> }) {
   const options = questionOptions(row);
   const kind = row.inputType || "unknown";
-  if ((kind === "select" || kind === "multi") && options.length) {
+  if (kind === "multi" && options.length) {
+    return <MultiAnswer row={row} options={options} onChange={onChange} onCommit={onCommit} />;
+  }
+  if (kind === "select" && options.length) {
     return (
       <Select
         value={row.answer || ""}
