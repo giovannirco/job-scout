@@ -10,7 +10,7 @@ import { StatusMenu, useStatusChange } from "@/components/status-menu";
 import { openDock, useChatScope } from "@/frame/store";
 import { INTERVIEW_OUTCOMES, INTERVIEW_STAGES, INTERVIEW_STATUSES, changeKindLabel, humanDiffSummary, isCompanyNameLocation } from "@job-scout/shared";
 import { api, del, patch, post, qs, useApi, type Evaluation, type Interview, type Material, type Person, type PipelineStatus, type PositionDetail, type Profile, type Revision, type SystemInfo, type TimelineEvent, type TriageJson } from "@/lib/api";
-import { ago, dateShort, dateTime, employmentLabel, host, jdChangedAt, money, titleCase } from "@/lib/format";
+import { ago, createdFromLabel, dateShort, dateTime, employmentLabel, host, jdChangedAt, money, questionStatusLabel, titleCase } from "@/lib/format";
 import { Btn, Card, Chip, Dot, Empty, ErrorNote, Field, IconBtn, Input, Loading, Monogram, Page, Panel, Select, SortHead, Tabs, Textarea, TONE_DOT, TONE_TEXT, cn } from "@/ui/kit";
 
 type Tab = "brief" | "evaluation" | "jd" | "materials" | "forms" | "company" | "history";
@@ -683,7 +683,7 @@ function HistoryTab({ p }: { p: PositionDetail }) {
               <div className="absolute -left-[60px] top-[11px] w-[48px] text-right font-mono text-[10px] text-faint tabular leading-tight">{dateTime(e.occurredAt).replace(",", "\n")}</div>
               <div className="flex items-center gap-2 text-[12.5px]">
                 <span className="font-mono text-[10px] uppercase text-muted">{e.kind}</span>
-                <span>{e.title}</span>
+                <span>{createdFromLabel(e.title)}</span>
                 {e.actor && e.actor !== "system" ? <span className="text-faint text-[11px]">· {e.actor}</span> : null}
               </div>
               {e.body ? <div className="text-[12px] text-muted prewrap mt-0.5">{e.body}</div> : null}
@@ -711,7 +711,8 @@ function FormsTab({ p, noKey, onDraft }: { p: PositionDetail; noKey: boolean; on
   const navigate = useNavigate({ from: "/positions/$id" });
   const id = p.id;
   const harvestError = (p.metadata as { forms?: { harvestError?: string } } | null)?.forms?.harvestError;
-  const q = useApi<FormQuestion[]>(["position", id, "questions", search.sort], `/api/v1/positions/${id}/questions${qs({ sort: search.sort })}`);
+  const questionKey = ["position", id, "questions", search.sort];
+  const q = useApi<FormQuestion[]>(questionKey, `/api/v1/positions/${id}/questions${qs({ sort: search.sort })}`);
   if (q.isLoading) return <Loading rows={5} />;
   const rows = q.data || [];
   return (
@@ -739,7 +740,7 @@ function FormsTab({ p, noKey, onDraft }: { p: PositionDetail; noKey: boolean; on
             value={row.answer || ""}
             onChange={(e) => {
               const v = e.target.value;
-              q.data && qc.setQueryData(["position", id, "questions"], rows.map((r) => (r.id === row.id ? { ...r, answer: v } : r)));
+              if (q.data) qc.setQueryData(questionKey, rows.map((r) => (r.id === row.id ? { ...r, answer: v } : r)));
             }}
             onBlur={async (e) => {
               await patch(`/api/v1/positions/${id}/questions/${row.id}`, { answer: e.target.value || null });
@@ -766,7 +767,7 @@ function FormsTab({ p, noKey, onDraft }: { p: PositionDetail; noKey: boolean; on
             >
               Skip
             </Btn>
-            <span className="font-mono text-[10px] text-faint self-center">{row.status}</span>
+            <span className="font-mono text-[10px] text-faint self-center">{questionStatusLabel(row.status)}</span>
           </div>
         </Card>
       ))}
