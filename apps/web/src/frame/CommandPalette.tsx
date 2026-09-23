@@ -4,7 +4,7 @@ import { ArrowRight, Briefcase, Building2, CornerDownLeft, Search, Zap } from "l
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ScoreMeter, StatusBadge } from "@/components/badges";
-import { api, post, type CompanyRow, type PositionRow } from "@/lib/api";
+import { api, post, useApi, type CompanyRow, type PositionRow, type SystemInfo } from "@/lib/api";
 import { discoveryQueuedMessage } from "@/lib/discovery-toast";
 import { Kbd, Monogram, cn } from "@/ui/kit";
 import { setUi, toggleDock } from "./store";
@@ -31,22 +31,24 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   }, [open]);
 
   const trimmed = q.trim();
+  const sys = useApi<SystemInfo>(["system"], "/api/v1/settings/system", { staleTime: 30_000 });
+  const noKey = sys.data?.llmConfigured === false;
   const positions = useQuery<PositionRow[]>({
     queryKey: ["palette", "positions", trimmed],
-    queryFn: () => api<PositionRow[]>(`/api/v1/positions?q=${encodeURIComponent(trimmed)}&status=all&pageSize=8`),
+    queryFn: () => api<PositionRow[]>(`/api/v1/positions?q=${encodeURIComponent(trimmed)}&status=active&pageSize=8`),
     enabled: open && trimmed.length >= 2,
     staleTime: 10_000,
   });
   const companies = useQuery<CompanyRow[]>({
     queryKey: ["palette", "companies", trimmed],
-    queryFn: () => api<CompanyRow[]>(`/api/v1/companies?q=${encodeURIComponent(trimmed)}&pageSize=5`),
+    queryFn: () => api<CompanyRow[]>(`/api/v1/companies?q=${encodeURIComponent(trimmed)}&withPositions=true&pageSize=5`),
     enabled: open && trimmed.length >= 2,
     staleTime: 10_000,
   });
 
   const staticItems: Item[] = useMemo(
     () => [
-      { kind: "action", id: "add", label: "Add position from URL", hint: "fetch · gate · triage", run: () => setUi({ addOpen: true }) },
+      { kind: "action", id: "add", label: "Add position from URL", hint: noKey ? "fetch · gate" : "fetch · gate · triage", run: () => setUi({ addOpen: true }) },
       { kind: "action", id: "chat", label: "Open chat", hint: "⌘J", run: () => toggleDock("chat") },
       { kind: "action", id: "inbox", label: "Open inbox", hint: "⌘I", run: () => toggleDock("inbox") },
       {
@@ -66,7 +68,9 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       { kind: "nav", id: "pipeline", label: "Pipeline", to: "/pipeline" },
       { kind: "nav", id: "process", label: "Process", to: "/process", hint: "live loops" },
       { kind: "nav", id: "interviews", label: "Interviews", to: "/interviews", hint: "transcripts and briefs" },
-      { kind: "nav", id: "pass", label: "Pipeline · PASS awaiting decision", to: "/pipeline", search: { verdict: "pass", status: "triaged" } },
+      noKey
+        ? { kind: "nav", id: "unscored", label: "Pipeline · not scored", to: "/pipeline", search: { verdict: "none", status: "triaged", sort: "first_seen_desc" } }
+        : { kind: "nav", id: "pass", label: "Pipeline · PASS awaiting decision", to: "/pipeline", search: { verdict: "pass", status: "triaged", sort: "score_desc" } },
       { kind: "nav", id: "board", label: "Pipeline · board view", to: "/pipeline", search: { view: "board" } },
       { kind: "nav", id: "radar", label: "Radar", to: "/radar" },
       { kind: "nav", id: "companies", label: "Companies", to: "/companies" },
@@ -76,7 +80,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       { kind: "nav", id: "autopilot", label: "Settings · Autopilot", to: "/settings", search: { tab: "autopilot" } },
       { kind: "nav", id: "system", label: "Settings · System", to: "/settings", search: { tab: "system" } },
     ],
-    [qc],
+    [qc, noKey],
   );
 
   const items: Item[] = useMemo(() => {
@@ -148,7 +152,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                     <Building2 className="h-4 w-4 text-faint" />
                     <span className="flex-1 truncate">{it.row.name}</span>
                     <span className="font-mono text-[10.5px] text-faint tabular">
-                      {it.row.positionsTotal} pos · {it.row.positionsHot} hot
+                      {it.row.positionsOpen} open · {it.row.positionsHot} hot
                     </span>
                   </>
                 ) : (

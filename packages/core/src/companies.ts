@@ -102,11 +102,12 @@ export async function getCompany(idOrSlug: string) {
       salaryMax: positions.salaryMax,
       salaryCurrency: positions.salaryCurrency,
       locationRaw: sql<string | null>`(select jr.location_raw from jd_revisions jr where jr.position_id = "positions"."id" order by jr.revision desc limit 1)`,
+      firstSeenAt: positions.firstSeenAt,
       updatedAt: positions.updatedAt,
     })
     .from(positions)
     .where(eq(positions.companyId, row.id))
-    .orderBy(desc(positions.updatedAt))
+    .orderBy(desc(positions.firstSeenAt))
     .limit(100);
   const research = (
     await db

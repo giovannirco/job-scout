@@ -83,7 +83,7 @@ export function CompanyPage() {
           <Btn variant={c.research ? "default" : "primary"} disabled={noKey} title={noKey ? "Add a model key in Settings" : undefined} onClick={research}>
             <Sparkles className="h-3.5 w-3.5" /> {c.research ? "Refresh research" : "Research"}
           </Btn>
-          <IconBtn label="Chat about this company" onClick={() => openDock("chat")}>
+          <IconBtn label="Chat about this company" disabled={noKey} title={noKey ? "Add a model key in Settings" : "Chat about this company"} onClick={() => openDock("chat")}>
             <MessageSquareText className="h-4 w-4" />
           </IconBtn>
         </div>
@@ -105,7 +105,7 @@ export function CompanyPage() {
                     <Th>Title</Th>
                     <Th w={110}>Signal</Th>
                     <Th>Status</Th>
-                    <Th right>Updated</Th>
+                    <Th right>Seen</Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -182,7 +182,7 @@ function PositionRow({ p, muted, onOpen }: { p: CompanyDetail["positions"][numbe
         </span>
       </Td>
       <Td right mono className="text-muted">
-        {ago(p.updatedAt)}
+        {p.firstSeenAt ? ago(p.firstSeenAt) : <span className="text-faint">—</span>}
       </Td>
     </Tr>
   );
