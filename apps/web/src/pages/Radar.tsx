@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { LaneBadge, ScoreMeter, StatusBadge } from "@/components/badges";
 import { useChatScope } from "@/frame/store";
 import { apiMeta, del, patch, post, qs, useApi, useApiMeta, type Board, type DeltaRow, type DiscoveryRow, type Watch } from "@/lib/api";
-import { ago, dateTime, titleCase } from "@/lib/format";
+import { ago, countLabel, dateTime, titleCase } from "@/lib/format";
 import { discoveryQueuedMessage } from "@/lib/discovery-toast";
 import { gateReasonLabel } from "@/lib/gate-reason";
 import type { RadarSearch } from "@/router";
@@ -153,7 +153,7 @@ function Discovery({ search, set, summary }: { search: RadarSearch; set: (p: Par
           <Search className="h-3.5 w-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-faint" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Title, company…" className="w-[200px] h-7 rounded-md border border-border bg-bg pl-7 pr-2 text-[12px] outline-none focus:border-accent placeholder:text-faint" />
         </form>
-        <span className="ml-auto text-[11px] text-faint font-mono tabular">{total} rows</span>
+        <span className="ml-auto text-[11px] text-faint font-mono tabular">{countLabel(total, "row")}</span>
       </div>
 
       {list.isLoading ? (
@@ -261,7 +261,7 @@ function Deltas() {
           ]}
         />
         <HoursSelect value={hours} onChange={setHours} />
-        <span className="text-[11px] text-faint font-mono ml-auto tabular">{rows.length} events</span>
+        <span className="text-[11px] text-faint font-mono ml-auto tabular">{countLabel(rows.length, "event")}</span>
       </div>
       {q.isLoading ? (
         <Loading rows={8} />
