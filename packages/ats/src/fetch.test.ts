@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchAshbyJob, listBoard } from "./fetch.js";
+import { fetchAshbyJob, greenhouseOfficeIsRemote, listBoard } from "./fetch.js";
 
 const REMOTEOK_API = "https://remoteok.com/api";
 const WWR_RSS = "https://weworkremotely.com/categories/remote-devops-sysadmin-jobs.rss";
@@ -487,5 +487,13 @@ describe("listBoard remotive", () => {
   it("throws when the feed is unavailable", async () => {
     mockRemotiveFetch({ error: "nope" }, 403);
     await expect(listBoard("market", "remotive", "Remotive")).rejects.toThrow(/remotive/i);
+  });
+});
+
+describe("greenhouse office remote signal", () => {
+  it("treats a distributed office as remote and ignores a city office list that also has one", () => {
+    expect(greenhouseOfficeIsRemote(["Distributed, Global"])).toBe(true);
+    expect(greenhouseOfficeIsRemote(["Boston", "New York"])).toBe(false);
+    expect(greenhouseOfficeIsRemote(["Boston", "Remote"])).toBe(true);
   });
 });

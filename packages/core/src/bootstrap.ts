@@ -92,6 +92,15 @@ export async function bootstrap(opts: { seedBoards?: boolean } = {}) {
         })
         .catch((e) => log.error("bootstrap.place-split.failed", { err: e }));
     }
+    if (stored.blankGreenhouseVersion !== "1") {
+      const { refetchBlankGreenhouseFilings } = await import("./scan.js");
+      await refetchBlankGreenhouseFilings()
+        .then(async (r) => {
+          await updateSettings({ blankGreenhouseVersion: "1" });
+          if (r.checked) log.info("bootstrap.blank-greenhouse", r);
+        })
+        .catch((e) => log.error("bootstrap.blank-greenhouse.failed", { err: e }));
+    }
   }
   const db = await getDb();
   if (opts.seedBoards !== false) {

@@ -272,6 +272,8 @@ describe("classifyListing", () => {
     expect(classifyListing({ locationRaw: "Ontario, CAN" }).workplace).toBe("onsite");
     expect(classifyListing({ locationRaw: "San Francisco", workplaceType: "Remote", title: "Software Engineer, Distributed Data Systems" }).workplace).toBe("onsite");
     expect(classifyListing({ locationRaw: "United States", workplaceType: "Remote" }).workplace).toBe("remote");
+    expect(classifyListing({ locationRaw: "United States", isRemote: true }).workplace).toBe("remote");
+    expect(classifyListing({ locationRaw: "Boston, Massachusetts, USA; New York, New York, USA", isRemote: true }).workplace).toBe("onsite");
     expect(classifyListing({ locationRaw: "Distributed" }).workplace).toBe("remote");
     expect(classifyListing({ locationRaw: "", descriptionText: "Job ID: P1\n#LI-Remote" }).workplace).toBe("remote");
     expect(classifyListing({ locationRaw: "Poland · Brazil · Sweden · Colombia", company: "Kraken" }).workplace).toBe("unknown");
