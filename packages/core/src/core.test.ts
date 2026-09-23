@@ -264,6 +264,42 @@ describe("core on pglite", () => {
     expect(again.position.archiveReason).toContain("v1-bulk-import");
   });
 
+  it("rechecks stored discovery when the gate starts allowing java titles", async () => {
+    const { regateRecentDiscovery } = await import("./scan.js");
+    const { updateSettings } = await import("./settings.js");
+    const { getDb, discoveryFeed, jobs, id } = await import("@job-scout/db");
+    const { eq } = await import("drizzle-orm");
+    const db = await getDb();
+    const rowId = id("df");
+    await db.insert(discoveryFeed).values({
+      id: rowId,
+      externalIdentity: "greenhouse:acme:java-regate",
+      company: "Acme",
+      title: "Senior Java Engineer",
+      url: "https://boards.greenhouse.io/acme/jobs/java-regate",
+      locationRaw: "Remote",
+      lane: "filtered",
+      gateReason: "title_no_include",
+      observedAt: new Date(),
+    });
+    await updateSettings({
+      gate: {
+        titleInclude: ["java", "software engineer"],
+        titleExclude: ["manager"],
+        geoAllow: ["remote"],
+        geoBlock: [],
+        maxPostingAgeDays: 0,
+        allowUnknownGeo: true,
+      },
+    });
+    const result = await regateRecentDiscovery();
+    expect(result.nowPassed).toBeGreaterThanOrEqual(1);
+    const row = (await db.select().from(discoveryFeed).where(eq(discoveryFeed.id, rowId)))[0];
+    expect(row?.lane).toBe("passed");
+    const queued = await db.select({ payload: jobs.payload }).from(jobs).where(eq(jobs.type, "scan_url"));
+    expect(queued.some((r) => (r.payload as { url?: string }).url?.includes("java-regate"))).toBe(true);
+  });
+
   it("listDiscovery attaches an existing position by ATS identity when positionId is missing", async () => {
     const { upsertFromJob } = await import("./positions.js");
     const { listDiscovery } = await import("./radar.js");
