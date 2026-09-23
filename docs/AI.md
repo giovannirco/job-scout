@@ -25,11 +25,11 @@ Before any model call, `packages/shared/src/gate.ts` rejects listings with no mo
 | check | what it does |
 |--|--|
 | Title include | Profile **target roles** replace this list. `java` does not match JavaScript. `engineer` and `developer` match each other. |
-| Title exclude | `junior` also excludes new grad and early career. |
+| Title exclude | `junior` also excludes new grad and early career. A north star that says “not infrastructure” also excludes infrastructure, Kubernetes, and DevOps. |
 | Named office | A city or single country with no remote wording does not pass, even when unknown geo is allowed. A country list is not one office. |
-| Home location | A US city on the profile drops a remote role that requires another country. A blank location does not. |
-| Geo allow / block | Word lists. A block wins when both match (`Remote - US only` hits `us only`). |
-| Posting age | Default 14 days, when the board exposes a date. |
+| Home location | A US city drops a remote role that requires another country, and keeps “Remote - US only”. A Brazil city drops US-only roles. Other cities do not filter. Clearing the location does not restore archives. |
+| Geo allow / block | Word lists. A block wins when both match, except `us only` / `usa only` when the profile is in the US. |
+| Posting age | Default 14 days when a date is known. A job the board is still listing skips this check. |
 
 Reasons include `title_exclude:<term>`, `title_no_include`, `geo_block:<term>`, `geo_unlisted`, `geo_home`, `geo_unknown`, and `stale:<days>d`.
 

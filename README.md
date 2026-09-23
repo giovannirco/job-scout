@@ -29,7 +29,7 @@ Everything the model does is one of `triage`, `evaluate`, `materials`, `company_
 
 - The pipeline opens on **All open**, not on PASS verdicts.
 - Today counts unscored filings instead of decisions.
-- Chat, triage, evaluate, materials, JD review, company research, and drafted form answers stay off. The buttons say to add a key in Settings.
+- Chat, triage, evaluate, materials, JD review, company research, and drafted form answers stay off. The position chat button is disabled with the others.
 - Saving an interview transcript does not queue a brief.
 
 ## What the gate uses
@@ -38,13 +38,19 @@ Saving **target roles** replaces the title include list and rechecks listings fr
 
 A **named office** (a city or country, with no remote wording) does not pass, even when unknown geo is allowed. A list of countries is not one office. A board that marks the job remote still passes.
 
-A **US city** on the profile drops a remote role that requires another country. `Remote`, `Remote - USA`, and Americas stay. A blank location does not filter. The pipeline chip says **home** when a place restriction matches that city.
+A **US city** on the profile drops a remote role that requires another country, and it keeps a posting that says “Remote - US only”. A **Brazil** city drops US-only roles. Any other city does not filter. Clearing the location does not restore archived filings. The pipeline chip says **home** when a place restriction matches that city.
 
-An untouched scan filing that misses the gate is archived. A URL pasted by hand, with no discovery row, stays. Discovery stops listing an archived filing as passed.
+The north star is for the model, once a key exists. The sentence “not infrastructure” also excludes infrastructure, Kubernetes, and DevOps titles with no key.
+
+A job the board is still listing is not dropped because its first-published date is old. The 14-day age rule still applies when the listing was not just seen on a board.
+
+An untouched scan filing that misses the gate is archived. A URL pasted by hand, with no discovery row, stays. Discovery stops listing an archived filing as passed. An unscored position shows its status without an empty score.
 
 ## Families
 
 The same company, role, and requisition collapse to one pipeline row. A country stuck on the end of the title (`| UK | Remote`) does not split them. Senior and Staff stay separate. The location cell shows the first open place and a count (`Germany (Remote) +4`); the full list is the tooltip. Archived copies are not part of that count. When every known salary uses one currency, the comp cell spans the low and the high across those places.
+
+Pay written as `$143,800.00 to $231,900.00` is read. A top amount that got glued to the next number (`$179,300,152`) is cut back to the band. A `$500` stipend is not a salary. Titles are trimmed. A board that cannot be listed, such as Bitso on BambooHR, stays off and the sources page says why.
 
 **Sources.** Discovery scans Greenhouse, Ashby, and Lever company boards plus the Remote OK public JSON feed (`https://remoteok.com/api`) and the We Work Remotely DevOps/Sysadmin RSS (`https://weworkremotely.com/categories/remote-devops-sysadmin-jobs.rss`), craft-filtered with `isCraftMatch`. Remote OK `sys admin` / `infosec` tags keep only when the title is craft. Other market indexes stay manual watches. A Settings bookmarklet POSTs the current tab (`url`, `title`, `body.innerText`) so LinkedIn/Indeed JDs survive login walls — stay on the listing; it does not log in or apply for you.
 
