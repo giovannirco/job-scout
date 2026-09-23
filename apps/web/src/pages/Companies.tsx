@@ -3,7 +3,7 @@ import { LayoutGrid, List, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useChatScope } from "@/frame/store";
 import { qs, useApiMeta, type CompanyRow } from "@/lib/api";
-import { ago, host } from "@/lib/format";
+import { ago, countLabel, host } from "@/lib/format";
 import { Card, Empty, ErrorNote, Loading, Monogram, Page, PageHeader, Pager, Seg, SortHead, Table, Td, Th, Tr, cn } from "@/ui/kit";
 
 const PAGE_SIZE = 50;
@@ -28,7 +28,7 @@ export function CompaniesPage() {
     <Page wide>
       <PageHeader
         title="Companies"
-        subtitle={`${total} ${search.all ? "known" : "with positions"}`}
+        subtitle={search.all ? `${countLabel(total, "company", "companies")} known` : `${countLabel(total, "company", "companies")} with an open role`}
         actions={
           <>
             <form
@@ -45,7 +45,7 @@ export function CompaniesPage() {
               value={search.all ? "all" : "positions"}
               onChange={(v) => navigate({ search: { q: search.q, all: v === "all" ? true : undefined } })}
               options={[
-                { value: "positions", label: "With positions" },
+                { value: "positions", label: "Open roles" },
                 { value: "all", label: "All" },
               ]}
             />
@@ -74,14 +74,14 @@ export function CompaniesPage() {
                 <Monogram name={c.name} size={32} />
                 <div className="min-w-0">
                   <div className="font-medium text-[13px] truncate">{c.name}</div>
-                  <div className="text-[11px] text-muted truncate">{host(c.website) || "—"}</div>
+                  <div className="text-[11px] text-muted truncate">{host(c.website) || host(c.careersUrl) || "—"}</div>
                 </div>
               </div>
               {c.industryTags?.length ? <div className="text-[10.5px] font-mono text-faint truncate">{c.industryTags.slice(0, 3).join(" · ")}</div> : <div className="h-[15px]" />}
               <div className="grid grid-cols-3 gap-1 pt-2 border-t border-border/70 text-center">
                 <Stat label="hot" v={c.positionsHot} tone={c.positionsHot ? "text-good" : "text-faint"} />
                 <Stat label="pass" v={c.positionsPass} tone={c.positionsPass ? "text-fg" : "text-faint"} />
-                <Stat label="total" v={c.positionsTotal} tone="text-muted" />
+                <Stat label="open" v={c.positionsOpen} tone="text-muted" />
               </div>
             </Card>
           ))}
@@ -102,7 +102,7 @@ export function CompaniesPage() {
                 <SortHead label="Pass" field="pass" sort={search.sort} onSort={(n) => navigate({ search: (prev) => ({ ...prev, sort: n, page: undefined }) })} />
               </Th>
               <Th right>
-                <SortHead label="Total" field="total" sort={search.sort} onSort={(n) => navigate({ search: (prev) => ({ ...prev, sort: n, page: undefined }) })} />
+                <SortHead label="Open" field="open" sort={search.sort} onSort={(n) => navigate({ search: (prev) => ({ ...prev, sort: n, page: undefined }) })} />
               </Th>
               <Th right>
                 <SortHead label="Updated" field="updated" sort={search.sort} onSort={(n) => navigate({ search: (prev) => ({ ...prev, sort: n, page: undefined }) })} />
@@ -118,7 +118,7 @@ export function CompaniesPage() {
                     {c.name}
                   </span>
                 </Td>
-                <Td className="text-muted">{host(c.website) || "—"}</Td>
+                <Td className="text-muted">{host(c.website) || host(c.careersUrl) || "—"}</Td>
                 <Td className="text-faint font-mono text-[11px] max-w-[260px]">
                   <div className="truncate">{c.industryTags?.join(" · ") || ""}</div>
                 </Td>
@@ -129,7 +129,7 @@ export function CompaniesPage() {
                   {c.positionsPass}
                 </Td>
                 <Td right mono className="text-muted">
-                  {c.positionsTotal}
+                  {c.positionsOpen}
                 </Td>
                 <Td right mono className="text-muted">
                   {ago(c.updatedAt)}
