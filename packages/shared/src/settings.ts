@@ -271,6 +271,8 @@ export const Settings = z.object({
   titleHyphenVersion: z.string().nullable().optional(),
   /** One-shot: "Backend/API Engineer" and "Engineer, Backend" match the backend role. */
   rolePhraseVersion: z.string().nullable().optional(),
+  /** One-shot: a board location that is only one office is expanded to the other offices. */
+  officeListVersion: z.string().nullable().optional(),
 });
 export type Settings = z.infer<typeof Settings>;
 
@@ -353,6 +355,7 @@ export function resolveSettings(stored: unknown): Settings {
     homeGateVersion: typeof s.homeGateVersion === "string" ? s.homeGateVersion : null,
     profileGateVersion: typeof s.profileGateVersion === "string" ? s.profileGateVersion : null,
     placeSplitVersion: typeof s.placeSplitVersion === "string" ? s.placeSplitVersion : null,
+    officeListVersion: typeof s.officeListVersion === "string" ? s.officeListVersion : null,
   };
   return Settings.parse(merged);
 }

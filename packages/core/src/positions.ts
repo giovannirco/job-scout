@@ -12,7 +12,7 @@ import {
   slugify,
   type PositionStatus,
 } from "@job-scout/db";
-import { decodeHtmlEntities, fetchJobFromUrl as fetchListing, type AtsJob } from "@job-scout/ats";
+import { decodeHtmlEntities, fetchJobFromUrl as fetchListing, greenhouseListingLocation, type AtsJob } from "@job-scout/ats";
 import { fetchJob as fetchJobFromUrl } from "./fetch-job.js";
 import {
   classifyMateriality,
@@ -1120,6 +1120,7 @@ async function afterAtsFetch(positionId: string, job: AtsJob, facts?: ReturnType
       workplace: f.workplace,
       geoClass: f.geoClass,
       remoteClass: f.remoteClass,
+      ...(job.employmentType ? { employmentType: job.employmentType } : {}),
       metadata: { ...prev, ats },
       updatedAt: new Date(),
     })
@@ -1128,6 +1129,98 @@ async function afterAtsFetch(positionId: string, job: AtsJob, facts?: ReturnType
   await harvestFromJob(positionId, job);
   const { maybeEnqueueListingClassify } = await import("./listing-classify.js");
   await maybeEnqueueListingClassify(positionId, f);
+}
+
+/** The board location was one office. The other offices name more places. Rewrite the latest snapshot in place. */
+export async function expandStoredOfficeLocations(): Promise<{ checked: number; updated: number }> {
+  const db = await getDb();
+  const rows = await db
+    .select({
+      id: positions.id,
+      title: positions.title,
+      company: companies.name,
+      metadata: positions.metadata,
+      salaryRaw: positions.salaryRaw,
+    })
+    .from(positions)
+    .innerJoin(companies, eq(companies.id, positions.companyId))
+    .where(eq(positions.atsProvider, "greenhouse"));
+  let updated = 0;
+  for (const row of rows) {
+    const ats = ((row.metadata || {}) as { ats?: { offices?: unknown; workplaceType?: string | null; isRemote?: boolean | null } }).ats;
+    const offices = Array.isArray(ats?.offices) ? ats.offices.filter((office): office is string => typeof office === "string") : [];
+    if (offices.length < 2) continue;
+    const rev = (
+      await db.select().from(jdRevisions).where(eq(jdRevisions.positionId, row.id)).orderBy(desc(jdRevisions.revision)).limit(1)
+    )[0];
+    if (!rev?.locationRaw) continue;
+    const next = greenhouseListingLocation(rev.locationRaw, offices).locationRaw?.trim();
+    if (!next || next === rev.locationRaw.trim()) continue;
+    const facts = classifyListing({
+      locationRaw: next,
+      workplaceType: ats?.workplaceType,
+      isRemote: ats?.isRemote,
+      company: row.company,
+      title: row.title,
+      descriptionText: rev.descriptionText,
+    });
+    const hash = contentHash({
+      title: rev.title || row.title,
+      descriptionText: rev.descriptionText,
+      salaryRaw: rev.salaryRaw || row.salaryRaw,
+      locationRaw: next,
+    });
+    await db
+      .update(jdRevisions)
+      .set({ locationRaw: next, geoClass: facts.geoClass, remoteClass: facts.remoteClass, contentHash: hash })
+      .where(eq(jdRevisions.id, rev.id));
+    await db
+      .update(positions)
+      .set({
+        geoClass: facts.geoClass,
+        remoteClass: facts.remoteClass,
+        workplace: facts.workplace,
+        contentHash: hash,
+        updatedAt: new Date(),
+      })
+      .where(eq(positions.id, row.id));
+    await db
+      .update(discoveryFeed)
+      .set({ locationRaw: next, geoClass: facts.geoClass })
+      .where(and(eq(discoveryFeed.positionId, row.id), eq(discoveryFeed.locationRaw, rev.locationRaw)));
+    updated++;
+  }
+  return { checked: rows.length, updated };
+}
+
+/** Fill employment type from Greenhouse metadata without writing a new JD revision. */
+export async function repairGreenhouseEmployment(): Promise<{ checked: number; updated: number; failed: number }> {
+  const db = await getDb();
+  const rows = await db
+    .select({
+      id: positions.id,
+      token: positions.atsBoardToken,
+      jobId: positions.atsJobId,
+      status: positions.status,
+      employmentType: positions.employmentType,
+    })
+    .from(positions)
+    .where(eq(positions.atsProvider, "greenhouse"));
+  const open = rows.filter((row) => row.status !== "archived" && row.token && row.jobId && !row.employmentType);
+  const { fetchGreenhouseJob } = await import("@job-scout/ats");
+  let updated = 0;
+  let failed = 0;
+  for (const row of open) {
+    try {
+      const job = await fetchGreenhouseJob(row.token!, row.jobId!);
+      if (!job.employmentType) continue;
+      await db.update(positions).set({ employmentType: job.employmentType, updatedAt: new Date() }).where(eq(positions.id, row.id));
+      updated++;
+    } catch {
+      failed++;
+    }
+  }
+  return { checked: open.length, updated, failed };
 }
 
 /** Fetch the ATS page for a position and apply. */

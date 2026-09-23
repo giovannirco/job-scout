@@ -153,6 +153,18 @@ function salaryFromGhContent(html: string): string | undefined {
   return extractSalaryRaw(stripHtml(html));
 }
 
+export function greenhouseEmployment(metadata: unknown): string | undefined {
+  if (!Array.isArray(metadata)) return undefined;
+  for (const row of metadata) {
+    if (!row || typeof row !== "object") continue;
+    const name = String((row as { name?: unknown }).name || "");
+    if (!/employment\s*(type|length)/i.test(name)) continue;
+    const value = (row as { value?: unknown }).value;
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
 /** An office named Remote or Distributed is a remote signal. A city office still wins later. */
 export function greenhouseOfficeIsRemote(offices: string[]): boolean {
   return offices.some((name) => /\b(remote|distributed|global|anywhere)\b/i.test(name));
@@ -178,6 +190,55 @@ export function regionsDisagree(left: string, right: string): boolean {
   return a != null && b != null && a !== b;
 }
 
+function placeKey(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/\b(remote|distributed|home[\s-]*based)\b/g, " ")
+    .replace(/\bu\.s\.a?\.?\b/g, "united states")
+    .replace(/\busa\b/g, "united states")
+    .replace(/\bus\b/g, "united states")
+    .replace(/[^a-z]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function placeCovered(name: string, office: string): boolean {
+  const officeKey = placeKey(office);
+  const nameKey = placeKey(name);
+  if (!officeKey) return true;
+  if (nameKey === officeKey || nameKey.includes(officeKey)) return true;
+  return nameKey.length > 3 && officeKey.includes(nameKey);
+}
+
+function samePlace(left: string, right: string): boolean {
+  const a = placeKey(left);
+  const b = placeKey(right);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  return a.startsWith(`${b} `) || b.startsWith(`${a} `);
+}
+
+function joinOffices(offices: string[]): string {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const office of offices) {
+    const key = placeKey(office);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(office.trim());
+  }
+  return out.join(" · ");
+}
+
+/** A single board location is not the whole list when other offices name another country. */
+function oneOfficeAmongMany(name: string, offices: string[]): string | null {
+  if (/[·;]|\bor\b/i.test(name)) return null;
+  if (!offices.some((office) => samePlace(name, office))) return null;
+  if (offices.every((office) => placeCovered(name, office))) return null;
+  const joined = joinOffices(offices);
+  return joined && joined !== name ? joined : null;
+}
+
 /** When the board location is N/A or HQ, the office list is the place. A region office is not a desk. */
 export function greenhouseListingLocation(
   locationName: string | undefined,
@@ -188,6 +249,8 @@ export function greenhouseListingLocation(
   if (name && !JUNK_PLACE.test(name)) {
     const officeText = usable.join(" · ");
     if (officeText && regionsDisagree(name, officeText)) return { locationRaw: officeText, regionOffice: false };
+    const expanded = oneOfficeAmongMany(name, usable);
+    if (expanded) return { locationRaw: expanded, regionOffice: false };
     return { locationRaw: name, regionOffice: false };
   }
   if (!usable.length) return { locationRaw: undefined, regionOffice: false };
@@ -286,6 +349,7 @@ export async function fetchGreenhouseJob(
     requisitionId: data.requisition_id,
     postedAt: data.first_published,
     updatedAt: data.updated_at,
+    employmentType: greenhouseEmployment(data.metadata),
     questions,
     questionPrompts,
     listingStatus: "open",
