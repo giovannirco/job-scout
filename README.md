@@ -38,6 +38,19 @@ How much runs unattended is a policy (Settings › Autopilot). Three presets plu
 
 Pipeline status never changes without an approval. A global daily call/token budget sits above the per-operation caps. Details in [docs/AI.md](./docs/AI.md).
 
+## WhatsApp (a WAHA server)
+
+Product alerts go to dedicated groups via in-cluster WAHA (`WAHA_BASE_URL` + out-of-band `WAHA_API_KEY`). Settings › Notifications toggles events, chatIds, quiet hours (alerts delay overnight in America/Sao_Paulo; chat still replies), and a test send. **job-scout chat** inbound is a ClusterIP webhook (`POST /api/v1/webhooks/waha`, `X-Api-Key` = `WAHA_WEBHOOK_KEY`); only the `message` event is handled (`message.any` is ignored so one GOWS delivery does not double-reply). The desk agent runs on **grok-4.6** (intake a JD URL, talk process). It never applies.
+
+| group | chatId | traffic |
+|--|--|--|
+| **job-scout desk** | `` | PASS to decide, approvals, interview reminders, stale applied |
+| **job-scout new** | `` | triage PASS only |
+| **job-scout process** | `` | applied/screen/interview/offer, JD change or listing closed on hot |
+| **job-scout research** | `` | company research pack landed |
+| **job-scout chat** | `` | inbound desk agent |
+| **an engineering-only room** | `` | engineering loop only — **never** product alerts |
+
 ## UI
 
 Dark/light. `⌘K` palette for positions, companies and actions. A right-hand dock with **Wire** (live worker activity), **Inbox** (approvals) and **Chat** (agent scoped to the page you are on: global, one position, one company).
@@ -50,7 +63,7 @@ Dark/light. `⌘K` palette for positions, companies and actions. A right-hand do
 | **Companies** | grid or table, with research and positions per company |
 | **Inbox** | autopilot suggestions and drafts to approve or dismiss |
 | **Position** | status stepper · Brief · Evaluation · JD (revisions + diffs) · Materials · Company · History |
-| **Settings** | Profile · Gate · AI models · Autopilot · Appearance · System (queue, retention, tokens, job-scout Steel health) |
+| **Settings** | Profile · Gate · AI models · Autopilot · **Notifications** (WhatsApp groups) · Appearance · System (queue, retention, tokens, job-scout Steel health) |
 
 ## Quickstart
 
@@ -62,6 +75,13 @@ pnpm test                    # vitest on PGlite
 ```
 
 Point it at a gateway with `OPENAI_BASE_URL` / `OPENAI_API_KEY`, then pick models under Settings › AI. Default agent/MCP token: `dev-agent-token` (`API_TOKEN_SEED`).
+
+Same stack in Docker. Postgres is included. The model gateway is not: set `OPENAI_API_KEY` in `.env`, and set `COMPOSE_OPENAI_BASE_URL` if the gateway is not on the host at port 8317.
+
+```bash
+cp .env.example .env
+docker compose up --build          # http://localhost:8080  (auth mode dev, no password)
+```
 
 Separate processes, as deployed:
 
@@ -79,7 +99,7 @@ apps/api/          Hono routes by resource · auth · mcp/ (29 tools) · serves 
 apps/worker/       loop.ts (job types, retries, stale requeue) · once.ts (cron entry)
 apps/web/          React app — ui/kit.tsx primitives · frame/ (sidebar, dock, chat, palette) · pages/
 packages/core/     services shared by api + worker: positions, scan, triage, evaluate, materials,
-                   autopilot, chat, browser, settings, retention, radar
+                   autopilot, chat, WAHA notify/inbox, browser, settings, retention, radar
 packages/llm/      OpenAI-compatible client (json_schema, document, streaming tool calls) · prompts · scout brief
 packages/db/       drizzle schema + migrations · Postgres or PGlite client
 packages/shared/   gate · settings schema · classify · salary · hash · types

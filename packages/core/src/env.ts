@@ -19,5 +19,10 @@ export const coreEnv = {
   steelBaseUrl: (process.env.STEEL_BASE_URL || "").replace(/\/+$/, ""),
   /** Playwright MCP sidecar on the job-scout Steel pod (in-cluster: http://playwright.example:8931/mcp) */
   browserMcpUrl: process.env.BROWSER_MCP_URL || "",
+  wahaBaseUrl: (process.env.WAHA_BASE_URL || "").replace(/\/+$/, ""),
+  wahaApiKey: process.env.WAHA_API_KEY || "",
+  wahaSession: process.env.WAHA_SESSION || "default",
+  wahaWebhookKey: process.env.WAHA_WEBHOOK_KEY || "",
+  publicBaseUrl: (process.env.PUBLIC_BASE_URL || "").replace(/\/+$/, ""),
   isProd: process.env.NODE_ENV === "production",
 };

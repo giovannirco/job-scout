@@ -15,7 +15,7 @@ declare module "hono" {
   }
 }
 
-const PUBLIC = new Set(["/api/v1/health", "/api/v1/ready", "/api/v1/auth/login", "/api/v1/auth/status"]);
+const PUBLIC = new Set(["/api/v1/health", "/api/v1/ready", "/api/v1/auth/login", "/api/v1/auth/status", "/api/v1/webhooks/waha"]);
 
 export async function resolveBearer(token: string): Promise<AuthUser | null> {
   if (!token) return null;

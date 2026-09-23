@@ -50,6 +50,11 @@ envFrom:
       name: {{ include "job-scout.fullname" . }}-config
   - secretRef:
       name: {{ .Values.existingSecret }}
+  {{- range .Values.extraSecrets }}
+  - secretRef:
+      name: {{ . | quote }}
+      optional: true
+  {{- end }}
 {{- end -}}
 
 {{/* PodSecurity "restricted" compliant contexts. Image runs as uid 10001. */}}

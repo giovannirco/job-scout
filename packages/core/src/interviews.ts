@@ -358,6 +358,24 @@ export async function addInterview(positionId: string, input: InterviewInput) {
   const row = (await db.select(INTERVIEW_ROW).from(interviews).where(eq(interviews.id, iid)))[0];
   if (!row) throw new Error("interview insert failed");
   const briefJobId = await maybeEnqueueBrief(positionId, iid, transcriptMarkdown, input.skipBrief);
+  if (scheduledAt && scheduledAt.getTime() > Date.now() - 60_000) {
+    const { getPosition } = await import("./positions.js");
+    const { emitNotify } = await import("./notify.js");
+    const pos = await getPosition(positionId);
+    if (pos) {
+      await emitNotify({
+        event: "interview_scheduled",
+        title: pos.title,
+        company: pos.company.name,
+        slug: pos.slug,
+        extra: [trimOrNull(input.title), scheduledAt.toISOString()].filter(Boolean).join(" · "),
+        url: pos.primaryUrl,
+        positionId: pos.id,
+        companyId: pos.companyId,
+        subjectId: iid,
+      });
+    }
+  }
   return { ...row, briefJobId };
 }
 

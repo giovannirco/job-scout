@@ -276,6 +276,26 @@ const LOCAL_TOOLS: LocalTool[] = [
     },
   },
   {
+    name: "intake_url",
+    description: "Create or refresh a position from a job URL and queue triage. Use when the operator pastes a JD link.",
+    parameters: { type: "object", properties: { url: { type: "string" }, company: { type: "string" } }, required: ["url"] },
+    write: true,
+    run: async (a) => {
+      const { intakeUrl } = await import("./scan.js");
+      const r = await intakeUrl(str(a.url), { companyName: str(a.company) || undefined });
+      return { slug: r.position.slug, title: r.position.title, company: r.position.company?.name, created: r.created, revived: r.revived, triageJobId: r.triageJobId, url: r.position.primaryUrl };
+    },
+  },
+  {
+    name: "list_processes",
+    description: "Live applications in applied/screen/interview/offer with nextAction and interview rounds.",
+    parameters: { type: "object", properties: {} },
+    run: async () => {
+      const { listProcesses } = await import("./interviews.js");
+      return listProcesses();
+    },
+  },
+  {
     name: "web_fetch",
     description: "Fetch a URL and return its readable markdown (rendered in the browser plane when available). Good for JDs, company pages, news. For interactive browsing use the browser_* tools.",
     parameters: { type: "object", properties: { url: { type: "string" }, maxChars: { type: "integer", default: 15000 } }, required: ["url"] },
@@ -466,11 +486,12 @@ function boundHistory(rows: ChatMessageRow[]): ChatMessageRow[] {
   return out;
 }
 
-export async function runChatTurn(threadId: string, userText: string, emit: (e: ChatEvent) => void, opts: { signal?: AbortSignal } = {}) {
+export async function runChatTurn(threadId: string, userText: string, emit: (e: ChatEvent) => void, opts: { signal?: AbortSignal; model?: string } = {}) {
   const thread = await getThread(threadId);
   if (!thread) throw new Error("thread not found");
   const settings = await getSettings();
   const cfg = await gateOperation("chat", settings);
+  if (opts.model?.trim()) cfg.model = opts.model.trim();
   const profile = await getProfile();
   const db = await getDb();
 

@@ -1,0 +1,107 @@
+# Local stack: Postgres, the API (UI + migrations), and the worker.
+#
+#   cp .env.example .env          # set OPENAI_API_KEY if you want model calls
+#   docker compose up --build
+#
+# Open http://localhost:8080 . Auth mode is dev, so the UI has no password.
+# Ports bind to 127.0.0.1 only.
+#
+# Postgres is the only bundled dependency. Point OPENAI at any OpenAI-compatible
+# gateway. Compose does not reuse OPENAI_BASE_URL from .env, because that value
+# is for `pnpm dev` on the host (127.0.0.1 is the container, not your machine).
+# Set COMPOSE_OPENAI_BASE_URL to override the default below.
+#
+# Steel and WhatsApp stay off until you set STEEL_* / WAHA_* yourself. Empty
+# means the desk runs without a browser and without sending messages.
+
+name: job-scout
+
+x-app-env: &app-env
+  DATABASE_URL: postgresql://job_scout:job_scout@postgres:5432/job_scout
+  PGSSL: "0"
+  NODE_ENV: production
+  LOG_FORMAT: json
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  API_TOKEN_SEED: ${API_TOKEN_SEED:-dev-agent-token}
+  OPENAI_BASE_URL: ${COMPOSE_OPENAI_BASE_URL:-http://host.docker.internal:8317/v1}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  LLM_TIMEOUT_MS: ${LLM_TIMEOUT_MS:-180000}
+  ATS_USER_AGENT: ${ATS_USER_AGENT:-job-scout/2 (local; no apply)}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: job_scout
+      POSTGRES_PASSWORD: job_scout
+      POSTGRES_DB: job_scout
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U job_scout -d job_scout"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  api:
+    image: job-scout:local
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+      args:
+        APP_VERSION: ${APP_VERSION:-local}
+    command: ["node", "--import", "tsx", "apps/api/src/index.ts"]
+    environment:
+      <<: *app-env
+      AUTH_MODE: ${AUTH_MODE:-dev}
+      AUTH_PASSWORD: ${AUTH_PASSWORD:-job-scout}
+      HOST: 0.0.0.0
+      PORT: "8080"
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
+      EMBED_WORKER: "0"
+      METRICS_PORT: "9464"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:${JOB_SCOUT_PORT:-8080}:8080"
+      - "127.0.0.1:${API_METRICS_PORT:-9464}:9464"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8080/api/v1/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 40s
+
+  worker:
+    image: job-scout:local
+    pull_policy: never
+    command: ["node", "--import", "tsx", "apps/worker/src/index.ts"]
+    environment:
+      <<: *app-env
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
+      WORKER_POLL_MS: ${WORKER_POLL_MS:-1500}
+      WORKER_SCHEDULER: "1"
+      METRICS_PORT: "9465"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      api:
+        condition: service_healthy
+    # The image healthcheck calls the API port. This process does not listen there.
+    healthcheck:
+      disable: true
+
+volumes:
+  pgdata:

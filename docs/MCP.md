@@ -1,6 +1,6 @@
 # MCP
 
-job-scout **is** the MCP server; there is no separate process. Every capability of the UI is also a tool, so an agent can work the pipeline without scraping the API.
+job-scout **is** the MCP server; there is no separate process. Every capability of the UI is also a tool, so an agent can work the pipeline without scraping the API. WhatsApp desk chat is not MCP — it is the same local tools (`intake_url`, `list_processes`, …) invoked from `runChatTurn` on the API webhook.
 
 | | |
 |--|--|

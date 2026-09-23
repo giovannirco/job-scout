@@ -481,6 +481,26 @@ export type CompanyDetail = {
   boards: Board[];
 };
 
+export type NotifyChannel = "desk" | "new" | "process" | "research" | "chat";
+export type NotificationsConfig = {
+  enabled: boolean;
+  session: string;
+  minTriageScore: number;
+  channels: Record<NotifyChannel, { enabled: boolean; chatId: string }>;
+  events: {
+    triage_pass: boolean;
+    approval_pending: boolean;
+    interview_scheduled: boolean;
+    stale_applied: boolean;
+    status_hot: boolean;
+    jd_change_hot: boolean;
+    listing_closed_hot: boolean;
+    company_research: boolean;
+  };
+  quietHours: { enabled: boolean; timezone: string; start: string; end: string };
+  chat: { model: string; allowFrom: string[]; cursorTs: number; cursorId: string };
+};
+
 export type Settings = {
   llm: {
     operations: Record<string, { model: string; enabled: boolean; dailyCap: number; temperature?: number }>;
@@ -492,6 +512,7 @@ export type Settings = {
   triage: { passThreshold: number; marginalThreshold: number; jdMaxChars: number; keepMarginal: boolean };
   retention: { snapshotsKeep: number; jobsDays: number; discoveryDays: number; deltasDays: number; llmRunsDays: number };
   scan: { boardIntervalMinutes: number; boardsPerTick: number; autoTriage: boolean };
+  notifications?: NotificationsConfig;
 };
 
 export type Profile = {

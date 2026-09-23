@@ -158,13 +158,16 @@ const aiLogsRoute = createRoute({
   }),
 });
 
-export type SettingsSearch = { tab?: "profile" | "gate" | "ai" | "autopilot" | "appearance" | "system" };
+export type SettingsSearch = { tab?: "profile" | "gate" | "ai" | "autopilot" | "notifications" | "appearance" | "system" };
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings",
   component: SettingsPage,
   validateSearch: (s: Record<string, unknown>): SettingsSearch => ({
-    tab: s.tab === "gate" || s.tab === "ai" || s.tab === "autopilot" || s.tab === "appearance" || s.tab === "system" || s.tab === "profile" ? s.tab : undefined,
+    tab:
+      s.tab === "gate" || s.tab === "ai" || s.tab === "autopilot" || s.tab === "notifications" || s.tab === "appearance" || s.tab === "system" || s.tab === "profile"
+        ? s.tab
+        : undefined,
   }),
 });
 

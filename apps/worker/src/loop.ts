@@ -5,7 +5,9 @@ import {
   completeJob,
   enqueueDueBoardScans,
   enqueueDueWatchChecks,
+  enqueueStaleAppliedNags,
   failJob,
+  flushDueNotifications,
   intakeUrl,
   LlmGateError,
   jobDuration,
@@ -23,6 +25,7 @@ import {
   runRetention,
   runTriage,
   runInterviewBrief,
+  pollWhatsAppInbox,
   scanBoard,
   type JobRow,
 } from "@job-scout/core";
@@ -159,6 +162,15 @@ export function startWorker(opts: WorkerOptions = {}) {
   const stale = safe("requeue-stale", async () => ({ requeued: await requeueStale() }));
   setTimeout(stale, 5_000);
   timers.push(setInterval(stale, 15 * 60_000));
+  const notifyFlush = safe("notify-flush", () => flushDueNotifications());
+  const inbox = safe("whatsapp-inbox", () => pollWhatsAppInbox());
+  setTimeout(notifyFlush, 8_000);
+  setTimeout(inbox, 12_000);
+  timers.push(setInterval(notifyFlush, 4_000));
+  timers.push(setInterval(inbox, 5_000));
+  const nagStale = safe("stale-applied-nags", () => enqueueStaleAppliedNags());
+  setTimeout(nagStale, 90_000);
+  timers.push(setInterval(nagStale, 6 * 3_600_000));
 
   if (opts.scheduler !== false) {
     const discovery = safe("discovery", () => enqueueDueBoardScans());
@@ -191,7 +203,7 @@ export function startWorker(opts: WorkerOptions = {}) {
 function summarize(r: unknown): Record<string, unknown> {
   if (!r || typeof r !== "object") return {};
   const o = r as Record<string, unknown>;
-  const keys = ["company", "total", "passed", "filtered", "created", "closed", "triageEnqueued", "verdict", "score", "changed", "enqueued", "due", "skipped"];
+  const keys = ["company", "total", "passed", "filtered", "created", "closed", "triageEnqueued", "verdict", "score", "changed", "enqueued", "due", "skipped", "accepted", "replied", "seen"];
   const out: Record<string, unknown> = {};
   for (const k of keys) if (k in o) out[k] = o[k];
   return out;

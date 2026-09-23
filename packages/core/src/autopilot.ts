@@ -207,6 +207,17 @@ export async function createApproval(input: {
   };
   await db.insert(approvals).values(row);
   if (input.positionId) await addEvent({ positionId: input.positionId, kind: "approval", title: `Inbox: ${input.title}`, actor: row.source });
+  const { emitNotify } = await import("./notify.js");
+  await emitNotify({
+    event: "approval_pending",
+    title: input.title,
+    company: "",
+    extra: input.body ?? null,
+    positionId: input.positionId ?? null,
+    companyId: input.companyId ?? null,
+    subjectId: row.id,
+    slug: null,
+  });
   return row;
 }
 

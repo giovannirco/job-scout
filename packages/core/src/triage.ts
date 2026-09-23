@@ -89,6 +89,21 @@ export async function runTriage(positionId: string, opts: { force?: boolean } = 
     verdict,
     status: (set.status as typeof pos.status | undefined) ?? pos.status,
   });
+  if (verdict === "pass") {
+    const { emitNotify } = await import("./notify.js");
+    await emitNotify({
+      event: "triage_pass",
+      title: pos.title,
+      company: pos.company.name,
+      slug: pos.slug,
+      score,
+      url: pos.primaryUrl,
+      extra: out.oneLiner,
+      positionId: pos.id,
+      companyId: pos.companyId,
+      subjectId: pos.id,
+    });
+  }
   return { skipped: false as const, score, verdict, oneLiner: out.oneLiner, model: res.model, ...auto };
 }
 

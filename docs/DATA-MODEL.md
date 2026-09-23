@@ -48,9 +48,10 @@ Schema: `packages/db/src/schema.ts` (drizzle). Migrations: `packages/db/migratio
 |--|--|
 | `jobs` | the queue: `type`, `payload`, `status` (queued/running/succeeded/failed), `priority`, `dedupe_key`, `attempts`, `run_after`, `started_at`, `error`, `result` |
 | `llm_runs` | one row per model call: operation, model, tokens in/out, latency, ok/error, position/company |
-| `settings` | single JSON document (see `packages/shared/src/settings.ts`): `llm.operations`, `gate`, `triage`, `scan`, `retention`, `autopilot`, `chat`, cached model catalog |
+| `settings` | single JSON document (see `packages/shared/src/settings.ts`): `llm.operations`, `gate`, `triage`, `scan`, `retention`, `autopilot`, `chat`, `notifications` (WhatsApp channels/events/quiet hours/allowFrom), cached model catalog |
 | `approvals` | autopilot inbox: `kind`, `status`, position/company, title/body, `payload` (e.g. `toStatus`, `materialIds`, `reason`), resolved by/at |
-| `chat_threads` | `scope`, position/company, model, `messages` JSON (user / assistant with tool calls / tool results, tokens) |
+| `chat_threads` | `scope`, position/company, model, `messages` JSON (user / assistant with tool calls / tool results, tokens). WhatsApp desk chat uses one global thread titled `WhatsApp · job-scout chat` |
+| `notification_outbox` | WhatsApp sends: `channel`, `event`, `chat_id`, `body`, `status` (`pending` `sent` `failed` `cancelled`), unique `dedupe_key`, `scheduled_for` (quiet hours), `provider_ref` |
 | `profiles` | you: identity, master resume, resume surfaces (`ai` / `sre` / `platform`), scout brief |
 | `api_tokens` | hashed Bearer tokens with scopes |
 

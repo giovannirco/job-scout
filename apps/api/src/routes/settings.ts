@@ -7,6 +7,8 @@ import {
   getModelsCatalog,
   getProfile,
   getSettings,
+  sendTestNotify,
+  wahaConfigured,
   jobStats,
   listJobs,
   llmConfigured,
@@ -34,6 +36,16 @@ import { env } from "../env.js";
 export const settingsRoutes = new Hono();
 
 settingsRoutes.get("/", async (c) => ok(c, await getSettings({ fresh: true })));
+settingsRoutes.get("/notifications", async (c) => {
+  const s = await getSettings({ fresh: true });
+  return ok(c, { ...s.notifications, wahaConfigured: wahaConfigured() });
+});
+settingsRoutes.post("/notifications/test", async (c) => {
+  const b = (await body(c)) as { channel?: string };
+  const channel = b.channel || "desk";
+  return ok(c, await sendTestNotify(channel));
+});
+
 settingsRoutes.patch("/", async (c) => {
   try {
     return ok(c, await updateSettings(await body(c)));

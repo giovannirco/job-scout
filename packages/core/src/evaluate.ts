@@ -190,5 +190,17 @@ export async function runCompanyResearch(companyIdOrSlug: string, positionId?: s
     .set({ overview: company.overview || res.data.oneLiner, updatedAt: new Date() })
     .where(eq(companies.id, company.id));
   if (positionId) await addEvent({ positionId, kind: "company_research", title: `Company research: ${company.name}`, metadata: { evaluationId: evalId } });
+  const { emitNotify } = await import("./notify.js");
+  await emitNotify({
+    event: "company_research",
+    title: company.name,
+    company: company.name,
+    extra: res.data.oneLiner ?? null,
+    slug: null,
+    positionId: positionId ?? null,
+    companyId: company.id,
+    subjectId: company.id,
+    revision: evalId,
+  });
   return { evaluationId: evalId, summary: res.data, model: res.model };
 }

@@ -15,14 +15,16 @@ job-scout is a personal career control plane for an engineer who runs a real job
 
 | actor | through |
 |--|--|
-| you | the web UI (Today, Pipeline, Radar, Companies, Inbox, Position, Settings), the dock chat, the API |
-| the worker | the queue — scans, checks, model operations, retention |
+| you | the web UI (Today, Pipeline, Radar, Companies, Inbox, Position, Settings), the dock chat, the API, WhatsApp **job-scout chat** |
+| the worker | the queue — scans, checks, model operations, retention, WhatsApp outbox flush |
 | agents (career-ops sync, Grok, Cursor, Claude Code) | MCP at `/mcp` with a scoped token |
-| the chat agent | local tools plus, when configured, a headless browser through Playwright MCP |
+| the chat agent | local tools plus, when configured, a headless browser through Playwright MCP; WhatsApp **job-scout chat** uses the same agent on grok-4.6 via a ClusterIP webhook |
 
 ## What a day looks like
 
 Today opens on the funnel and the count of things that need a decision: PASS verdicts, approvals filed by autopilot, JDs that changed on positions in play, interviews coming up, applications with no reply for a week. Decide from the list (Review / Skip), open a position for the brief, the A–H evaluation and the JD history, ask the scoped chat to compare the role against your master resume, draft materials, mark applied. The Wire shows what the worker is doing meanwhile; the Machine panel shows what it cost.
+
+WhatsApp is a second surface for the same desk: Settings › Notifications routes triage PASS to **job-scout new**, inbox/interview/stale nags to **job-scout desk**, hot process and JD changes to **job-scout process**, company packs to **job-scout research**. Paste a JD URL in **job-scout chat** to intake and triage (webhook → desk agent; never apply). Product alerts never go to **an engineering-only room**.
 
 ## Non-goals
 

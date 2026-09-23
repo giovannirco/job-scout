@@ -49,6 +49,9 @@ The dashboard lives in the repo at `deploy/helm/job-scout/dashboards/job-scout.j
 | `job_scout_mcp_tool_calls_total` | `tool status` | MCP tool invocations (`ok` `error` `throw`) |
 | `job_scout_mcp_tool_duration_seconds` | `tool` | MCP tool latency |
 | `job_scout_retention_deleted_rows_total` | `table` | Rows pruned |
+| `job_scout_notify_enqueued_total` | `channel event` | WhatsApp outbox rows inserted |
+| `job_scout_notify_sent_total` | `channel event outcome` | Flush attempts (`sent` `failed` `noop`) |
+| `job_scout_notify_inbox_total` | `outcome` | Inbound desk-chat turns (`ok` `turn_error` `fetch_error`) |
 
 **DB-truth gauges** are refreshed on scrape (throttled to once per 10 s) by the **API only**, so a single replica reports them and sums stay honest. They survive restarts because they are read from Postgres.
 
@@ -107,6 +110,9 @@ Shape:
 | `autopilot.hook` / `autopilot.hook.failed` | what each hook decided (`actions`) |
 | `approval.resolved` | inbox decision |
 | `chat.turn` / `chat.turn.failed` / `chat.tool` | chat agent |
+| `waha.noop` | sender constructed without `WAHA_BASE_URL`/`WAHA_API_KEY` |
+| `notify.emit.failed` / `notify.send.failed` | outbox insert / WAHA sendText |
+| `whatsapp.inbox.webhook_failed` / `whatsapp.inbox.fetch_failed` / `whatsapp.inbox.turn_failed` | inbound desk chat |
 | `browser.render` / `browser.render.failed` | Steel |
 | `retention.done`, `once.done` / `once.failed` | cron entry |
 | `db.pool.error`, `db.migrations.applied` | Postgres |

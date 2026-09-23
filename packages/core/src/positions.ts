@@ -417,6 +417,21 @@ export async function patchPosition(idOrSlug: string, patch: Record<string, unkn
   await db.update(positions).set(set).where(eq(positions.id, pos.id));
   if (set.status && set.status !== pos.status) {
     await addEvent({ positionId: pos.id, kind: "status", title: `${pos.status} → ${String(set.status)}`, actor });
+    if ((HOT_STATUSES as readonly string[]).includes(String(set.status))) {
+      const { emitNotify } = await import("./notify.js");
+      await emitNotify({
+        event: "status_hot",
+        title: pos.title,
+        company: pos.company.name,
+        slug: pos.slug,
+        extra: `${pos.status} → ${String(set.status)}`,
+        url: pos.primaryUrl,
+        positionId: pos.id,
+        companyId: pos.companyId,
+        subjectId: pos.id,
+        revision: String(set.status),
+      });
+    }
   }
   return getPosition(pos.id);
 }
@@ -636,6 +651,21 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
     // dynamic import: autopilot depends on this module
     const { afterJdChange } = await import("./autopilot.js");
     await afterJdChange({ positionId: pos.id, status: pos.status, changeKind: change_kind, revision: nextRev });
+    if ((HOT_STATUSES as readonly string[]).includes(pos.status) || listingClosed) {
+      const { emitNotify } = await import("./notify.js");
+      await emitNotify({
+        event: listingClosed ? "listing_closed_hot" : "jd_change_hot",
+        title: pos.title,
+        company: pos.company.name,
+        slug: pos.slug,
+        extra: listingClosed ? "listing closed" : `JD ${change_kind}`,
+        url: pos.primaryUrl,
+        positionId: pos.id,
+        companyId: pos.companyId,
+        subjectId: pos.id,
+        revision: nextRev,
+      });
+    }
   }
   return { changed: true as const, revision: nextRev, material, changeKind: change_kind };
 }

@@ -109,6 +109,24 @@ export const schedulerRuns = new client.Counter({
   labelNames: ["task", "status"],
   registers: [registry],
 });
+export const notifyEnqueued = new client.Counter({
+  name: `${P}notify_enqueued_total`,
+  help: "WhatsApp notifications enqueued by channel and event.",
+  labelNames: ["channel", "event"],
+  registers: [registry],
+});
+export const notifySent = new client.Counter({
+  name: `${P}notify_sent_total`,
+  help: "WhatsApp notification send attempts by channel, event, and outcome.",
+  labelNames: ["channel", "event", "outcome"],
+  registers: [registry],
+});
+export const notifyInbox = new client.Counter({
+  name: `${P}notify_inbox_total`,
+  help: "Inbound WhatsApp desk-chat turns by outcome.",
+  labelNames: ["outcome"],
+  registers: [registry],
+});
 
 export const boardScans = new client.Counter({
   name: `${P}board_scans_total`,

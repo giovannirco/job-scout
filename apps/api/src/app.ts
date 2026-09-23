@@ -15,6 +15,7 @@ import { companiesRoutes } from "./routes/companies.js";
 import { positionsRoutes } from "./routes/positions.js";
 import { radarRoutes } from "./routes/radar.js";
 import { settingsRoutes } from "./routes/settings.js";
+import { webhookRoutes } from "./routes/webhooks.js";
 import { todayRoutes } from "./routes/today.js";
 import { interviewsDeskRoutes, processesRoutes } from "./routes/process.js";
 import { handleClip } from "./routes/clip.js";
@@ -93,6 +94,7 @@ export function createApp() {
   app.route("/api/v1/settings", settingsRoutes);
   app.route("/api/v1/approvals", approvalsRoutes);
   app.route("/api/v1/chat", chatRoutes);
+  app.route("/api/v1/webhooks", webhookRoutes);
 
   app.onError((err, c) => {
     log.error("http.unhandled", { requestId: c.get("requestId"), method: c.req.method, path: c.req.path, err });

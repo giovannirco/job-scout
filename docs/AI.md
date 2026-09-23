@@ -54,7 +54,9 @@ Guarantees:
 
 Each user message runs a tool-calling loop (`ChatConfig.maxSteps`, default 12) over `chatStream`, emitting SSE events: `delta`, `tool_call`, `tool_result`, `message`, `done`, `error`.
 
-Local tools: `search_positions`, `get_position`, `get_evaluation`, `get_materials`, `get_company`, `search_companies`, `today`, `list_approvals`, `resolve_approval`, `set_position_status`, `add_note`, `run_operation`, `web_fetch`. `writeTools=false` hides the mutating ones. With `browserTools=true` and `BROWSER_MCP_URL` set, the Playwright MCP tools (`browser_navigate`, `browser_snapshot`, `browser_click`, …) are proxied in, so the agent can open the actual job page and read it.
+Local tools: `search_positions`, `get_position`, `get_evaluation`, `get_materials`, `get_company`, `search_companies`, `today`, `list_approvals`, `resolve_approval`, `set_position_status`, `add_note`, `run_operation`, `intake_url`, `list_processes`, `web_fetch`. `writeTools=false` hides the mutating ones. With `browserTools=true` and `BROWSER_MCP_URL` set, the Playwright MCP tools (`browser_navigate`, `browser_snapshot`, `browser_click`, …) are proxied in, so the agent can open the actual job page and read it.
+
+WhatsApp **job-scout chat** (`packages/core/src/whatsapp-inbox.ts`) is the same agent on Settings › Notifications `chat.model` (default **grok-4.6**), with writes on, over a durable global thread titled `WhatsApp · job-scout chat`. It can inspect process and intake a JD URL. It never applies. Inbound is a ClusterIP webhook, not the dock SSE.
 
 ## Browser plane
 

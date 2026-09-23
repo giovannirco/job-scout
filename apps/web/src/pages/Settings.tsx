@@ -1,11 +1,11 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
-import { Bot, Copy, Globe, Hand, Play, RefreshCw, Sparkles, Trash2, Zap } from "lucide-react";
+import { Bot, Copy, Globe, Hand, MessageCircle, Play, RefreshCw, Sparkles, Trash2, Zap } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { clipBookmarklet } from "@job-scout/shared";
 import { useChatScope, useTheme, type ThemePref } from "@/frame/store";
-import { api, del, patch, post, qs, useApi, type ApiToken, type AutopilotConfig, type AutopilotState, type Job, type LlmStatus, type ModelsCatalog, type Profile, type Settings, type SystemInfo } from "@/lib/api";
+import { api, del, patch, post, qs, useApi, type ApiToken, type AutopilotConfig, type AutopilotState, type Job, type LlmStatus, type ModelsCatalog, type NotificationsConfig, type NotifyChannel, type Profile, type Settings, type SystemInfo } from "@/lib/api";
 import { ago, compact, dateTime } from "@/lib/format";
 import type { SettingsSearch } from "@/router";
 import { Btn, Budget, Card, Chip, Dot, Empty, IconBtn, Input, Loading, Page, Panel, Seg, Select, Switch, Table, Td, Textarea, Th, Tr, cn } from "@/ui/kit";
@@ -17,6 +17,7 @@ const TABS: { value: Tab; label: string; blurb: string }[] = [
   { value: "gate", label: "Gate", blurb: "Deterministic filter before any model call" },
   { value: "ai", label: "AI models", blurb: "Model per operation, caps, gateway" },
   { value: "autopilot", label: "Autopilot", blurb: "How much runs unattended" },
+  { value: "notifications", label: "Notifications", blurb: "WhatsApp groups via a WAHA server" },
   { value: "appearance", label: "Appearance", blurb: "Theme" },
   { value: "system", label: "System", blurb: "Jobs, retention, tokens, job-scout Steel" },
 ];
@@ -51,10 +52,109 @@ export function SettingsPage() {
         {tab === "gate" ? <GateTab /> : null}
         {tab === "ai" ? <AiTab /> : null}
         {tab === "autopilot" ? <AutopilotTab /> : null}
+        {tab === "notifications" ? <NotificationsTab /> : null}
         {tab === "appearance" ? <AppearanceTab /> : null}
         {tab === "system" ? <SystemTab /> : null}
       </div>
     </Page>
+  );
+}
+
+const EVENT_LABELS: { key: keyof NotificationsConfig["events"]; label: string; room: string }[] = [
+  { key: "triage_pass", label: "Triage PASS", room: "new" },
+  { key: "approval_pending", label: "Inbox approvals", room: "desk" },
+  { key: "interview_scheduled", label: "Interview scheduled", room: "desk" },
+  { key: "stale_applied", label: "Stale applied (7d)", room: "desk" },
+  { key: "status_hot", label: "Applied / screen / interview / offer", room: "process" },
+  { key: "jd_change_hot", label: "JD change on hot roles", room: "process" },
+  { key: "listing_closed_hot", label: "Listing closed on hot roles", room: "process" },
+  { key: "company_research", label: "Company research pack", room: "research" },
+];
+const CHANNELS: NotifyChannel[] = ["desk", "new", "process", "research", "chat"];
+
+function NotificationsTab() {
+  const q = useApi<NotificationsConfig & { wahaConfigured: boolean }>(["notifications"], "/api/v1/settings/notifications");
+  const qc = useQueryClient();
+  const [f, setF] = useState<NotificationsConfig | null>(null);
+  useEffect(() => {
+    if (q.data) {
+      const { wahaConfigured: _w, ...rest } = q.data;
+      void _w;
+      setF(rest);
+    }
+  }, [q.data]);
+  if (!f || !q.data) return <Loading rows={6} />;
+  const { wahaConfigured: _w, ...base } = q.data;
+  void _w;
+  const dirty = JSON.stringify(f) !== JSON.stringify(base);
+  async function save() {
+    if (!f) return;
+    await patch("/api/v1/settings", { notifications: f });
+    void qc.invalidateQueries({ queryKey: ["notifications"] });
+    void qc.invalidateQueries({ queryKey: ["settings"] });
+    toast.success("Notifications saved");
+  }
+  async function test(channel: NotifyChannel) {
+    const r = await post<{ ok: boolean; error?: string; chatId: string }>("/api/v1/settings/notifications/test", { channel });
+    if (r.ok) toast.success(`Test sent to ${channel}`);
+    else toast.error(r.error || "Test failed");
+  }
+  return (
+    <div className="space-y-5 max-w-3xl">
+      <Panel title="WhatsApp" meta={q.data.wahaConfigured ? "WAHA connected" : "WAHA env missing — sends no-op until WAHA_API_KEY is set"}>
+        <div className="p-3 space-y-3">
+          <Switch checked={f.enabled} onChange={(v) => setF({ ...f, enabled: v })} label="Send product alerts" />
+          <div className="flex items-center gap-2 text-[12.5px] text-muted">
+            <MessageCircle className="h-3.5 w-3.5" />
+            Desk chat model <span className="text-fg">{f.chat.model}</span> · group job-scout chat
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="text-[12px] text-muted">
+              Min triage score for new
+              <Input type="number" step="0.1" value={f.minTriageScore} onChange={(e) => setF({ ...f, minTriageScore: Number(e.target.value) })} />
+            </label>
+            <label className="text-[12px] text-muted">
+              Session
+              <Input value={f.session} onChange={(e) => setF({ ...f, session: e.target.value })} />
+            </label>
+          </div>
+        </div>
+      </Panel>
+      <Panel title="Groups" meta="chatIds on a WAHA server">
+        <div className="divide-y divide-border">
+          {CHANNELS.map((ch) => (
+            <div key={ch} className="p-3 flex flex-wrap items-center gap-2">
+              <Switch checked={f.channels[ch].enabled} onChange={(v) => setF({ ...f, channels: { ...f.channels, [ch]: { ...f.channels[ch], enabled: v } } })} label={ch} />
+              <Input className="flex-1 min-w-[12rem]" value={f.channels[ch].chatId} onChange={(e) => setF({ ...f, channels: { ...f.channels, [ch]: { ...f.channels[ch], chatId: e.target.value } } })} />
+              <Btn onClick={() => void test(ch)}>Test</Btn>
+            </div>
+          ))}
+        </div>
+      </Panel>
+      <Panel title="Events">
+        <div className="p-3 space-y-2">
+          {EVENT_LABELS.map((e) => (
+            <Switch
+              key={e.key}
+              checked={f.events[e.key]}
+              onChange={(v) => setF({ ...f, events: { ...f.events, [e.key]: v } })}
+              label={`${e.label} → ${e.room}`}
+            />
+          ))}
+        </div>
+      </Panel>
+      <Panel title="Quiet hours" meta="alerts delay; chat still replies">
+        <div className="p-3 space-y-2">
+          <Switch checked={f.quietHours.enabled} onChange={(v) => setF({ ...f, quietHours: { ...f.quietHours, enabled: v } })} label="Hold alerts overnight" />
+          <div className="grid grid-cols-3 gap-2">
+            <Input value={f.quietHours.timezone} onChange={(e) => setF({ ...f, quietHours: { ...f.quietHours, timezone: e.target.value } })} />
+            <Input value={f.quietHours.start} onChange={(e) => setF({ ...f, quietHours: { ...f.quietHours, start: e.target.value } })} />
+            <Input value={f.quietHours.end} onChange={(e) => setF({ ...f, quietHours: { ...f.quietHours, end: e.target.value } })} />
+          </div>
+        </div>
+      </Panel>
+      <SaveBar dirty={dirty} onSave={() => void save()} />
+    </div>
   );
 }
 

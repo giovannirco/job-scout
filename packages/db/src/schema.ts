@@ -611,6 +611,33 @@ export const chatThreads = pgTable(
   (t) => [index("chat_threads_scope_idx").on(t.scope, t.positionId, t.companyId), index("chat_threads_updated_idx").on(t.updatedAt)],
 );
 
+export const NOTIFY_OUTBOX_STATUSES = ["pending", "sent", "failed", "cancelled"] as const;
+export type NotifyOutboxStatus = (typeof NOTIFY_OUTBOX_STATUSES)[number];
+
+export const notificationOutbox = pgTable(
+  "notification_outbox",
+  {
+    id: text("id").primaryKey(),
+    channel: text("channel").notNull(),
+    event: text("event").notNull(),
+    chatId: text("chat_id").notNull(),
+    body: text("body").notNull(),
+    status: text("status").$type<NotifyOutboxStatus>().notNull().default("pending"),
+    dedupeKey: text("dedupe_key"),
+    positionId: text("position_id").references(() => positions.id, { onDelete: "set null" }),
+    companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
+    providerRef: text("provider_ref"),
+    error: text("error"),
+    scheduledFor: timestamp("scheduled_for", { withTimezone: true }),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("notify_outbox_status_sched_idx").on(t.status, t.scheduledFor),
+    uniqueIndex("notify_outbox_dedupe_uidx").on(t.dedupeKey),
+  ],
+);
+
 export const schema = {
   profiles,
   companies,
@@ -634,4 +661,5 @@ export const schema = {
   settings,
   approvals,
   chatThreads,
+  notificationOutbox,
 };

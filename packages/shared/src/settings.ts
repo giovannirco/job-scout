@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_NOTIFICATIONS, type NotificationsConfig } from "./notify.js";
 
 /**
  * Operator settings — a single jsonb row. Every knob the UI exposes lives here
@@ -159,6 +160,47 @@ export function detectAutopilotPreset(cfg: AutopilotConfig): AutopilotPreset {
   return "custom";
 }
 
+const NotifyChannelCfg = z.object({
+  enabled: z.boolean().default(true),
+  chatId: z.string().default(""),
+});
+
+export const NotificationsConfigSchema = z.object({
+  enabled: z.boolean().default(true),
+  session: z.string().default("default"),
+  minTriageScore: z.number().min(0).max(5).default(3.5),
+  channels: z.object({
+    desk: NotifyChannelCfg,
+    new: NotifyChannelCfg,
+    process: NotifyChannelCfg,
+    research: NotifyChannelCfg,
+    chat: NotifyChannelCfg,
+  }),
+  events: z.object({
+    triage_pass: z.boolean().default(true),
+    approval_pending: z.boolean().default(true),
+    interview_scheduled: z.boolean().default(true),
+    stale_applied: z.boolean().default(true),
+    status_hot: z.boolean().default(true),
+    jd_change_hot: z.boolean().default(true),
+    listing_closed_hot: z.boolean().default(true),
+    company_research: z.boolean().default(true),
+  }),
+  quietHours: z.object({
+    enabled: z.boolean().default(true),
+    timezone: z.string().default("UTC"),
+    start: z.string().default("23:00"),
+    end: z.string().default("08:00"),
+  }),
+  chat: z.object({
+    model: z.string().default("grok-4.6"),
+    allowFrom: z.array(z.string()).default([]),
+    cursorTs: z.number().default(0),
+    cursorId: z.string().default(""),
+  }),
+});
+export type { NotificationsConfig };
+
 export const ChatConfig = z.object({
   /** Let the chat agent drive the job-scout Steel browser through Playwright MCP */
   browserTools: z.boolean().default(true),
@@ -192,6 +234,7 @@ export const Settings = z.object({
   }),
   autopilot: AutopilotConfig,
   chat: ChatConfig,
+  notifications: NotificationsConfigSchema,
   listingFactsBackfillAt: z.string().nullable().optional(),
   listingFactsBackfillVersion: z.string().nullable().optional(),
 });
@@ -244,6 +287,7 @@ export const DEFAULT_SETTINGS: Settings = {
   scan: { boardIntervalMinutes: 30, boardsPerTick: 40, autoTriage: true },
   autopilot: { preset: "assisted", budget: { dailyCalls: 0, dailyTokens: 0 }, ...AUTOPILOT_PRESET_VALUES.assisted },
   chat: { browserTools: true, writeTools: true, maxSteps: 12 },
+  notifications: DEFAULT_NOTIFICATIONS,
 };
 
 /** Deep-merge a stored partial settings document over the defaults and validate. */
@@ -264,8 +308,37 @@ export function resolveSettings(stored: unknown): Settings {
     scan: { ...DEFAULT_SETTINGS.scan, ...(s.scan as object | undefined) },
     autopilot: mergeAutopilot(s.autopilot),
     chat: { ...DEFAULT_SETTINGS.chat, ...(s.chat as object | undefined) },
+    notifications: mergeNotifications(s.notifications),
   };
   return Settings.parse(merged);
+}
+
+function mergeNotifications(stored: unknown): NotificationsConfig {
+  const d = DEFAULT_NOTIFICATIONS;
+  const n = (stored && typeof stored === "object" ? stored : {}) as Partial<NotificationsConfig>;
+  const ch = (n.channels && typeof n.channels === "object" ? n.channels : {}) as Partial<NotificationsConfig["channels"]>;
+  const ev = (n.events && typeof n.events === "object" ? n.events : {}) as Partial<NotificationsConfig["events"]>;
+  const qh = (n.quietHours && typeof n.quietHours === "object" ? n.quietHours : {}) as Partial<NotificationsConfig["quietHours"]>;
+  const chat = (n.chat && typeof n.chat === "object" ? n.chat : {}) as Partial<NotificationsConfig["chat"]>;
+  return {
+    enabled: n.enabled ?? d.enabled,
+    session: typeof n.session === "string" ? n.session : d.session,
+    minTriageScore: typeof n.minTriageScore === "number" ? n.minTriageScore : d.minTriageScore,
+    channels: {
+      desk: { ...d.channels.desk, ...ch.desk },
+      new: { ...d.channels.new, ...ch.new },
+      process: { ...d.channels.process, ...ch.process },
+      research: { ...d.channels.research, ...ch.research },
+      chat: { ...d.channels.chat, ...ch.chat },
+    },
+    events: { ...d.events, ...ev },
+    quietHours: { ...d.quietHours, ...qh },
+    chat: {
+      ...d.chat,
+      ...chat,
+      allowFrom: Array.isArray(chat.allowFrom) ? chat.allowFrom : d.chat.allowFrom,
+    },
+  };
 }
 
 function mergeAutopilot(stored: unknown): AutopilotConfig {
