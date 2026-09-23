@@ -193,11 +193,11 @@ export function PositionPage() {
       />
 
       {tab === "brief" ? <BriefTab p={p} noKey={noKey} onTriage={() => runAction("triage", { force: true })} /> : null}
-      {tab === "evaluation" ? <EvaluationTab p={p} hasEval={hasEval} hasJdReview={hasJdReview} onRun={runAction} /> : null}
+      {tab === "evaluation" ? <EvaluationTab p={p} hasEval={hasEval} hasJdReview={hasJdReview} noKey={noKey} onRun={runAction} /> : null}
       {tab === "jd" ? <JdTab p={p} /> : null}
-      {tab === "materials" ? <MaterialsTab p={p} onRun={runAction} /> : null}
-      {tab === "forms" ? <FormsTab p={p} onDraft={() => runAction("form_answers")} /> : null}
-      {tab === "company" ? <CompanyTab p={p} hasResearch={hasResearch} onRun={runAction} /> : null}
+      {tab === "materials" ? <MaterialsTab p={p} noKey={noKey} onRun={runAction} /> : null}
+      {tab === "forms" ? <FormsTab p={p} noKey={noKey} onDraft={() => runAction("form_answers")} /> : null}
+      {tab === "company" ? <CompanyTab p={p} hasResearch={hasResearch} noKey={noKey} onRun={runAction} /> : null}
       {tab === "history" ? <HistoryTab p={p} /> : null}
     </Page>
   );
@@ -453,7 +453,7 @@ function CareerOpsStamp({ p }: { p: PositionDetail }) {
 
 /* ---------------- Evaluation ---------------- */
 
-function EvaluationTab({ p, hasEval, hasJdReview, onRun }: { p: PositionDetail; hasEval: boolean; hasJdReview: boolean; onRun: (a: string) => void }) {
+function EvaluationTab({ p, hasEval, hasJdReview, noKey, onRun }: { p: PositionDetail; hasEval: boolean; hasJdReview: boolean; noKey: boolean; onRun: (a: string) => void }) {
   const evals = p.evaluations.filter((e) => e.kind === "evaluate");
   const reviews = p.evaluations.filter((e) => e.kind === "jd_review");
   const [sel, setSel] = useState<string | null>(null);
@@ -469,10 +469,10 @@ function EvaluationTab({ p, hasEval, hasJdReview, onRun }: { p: PositionDetail; 
           </button>
         ))}
         <span className="ml-auto flex gap-2">
-          <Btn variant="ghost" onClick={() => onRun("jd_review")}>
+          <Btn variant="ghost" disabled={noKey} title={noKey ? "Add a model key in Settings" : undefined} onClick={() => onRun("jd_review")}>
             {hasJdReview ? "Re-run JD review" : "JD review"}
           </Btn>
-          <Btn variant={hasEval ? "default" : "primary"} onClick={() => onRun("evaluate")}>
+          <Btn variant={hasEval ? "default" : "primary"} disabled={noKey} title={noKey ? "Add a model key in Settings" : undefined} onClick={() => onRun("evaluate")}>
             <Sparkles className="h-3.5 w-3.5" /> {hasEval ? "Re-evaluate" : "Evaluate"}
           </Btn>
         </span>
@@ -551,7 +551,7 @@ function JdTab({ p }: { p: PositionDetail }) {
 
 /* ---------------- Materials ---------------- */
 
-function MaterialsTab({ p, onRun }: { p: PositionDetail; onRun: (a: string, body?: Record<string, unknown>) => void }) {
+function MaterialsTab({ p, noKey, onRun }: { p: PositionDetail; noKey: boolean; onRun: (a: string, body?: Record<string, unknown>) => void }) {
   const [sel, setSel] = useState<string | null>(null);
   const current = sel || p.materials.find((m) => m.isCurrent && m.kind === "resume")?.id || p.materials[0]?.id || null;
   const m = useApi<Material>(["material", current], `/api/v1/positions/materials/${current}`, { enabled: Boolean(current) });
@@ -561,7 +561,7 @@ function MaterialsTab({ p, onRun }: { p: PositionDetail; onRun: (a: string, body
       <Panel
         title="Versions"
         actions={
-          <Btn size="xs" variant="primary" onClick={() => onRun("materials")}>
+          <Btn size="xs" variant="primary" disabled={noKey} title={noKey ? "Add a model key in Settings" : undefined} onClick={() => onRun("materials")}>
             <FileText className="h-3 w-3" /> Generate
           </Btn>
         }
@@ -606,7 +606,7 @@ function MaterialsTab({ p, onRun }: { p: PositionDetail; onRun: (a: string, body
 
 /* ---------------- Company ---------------- */
 
-function CompanyTab({ p, hasResearch, onRun }: { p: PositionDetail; hasResearch: boolean; onRun: (a: string) => void }) {
+function CompanyTab({ p, hasResearch, noKey, onRun }: { p: PositionDetail; hasResearch: boolean; noKey: boolean; onRun: (a: string) => void }) {
   const research = p.evaluations.find((e) => e.kind === "company_research");
   const e = useApi<Evaluation>(["evaluation", research?.id], `/api/v1/positions/${p.id}/evaluations/${research?.id}`, { enabled: Boolean(research) });
   return (
@@ -628,7 +628,7 @@ function CompanyTab({ p, hasResearch, onRun }: { p: PositionDetail; hasResearch:
         ) : null}
         {p.company.industryTags?.length ? <span className="text-faint font-mono text-[11px]">{p.company.industryTags.join(" · ")}</span> : null}
         <span className="ml-auto">
-          <Btn variant={hasResearch ? "default" : "primary"} onClick={() => onRun("company_research")}>
+          <Btn variant={hasResearch ? "default" : "primary"} disabled={noKey} title={noKey ? "Add a model key in Settings" : undefined} onClick={() => onRun("company_research")}>
             <Sparkles className="h-3.5 w-3.5" /> {hasResearch ? "Refresh research" : "Research company"}
           </Btn>
         </span>
@@ -702,7 +702,7 @@ type FormQuestion = {
   status: string;
 };
 
-function FormsTab({ p, onDraft }: { p: PositionDetail; onDraft: () => void }) {
+function FormsTab({ p, noKey, onDraft }: { p: PositionDetail; noKey: boolean; onDraft: () => void }) {
   const qc = useQueryClient();
   const search = useSearch({ from: "/positions/$id" });
   const navigate = useNavigate({ from: "/positions/$id" });
@@ -721,7 +721,7 @@ function FormsTab({ p, onDraft }: { p: PositionDetail; onDraft: () => void }) {
         <div className="flex items-center gap-2">
           <SortHead label="Question" field="question" sort={search.sort} onSort={(n) => navigate({ search: (prev) => ({ ...prev, sort: n, tab: "forms" }) })} />
           <SortHead label="Status" field="status" sort={search.sort} onSort={(n) => navigate({ search: (prev) => ({ ...prev, sort: n, tab: "forms" }) })} />
-          <Btn variant="primary" onClick={onDraft} disabled={!rows.length}>
+          <Btn variant="primary" onClick={onDraft} disabled={!rows.length || noKey} title={noKey ? "Add a model key in Settings" : undefined}>
             <Sparkles className="h-3.5 w-3.5" /> Draft answers
           </Btn>
         </div>
