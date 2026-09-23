@@ -34,18 +34,7 @@ export async function listDiscovery(q: {
   }
   const where = conds.length ? and(...conds) : undefined;
   const { field, dir } = parseListSort(q.sort, ["observed", "title", "company", "location", "lane"], "observed", "desc");
-  const d = <T>(col: T) => (dir === "asc" ? asc(col as never) : desc(col as never));
-  const order =
-    field === "title"
-      ? [d(discoveryFeed.title), desc(discoveryFeed.id)]
-      : field === "company"
-        ? [d(discoveryFeed.company), desc(discoveryFeed.id)]
-        : field === "location"
-          ? [d(discoveryFeed.locationRaw), desc(discoveryFeed.id)]
-          : field === "lane"
-            ? [d(discoveryFeed.lane), desc(discoveryFeed.observedAt)]
-            : [d(discoveryFeed.observedAt), desc(discoveryFeed.id)];
-  const rows = await db
+  const ranked = db
     .select({
       id: discoveryFeed.id,
       externalIdentity: discoveryFeed.externalIdentity,
@@ -64,6 +53,8 @@ export async function listDiscovery(q: {
       positionStatus: positions.status,
       triageVerdict: positions.triageVerdict,
       triageScore: positions.triageScore,
+      copies: sql<number>`count(*) over (partition by coalesce(${discoveryFeed.positionId}, ${discoveryFeed.id}))::int`.as("copies"),
+      rn: sql<number>`row_number() over (partition by coalesce(${discoveryFeed.positionId}, ${discoveryFeed.id}) order by ${discoveryFeed.observedAt} desc, ${discoveryFeed.id} desc)::int`.as("rn"),
     })
     .from(discoveryFeed)
     .leftJoin(
@@ -71,19 +62,50 @@ export async function listDiscovery(q: {
       sql`(${positions.id} = ${discoveryFeed.positionId}) or (${discoveryFeed.positionId} is null and ${positions.externalIdentity} is not null and ${positions.externalIdentity} = ${discoveryFeed.externalIdentity})`,
     )
     .where(where)
+    .as("disc_ranked");
+  const d = <T>(col: T) => (dir === "asc" ? asc(col as never) : desc(col as never));
+  const order =
+    field === "title"
+      ? [d(ranked.title), desc(ranked.id)]
+      : field === "company"
+        ? [d(ranked.company), desc(ranked.id)]
+        : field === "location"
+          ? [d(ranked.locationRaw), desc(ranked.id)]
+          : field === "lane"
+            ? [d(ranked.lane), desc(ranked.observedAt)]
+            : [d(ranked.observedAt), desc(ranked.id)];
+  const rows = await db
+    .select()
+    .from(ranked)
+    .where(sql`${ranked.rn} = 1`)
     .orderBy(...order)
     .limit(pageSize)
     .offset(q.cursor ? 0 : (page - 1) * pageSize);
-  const total = (await db.select({ c: sql<number>`count(*)::int` }).from(discoveryFeed).where(where))[0]?.c ?? 0;
+  const total = (
+    await db
+      .select({ c: sql<number>`count(distinct coalesce(${discoveryFeed.positionId}, ${discoveryFeed.id}))::int` })
+      .from(discoveryFeed)
+      .where(where)
+  )[0]?.c ?? 0;
   const last = rows[rows.length - 1];
-  return { items: rows, page, pageSize, total, nextCursor: rows.length === pageSize && last ? last.observedAt.toISOString() : null };
+  return {
+    items: rows.map(({ rn: _rn, ...item }) => item),
+    page,
+    pageSize,
+    total,
+    nextCursor: rows.length === pageSize && last ? last.observedAt.toISOString() : null,
+  };
 }
 
 export async function discoverySummary(hours = 24) {
   const db = await getDb();
   const since = new Date(Date.now() - hours * 3_600_000);
   const lanes = await db
-    .select({ lane: discoveryFeed.lane, c: sql<number>`count(*)::int` })
+    .select({
+      lane: discoveryFeed.lane,
+      c: sql<number>`count(*)::int`,
+      positions: sql<number>`count(distinct coalesce(${discoveryFeed.positionId}, ${discoveryFeed.id}))::int`,
+    })
     .from(discoveryFeed)
     .where(gte(discoveryFeed.observedAt, since))
     .groupBy(discoveryFeed.lane);

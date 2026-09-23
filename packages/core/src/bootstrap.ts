@@ -119,6 +119,15 @@ export async function bootstrap(opts: { seedBoards?: boolean } = {}) {
         })
         .catch((e) => log.error("bootstrap.craft-gate.failed", { err: e }));
     }
+    if (stored.archivedDiscoveryVersion !== "1") {
+      const { filterPassedDiscoveryForArchived } = await import("./scan.js");
+      await filterPassedDiscoveryForArchived()
+        .then(async (r) => {
+          await updateSettings({ archivedDiscoveryVersion: "1" });
+          if (r.updated) log.info("bootstrap.archived-discovery", r);
+        })
+        .catch((e) => log.error("bootstrap.archived-discovery.failed", { err: e }));
+    }
     if (stored.usPlaceGeoVersion !== "2") {
       const { reclassifyUsPlaceLists } = await import("./scan.js");
       await reclassifyUsPlaceLists()

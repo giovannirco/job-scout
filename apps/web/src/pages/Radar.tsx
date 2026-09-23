@@ -25,7 +25,7 @@ export function RadarPage() {
   const set = (p: Partial<RadarSearch>) => navigate({ search: (prev) => ({ ...prev, page: undefined, ...p }) });
   const hours = search.hours || 72;
 
-  const raw = useApi<{ lanes: { lane: string; c: number }[]; boards: { total: number; enabled: number; scanned24h: number; errored: number } }>(["radar", "summary", hours], `/api/v1/radar/discovery/summary?hours=${hours}`, {
+  const raw = useApi<{ lanes: { lane: string; c: number; positions?: number }[]; boards: { total: number; enabled: number; scanned24h: number; errored: number } }>(["radar", "summary", hours], `/api/v1/radar/discovery/summary?hours=${hours}`, {
     refetchInterval: 60_000,
   });
   const summary = raw.data ? { lanes: Object.fromEntries(raw.data.lanes.map((l) => [l.lane, l.c])) as Record<string, number>, boards: raw.data.boards } : undefined;
@@ -51,7 +51,7 @@ export function RadarPage() {
       >
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           <Kpi label={`seen · ${hours >= 168 ? `${hours / 24}d` : `${hours}h`}`} value={seen} hint="listings observed" />
-          <Kpi label="passed gate" value={summary?.lanes.passed ?? "—"} tone={summary?.lanes.passed ? "good" : "neutral"} hint="became positions" onClick={() => set({ tab: undefined, lane: undefined })} />
+          <Kpi label="passed gate" value={raw.data?.lanes.find((l) => l.lane === "passed")?.positions ?? summary?.lanes.passed ?? "—"} tone={summary?.lanes.passed ? "good" : "neutral"} hint="became positions" onClick={() => set({ tab: undefined, lane: undefined })} />
           <Kpi label="marginal" value={summary?.lanes.marginal ?? "—"} tone={summary?.lanes.marginal ? "warn" : "neutral"} hint="borderline title/geo" onClick={() => set({ tab: undefined, lane: "marginal" })} />
           <Kpi
             label="sources"
@@ -189,7 +189,10 @@ function Discovery({ search, set, summary }: { search: RadarSearch; set: (p: Par
                 </Td>
                 <Td className="max-w-[440px]">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="truncate">{r.title}</span>
+                    <span className="min-w-0">
+                      <span className="truncate block">{r.title}</span>
+                      {(r.copies || 0) > 1 ? <span className="block text-[11px] text-faint">{r.copies} copies of this posting</span> : null}
+                    </span>
                     <span className="text-muted text-[12px] truncate shrink-0 max-w-[40%]">{r.company}</span>
                     {lane === "all" ? <LaneBadge lane={r.lane} /> : null}
                   </div>

@@ -172,9 +172,24 @@ export async function scanBoard(boardId: string, opts: { force?: boolean } = {})
   // Passed: make sure a position exists (fetch full JD only for new identities or forced).
   for (const { j } of passedJobs) {
     const existing = (
-      await db.select({ id: positions.id, triagedAt: positions.triagedAt, status: positions.status }).from(positions).where(eq(positions.externalIdentity, j.externalIdentity)).limit(1)
+      await db.select({
+        id: positions.id,
+        triagedAt: positions.triagedAt,
+        status: positions.status,
+        archiveReason: positions.archiveReason,
+      }).from(positions).where(eq(positions.externalIdentity, j.externalIdentity)).limit(1)
     )[0];
     if (existing && !opts.force) {
+      if (existing.status === "archived") {
+        res.passed = Math.max(0, res.passed - 1);
+        res.filtered++;
+        await db.update(discoveryFeed).set({
+          positionId: existing.id,
+          lane: "filtered",
+          gateReason: reasonFromArchive(existing.archiveReason),
+        }).where(eq(discoveryFeed.externalIdentity, j.externalIdentity));
+        continue;
+      }
       await db.update(discoveryFeed).set({ positionId: existing.id }).where(eq(discoveryFeed.externalIdentity, j.externalIdentity));
       // Known position: watch_check refreshes JDs on its own schedule. Enqueue triage if never run.
       if (!existing.triagedAt && settings.autopilot.triageNew && existing.status === "triaged" && llmConfigured()) {
@@ -311,6 +326,25 @@ function titleGateMiss(title: string, gate: GateConfig): string | null {
   if (verdict.pass) return null;
   if (verdict.reason === "title_no_include" || verdict.reason?.startsWith("title_exclude:")) return verdict.reason;
   return null;
+}
+
+function reasonFromArchive(reason: string | null | undefined): string {
+  const code = reason?.match(/\(([^)]+)\)/)?.[1]?.trim();
+  return code || reason?.trim() || "archived";
+}
+
+/** A later scan can mark an archived filing as passed from a stale board location. Put it back. */
+export async function filterPassedDiscoveryForArchived(): Promise<{ updated: number }> {
+  const db = await getDb();
+  const rows = await db
+    .select({ id: discoveryFeed.id, reason: positions.archiveReason })
+    .from(discoveryFeed)
+    .innerJoin(positions, eq(positions.id, discoveryFeed.positionId))
+    .where(and(eq(discoveryFeed.lane, "passed"), eq(positions.status, "archived")));
+  for (const row of rows) {
+    await db.update(discoveryFeed).set({ lane: "filtered", gateReason: reasonFromArchive(row.reason) }).where(eq(discoveryFeed.id, row.id));
+  }
+  return { updated: rows.length };
 }
 
 function filingMiss(verdict: GateVerdict): string | null {
