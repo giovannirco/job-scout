@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
-import { api, client, post, type PositionRow, type TodayData } from "@/lib/api";
+import { api, apiMeta, client, useApi, type PositionRow, type SystemInfo, type TodayData } from "@/lib/api";
 import { compact } from "@/lib/format";
 import { Btn, IconBtn, Input, Kbd, Modal, cn } from "@/ui/kit";
 import { CommandPalette } from "./CommandPalette";
@@ -344,19 +344,25 @@ function AddUrlModal({ open, onClose, onCreated }: { open: boolean; onClose: () 
   const [company, setCompany] = useState("");
   const [busy, setBusy] = useState(false);
   const qc = useQueryClient();
+  const sys = useApi<SystemInfo>(["system"], "/api/v1/settings/system", { staleTime: 30_000 });
+  const noKey = sys.data?.llmConfigured === false;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (!url.trim()) return;
     setBusy(true);
     try {
-      const p = await post<PositionRow>("/api/v1/positions", { url: url.trim(), companyName: company.trim() || undefined });
-      toast.success(`${p.company?.name || "Position"} added — triage queued`);
+      const res = await apiMeta<PositionRow>("/api/v1/positions", {
+        method: "POST",
+        body: JSON.stringify({ url: url.trim(), companyName: company.trim() || undefined }),
+      });
+      const name = res.data.company?.name || "Position";
+      toast.success(res.meta.triageJobId ? `${name} added — triage queued` : `${name} added`);
       void qc.invalidateQueries({ queryKey: ["positions"] });
       void qc.invalidateQueries({ queryKey: ["today"] });
       setUrl("");
       setCompany("");
-      onCreated(p);
+      onCreated(res.data);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not add position");
     } finally {
@@ -367,13 +373,17 @@ function AddUrlModal({ open, onClose, onCreated }: { open: boolean; onClose: () 
   return (
     <Modal open={open} onClose={onClose} title="Add position">
       <form onSubmit={submit} className="p-4 space-y-3">
-        <p className="text-[12.5px] text-muted">Paste any job URL. Greenhouse, Ashby and Lever are read directly; Workday and SPA pages go through the browser. The JD is fetched, gated and triaged in the background.</p>
+        <p className="text-[12.5px] text-muted">
+          {noKey
+            ? "Paste any job URL. Greenhouse, Ashby and Lever are read directly. The listing is fetched and gated. Scoring waits until a model key is set."
+            : "Paste any job URL. Greenhouse, Ashby and Lever are read directly; Workday and SPA pages go through the browser. The JD is fetched, gated and triaged in the background."}
+        </p>
         <Input label="Job URL" autoFocus value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://boards.greenhouse.io/…" />
         <Input label="Company (optional)" value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Only if the page does not say" />
         <div className="flex justify-end gap-2 pt-1">
           <Btn onClick={onClose}>Cancel</Btn>
           <Btn variant="primary" type="submit" disabled={busy || !url.trim()}>
-            {busy ? "Adding…" : "Add and triage"}
+            {busy ? "Adding…" : noKey ? "Add" : "Add and triage"}
           </Btn>
         </div>
       </form>
