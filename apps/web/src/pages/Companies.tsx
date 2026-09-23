@@ -3,7 +3,7 @@ import { LayoutGrid, List, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useChatScope } from "@/frame/store";
 import { qs, useApiMeta, type CompanyRow } from "@/lib/api";
-import { ago, countLabel, host } from "@/lib/format";
+import { ago, companySite, countLabel } from "@/lib/format";
 import { Card, Empty, ErrorNote, Loading, Monogram, Page, PageHeader, Pager, Seg, SortHead, Table, Td, Th, Tr, cn } from "@/ui/kit";
 
 const PAGE_SIZE = 50;
@@ -74,7 +74,7 @@ export function CompaniesPage() {
                 <Monogram name={c.name} size={32} />
                 <div className="min-w-0">
                   <div className="font-medium text-[13px] truncate">{c.name}</div>
-                  <div className="text-[11px] text-muted truncate">{host(c.website) || host(c.careersUrl) || "—"}</div>
+                  <div className="text-[11px] text-muted truncate">{companySite(c.website, c.careersUrl)?.label || "—"}</div>
                 </div>
               </div>
               {c.industryTags?.length ? <div className="text-[10.5px] font-mono text-faint truncate">{c.industryTags.slice(0, 3).join(" · ")}</div> : <div className="h-[15px]" />}
@@ -118,7 +118,7 @@ export function CompaniesPage() {
                     {c.name}
                   </span>
                 </Td>
-                <Td className="text-muted">{host(c.website) || host(c.careersUrl) || "—"}</Td>
+                <Td className="text-muted">{companySite(c.website, c.careersUrl)?.label || "—"}</Td>
                 <Td className="text-faint font-mono text-[11px] max-w-[260px]">
                   <div className="truncate">{c.industryTags?.join(" · ") || ""}</div>
                 </Td>

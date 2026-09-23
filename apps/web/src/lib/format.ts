@@ -171,3 +171,24 @@ export function host(url: string | null | undefined): string {
     return url;
   }
 }
+
+const ATS_SITE = /(^|\.)(greenhouse\.io|ashbyhq\.com|lever\.co|myworkdayjobs\.com|smartrecruiters\.com|workable\.com)$/i;
+
+/** A company homepage. A careers link on the company domain is enough. An ATS board is not. */
+export function companySite(website?: string | null, careersUrl?: string | null): { href: string; label: string } | null {
+  const direct = (website || "").trim();
+  if (direct) {
+    const label = host(direct);
+    return label ? { href: direct, label } : null;
+  }
+  const careers = (careersUrl || "").trim();
+  if (!careers) return null;
+  try {
+    const url = new URL(careers);
+    const label = url.hostname.replace(/^www\./, "");
+    if (!label || ATS_SITE.test(label)) return null;
+    return { href: `${url.protocol}//${url.host}`, label };
+  } catch {
+    return null;
+  }
+}
