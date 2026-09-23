@@ -304,10 +304,16 @@ describe("core on pglite", () => {
 
   it("uses target roles as the title gate and rechecks a stored java listing", async () => {
     const { titleIncludesFromRoles, syncGateFromTargetRoles } = await import("./profile.js");
+    const { gateListing } = await import("@job-scout/shared");
     const { getSettings } = await import("./settings.js");
     const { getDb, discoveryFeed, id } = await import("@job-scout/db");
     const { eq } = await import("drizzle-orm");
-    expect(titleIncludesFromRoles([" Java Engineer ", "java engineer", "SRE", "a"])).toEqual(["java engineer", "sre"]);
+    expect(titleIncludesFromRoles([" Java Engineer ", "java engineer", "SRE", "a"])).toEqual(["java engineer", "java", "sre"]);
+    const includes = titleIncludesFromRoles(["Java Engineer", "Software Engineer"]);
+    const gate = { titleInclude: includes, titleExclude: [], geoAllow: ["remote"], geoBlock: [], maxPostingAgeDays: 0, allowUnknownGeo: true };
+    expect(gateListing({ title: "Senior Java Developer", locationRaw: "Remote" }, gate).pass).toBe(true);
+    expect(gateListing({ title: "Senior Software Engineer", locationRaw: "Remote" }, gate).pass).toBe(true);
+    expect(gateListing({ title: "JavaScript Engineer", locationRaw: "Remote" }, gate).pass).toBe(false);
     const db = await getDb();
     const rowId = id("df");
     await db.insert(discoveryFeed).values({
@@ -322,8 +328,8 @@ describe("core on pglite", () => {
       observedAt: new Date(),
     });
     const synced = await syncGateFromTargetRoles(["Java Engineer"]);
-    expect(synced?.titleInclude).toEqual(["java engineer"]);
-    expect((await getSettings({ fresh: true })).gate.titleInclude).toEqual(["java engineer"]);
+    expect(synced?.titleInclude).toEqual(["java engineer", "java"]);
+    expect((await getSettings({ fresh: true })).gate.titleInclude).toEqual(["java engineer", "java"]);
     const row = (await db.select().from(discoveryFeed).where(eq(discoveryFeed.id, rowId)))[0];
     expect(row?.lane).toBe("passed");
   });
