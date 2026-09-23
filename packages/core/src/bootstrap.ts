@@ -61,6 +61,15 @@ export async function bootstrap(opts: { seedBoards?: boolean } = {}) {
         })
         .catch((e) => log.error("bootstrap.gate-lanes.failed", { err: e }));
     }
+    if (stored.homeGateVersion !== "1") {
+      const { repairHomeMarketFilings } = await import("./scan.js");
+      await repairHomeMarketFilings()
+        .then(async (r) => {
+          await updateSettings({ homeGateVersion: "1" });
+          if (r.withdrawn) log.info("bootstrap.home-gate", r);
+        })
+        .catch((e) => log.error("bootstrap.home-gate.failed", { err: e }));
+    }
   }
   const db = await getDb();
   if (opts.seedBoards !== false) {

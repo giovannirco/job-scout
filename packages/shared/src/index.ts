@@ -15,3 +15,4 @@ export * from "./ats-keywords.js";
 export * from "./log.js";
 export * from "./clip.js";
 export * from "./position-identity.js";
+export * from "./home-geo.js";

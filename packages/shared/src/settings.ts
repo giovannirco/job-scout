@@ -243,6 +243,8 @@ export const Settings = z.object({
   officeGateVersion: z.string().nullable().optional(),
   /** One-shot: discovery rows stay filtered after the filing is archived for the gate. */
   gateLaneVersion: z.string().nullable().optional(),
+  /** One-shot: a US profile location drops remote roles that require another country. */
+  homeGateVersion: z.string().nullable().optional(),
 });
 export type Settings = z.infer<typeof Settings>;
 
@@ -322,6 +324,7 @@ export function resolveSettings(stored: unknown): Settings {
     misstampWithdrawVersion: typeof s.misstampWithdrawVersion === "string" ? s.misstampWithdrawVersion : null,
     officeGateVersion: typeof s.officeGateVersion === "string" ? s.officeGateVersion : null,
     gateLaneVersion: typeof s.gateLaneVersion === "string" ? s.gateLaneVersion : null,
+    homeGateVersion: typeof s.homeGateVersion === "string" ? s.homeGateVersion : null,
   };
   return Settings.parse(merged);
 }
