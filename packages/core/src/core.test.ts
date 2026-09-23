@@ -412,6 +412,7 @@ describe("core on pglite", () => {
     const { updateSettings } = await import("./settings.js");
     const { upsertFromJob, getPosition } = await import("./positions.js");
     const { getDb, discoveryFeed, id } = await import("@job-scout/db");
+    const { eq } = await import("drizzle-orm");
     const db = await getDb();
     const office = await upsertFromJob(job({
       jobId: "office-spain",
@@ -456,6 +457,9 @@ describe("core on pglite", () => {
     expect(result.withdrawn).toBeGreaterThanOrEqual(1);
     expect((await getPosition(office.position.id))?.status).toBe("archived");
     expect((await getPosition(office.position.id))?.archiveReason).toBe("left the location gate (geo_block:onsite)");
+    const officeFeed = (await db.select().from(discoveryFeed).where(eq(discoveryFeed.positionId, office.position.id)))[0];
+    expect(officeFeed?.lane).toBe("filtered");
+    expect(officeFeed?.gateReason).toBe("geo_block:onsite");
     expect((await getPosition(remote.position.id))?.status).toBe("triaged");
     expect((await getPosition(pasted.position.id))?.status).toBe("triaged");
     const repaired = await repairOfficeDiscoveryFilings();
