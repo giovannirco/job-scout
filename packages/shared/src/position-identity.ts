@@ -72,7 +72,7 @@ export function requisitionId(text = ""): string | null {
 }
 
 export function cleanLocation(value?: string | null): string {
-  return (value || "").split(/\s*[·;|]\s*/).map(p => p.replace(/\[object Object\]/g, "").trim()).filter(Boolean).join(" · ");
+  return (value || "").split(/\s*[·•;|]\s*/).map(p => p.replace(/\[object Object\]/g, "").trim()).filter(Boolean).join(" · ");
 }
 
 /** Recover only where the host's slug format and the exact title make the boundary deterministic. */

@@ -247,6 +247,8 @@ export const Settings = z.object({
   homeGateVersion: z.string().nullable().optional(),
   /** One-shot: north star excludes, US-only wording, and age on jobs the board still lists. */
   profileGateVersion: z.string().nullable().optional(),
+  /** One-shot: re-gate after bullet offices and home-based locations classify correctly. */
+  placeSplitVersion: z.string().nullable().optional(),
 });
 export type Settings = z.infer<typeof Settings>;
 
@@ -328,6 +330,7 @@ export function resolveSettings(stored: unknown): Settings {
     gateLaneVersion: typeof s.gateLaneVersion === "string" ? s.gateLaneVersion : null,
     homeGateVersion: typeof s.homeGateVersion === "string" ? s.homeGateVersion : null,
     profileGateVersion: typeof s.profileGateVersion === "string" ? s.profileGateVersion : null,
+    placeSplitVersion: typeof s.placeSplitVersion === "string" ? s.placeSplitVersion : null,
   };
   return Settings.parse(merged);
 }
