@@ -66,6 +66,28 @@ describe("gateListing", () => {
     expect(v.pass).toBe(true);
   });
 
+  it("rejects a named office even when unknown geo is allowed", () => {
+    const spain = gateListing({ title: "Site Reliability Engineer", locationRaw: "Spain" }, DEFAULT_GATE);
+    expect(spain.pass).toBe(false);
+    expect(spain.reason).toBe("geo_unlisted");
+    const remoteOffice = gateListing({ title: "Site Reliability Engineer", locationRaw: "Spain", workplaceType: "Remote" }, DEFAULT_GATE);
+    expect(remoteOffice.pass).toBe(true);
+    const offices = gateListing({ title: "Site Reliability Engineer", locationRaw: "San Francisco, CA · New York City, NY" }, DEFAULT_GATE);
+    expect(offices.pass).toBe(false);
+  });
+
+  it("keeps a country list when the board says remote", () => {
+    const v = gateListing(
+      {
+        title: "Site Reliability Engineer",
+        locationRaw: "Poland · Brazil · Sweden · Colombia",
+        workplaceType: "Remote",
+      },
+      DEFAULT_GATE,
+    );
+    expect(v.pass).toBe(true);
+  });
+
   it("passes a remote multi-country list that includes Portugal", () => {
     const v = gateListing(
       {

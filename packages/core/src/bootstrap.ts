@@ -43,6 +43,15 @@ export async function bootstrap(opts: { seedBoards?: boolean } = {}) {
         })
         .catch((e) => log.error("bootstrap.misstamp-withdraw.failed", { err: e }));
     }
+    if (stored.officeGateVersion !== "1") {
+      const { repairOfficeDiscoveryFilings } = await import("./scan.js");
+      await repairOfficeDiscoveryFilings()
+        .then(async (r) => {
+          await updateSettings({ officeGateVersion: "1" });
+          log.info("bootstrap.office-gate", r);
+        })
+        .catch((e) => log.error("bootstrap.office-gate.failed", { err: e }));
+    }
   }
   const db = await getDb();
   if (opts.seedBoards !== false) {

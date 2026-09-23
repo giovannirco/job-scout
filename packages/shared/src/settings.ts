@@ -239,6 +239,8 @@ export const Settings = z.object({
   listingFactsBackfillVersion: z.string().nullable().optional(),
   /** One-shot repair for discovery promotions stored as source "manual" before scan:discovery. */
   misstampWithdrawVersion: z.string().nullable().optional(),
+  /** One-shot withdraw of office filings the gate used to treat as unknown geo. */
+  officeGateVersion: z.string().nullable().optional(),
 });
 export type Settings = z.infer<typeof Settings>;
 
@@ -316,6 +318,7 @@ export function resolveSettings(stored: unknown): Settings {
     listingFactsBackfillAt: typeof s.listingFactsBackfillAt === "string" ? s.listingFactsBackfillAt : null,
     listingFactsBackfillVersion: typeof s.listingFactsBackfillVersion === "string" ? s.listingFactsBackfillVersion : null,
     misstampWithdrawVersion: typeof s.misstampWithdrawVersion === "string" ? s.misstampWithdrawVersion : null,
+    officeGateVersion: typeof s.officeGateVersion === "string" ? s.officeGateVersion : null,
   };
   return Settings.parse(merged);
 }

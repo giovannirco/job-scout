@@ -461,6 +461,8 @@ export async function listAshbyBoard(
       title: string;
       jobUrl?: string;
       publishedAt?: string;
+      isRemote?: boolean;
+      workplaceType?: string;
       location?: AshbyLocation;
       secondaryLocations?: AshbyLocation[];
     }>;
@@ -474,6 +476,8 @@ export async function listAshbyBoard(
     url: j.jobUrl,
     postedAt: postingDate(j.publishedAt),
     locationRaw: joinAshbyLocations(j.location, j.secondaryLocations),
+    workplaceType: j.workplaceType || (j.isRemote ? "remote" : undefined),
+    isRemote: j.isRemote,
     company,
   }));
   return { jobs, total: jobs.length };

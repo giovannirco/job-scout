@@ -292,6 +292,8 @@ describe("listBoard ashby", () => {
       "United Kingdom · Hungary · Poland · South Africa · Portugal · Ireland · Romania",
     );
     expect(jobs[0]?.locationRaw).not.toMatch(/\[object Object\]/);
+    expect(jobs[0]?.isRemote).toBe(true);
+    expect(jobs[0]?.workplaceType).toBe("Remote");
   });
 });
 

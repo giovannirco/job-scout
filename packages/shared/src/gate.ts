@@ -1,3 +1,4 @@
+import { isNamedOffice } from "./classify.js";
 import type { GateConfig } from "./settings.js";
 
 export type GateInput = {
@@ -102,6 +103,10 @@ export function gateListing(input: GateInput, cfg: GateConfig): GateVerdict {
   }
   for (const term of cfg.geoAllow) {
     if (has(geo, term)) return { pass: true, reason: null, matchedInclude };
+  }
+  // "Spain" is a place, not an unknown location. allowUnknownGeo only covers a blank.
+  if (isNamedOffice(input.locationRaw || "")) {
+    return { pass: false, reason: "geo_unlisted", matchedInclude };
   }
   return cfg.allowUnknownGeo
     ? { pass: true, reason: "geo_unlisted", matchedInclude }
