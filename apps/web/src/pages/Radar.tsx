@@ -5,9 +5,9 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { LaneBadge, ScoreMeter, StatusBadge } from "@/components/badges";
 import { useChatScope } from "@/frame/store";
-import { apiMeta, del, patch, post, qs, useApi, useApiMeta, type Board, type DeltaRow, type DiscoveryRow, type Watch } from "@/lib/api";
+import { apiMeta, del, patch, post, qs, useApi, useApiMeta, type Board, type DeltaRow, type DiscoveryRow, type SystemInfo, type Watch } from "@/lib/api";
 import { ago, countLabel, dateTime, titleCase } from "@/lib/format";
-import { discoveryQueuedMessage } from "@/lib/discovery-toast";
+import { discoveryQueuedMessage, promoteMessage } from "@/lib/discovery-toast";
 import { gateReasonLabel } from "@/lib/gate-reason";
 import type { RadarSearch } from "@/router";
 import { Btn, Card, Dot, Empty, IconBtn, Input, Kpi, Loading, Monogram, Page, PageHeader, Pager, Seg, Select, SortHead, Table, Tabs, Td, Th, Tr, cn, ErrorNote } from "@/ui/kit";
@@ -21,6 +21,7 @@ export function RadarPage() {
   const onSources = pathname.startsWith("/sources");
   const search = useSearch({ strict: false }) as RadarSearch;
   const navigate = useNavigate({ from: onSources ? "/sources" : "/discovery" });
+  const go = useNavigate();
   const tab: Tab = onSources ? (search.tab === "watches" ? "watches" : "boards") : search.tab || "discovery";
   const set = (p: Partial<RadarSearch>) => navigate({ search: (prev) => ({ ...prev, page: undefined, ...p }) });
   const hours = search.hours || 72;
@@ -51,14 +52,14 @@ export function RadarPage() {
       >
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           <Kpi label={`seen · ${hours >= 168 ? `${hours / 24}d` : `${hours}h`}`} value={seen} hint="listings observed" />
-          <Kpi label="passed gate" value={raw.data?.lanes.find((l) => l.lane === "passed")?.positions ?? summary?.lanes.passed ?? "—"} tone={summary?.lanes.passed ? "good" : "neutral"} hint="became positions" onClick={() => set({ tab: undefined, lane: undefined })} />
-          <Kpi label="marginal" value={summary?.lanes.marginal ?? "—"} tone={summary?.lanes.marginal ? "warn" : "neutral"} hint="borderline title/geo" onClick={() => set({ tab: undefined, lane: "marginal" })} />
+          <Kpi label="passed gate" value={raw.data?.lanes.find((l) => l.lane === "passed")?.positions ?? summary?.lanes.passed ?? "—"} tone={summary?.lanes.passed ? "good" : "neutral"} hint="became positions" onClick={() => void go({ to: "/discovery", search: { lane: "passed" } })} />
+          <Kpi label="marginal" value={summary?.lanes.marginal ?? "—"} tone={summary?.lanes.marginal ? "warn" : "neutral"} hint="borderline title/geo" onClick={() => void go({ to: "/discovery", search: { lane: "marginal" } })} />
           <Kpi
             label="sources"
             value={summary ? `${summary.boards.enabled}/${summary.boards.total}` : "—"}
             tone={summary?.boards.errored ? "bad" : "neutral"}
             hint={summary ? `${summary.boards.scanned24h} scanned 24h${summary.boards.errored ? ` · ${summary.boards.errored} erroring` : ""}` : undefined}
-            onClick={() => set({ tab: "boards" })}
+            onClick={() => void go({ to: "/sources", search: { tab: "boards" } })}
           />
         </div>
       </PageHeader>
@@ -101,6 +102,8 @@ function HoursSelect({ value, onChange }: { value: number; onChange: (h: number)
 /* ---------------- Discovery ---------------- */
 
 function Discovery({ search, set, summary }: { search: RadarSearch; set: (p: Partial<RadarSearch>) => void; summary?: { lanes: Record<string, number>; passedPositions?: number } }) {
+  const sys = useApi<SystemInfo>(["system"], "/api/v1/settings/system", { staleTime: 30_000 });
+  const noKey = sys.data?.llmConfigured === false;
   const lane = search.lane || "passed";
   const page = search.page || 1;
   const hours = search.hours || 72;
@@ -119,7 +122,7 @@ function Discovery({ search, set, summary }: { search: RadarSearch; set: (p: Par
     try {
       const res = await apiMeta<{ id: string; slug: string }>(`/api/v1/radar/discovery/${r.id}/promote`, { method: "POST" });
       const revived = Boolean(res.meta.revived);
-      toast.success(res.meta.created ? "Promoted — triage queued" : revived ? "Revived — back in the pipeline" : "Already in the pipeline");
+      toast.success(promoteMessage({ created: res.meta.created, revived, triageJobId: res.meta.triageJobId }));
       void qc.invalidateQueries({ queryKey: ["radar"] });
       void qc.invalidateQueries({ queryKey: ["positions"] });
       const slug = res.data?.slug;
@@ -151,7 +154,7 @@ function Discovery({ search, set, summary }: { search: RadarSearch; set: (p: Par
           }}
         >
           <Search className="h-3.5 w-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-faint" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Title, company…" className="w-[200px] h-7 rounded-md border border-border bg-bg pl-7 pr-2 text-[12px] outline-none focus:border-accent placeholder:text-faint" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Title, company, location…" className="w-[220px] h-7 rounded-md border border-border bg-bg pl-7 pr-2 text-[12px] outline-none focus:border-accent placeholder:text-faint" />
         </form>
         <span className="ml-auto text-[11px] text-faint font-mono tabular">{countLabel(total, "row")}</span>
       </div>
@@ -190,7 +193,13 @@ function Discovery({ search, set, summary }: { search: RadarSearch; set: (p: Par
                 <Td className="max-w-[440px]">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="min-w-0">
-                      <span className="truncate block">{r.title}</span>
+                      {r.positionSlug ? (
+                        <Link to="/positions/$id" params={{ id: r.positionSlug }} className="truncate block hover:underline decoration-border-strong underline-offset-2">
+                          {r.title}
+                        </Link>
+                      ) : (
+                        <span className="truncate block">{r.title}</span>
+                      )}
                       {(r.copies || 0) > 1 ? <span className="block text-[11px] text-faint">{r.copies} copies of this posting</span> : null}
                     </span>
                     <span className="text-muted text-[12px] truncate shrink-0 max-w-[40%]">{r.company}</span>
@@ -224,7 +233,7 @@ function Discovery({ search, set, summary }: { search: RadarSearch; set: (p: Par
                       </a>
                     ) : null}
                     {!r.positionSlug || r.positionStatus === "archived" ? (
-                      <Btn size="xs" variant="ghost" onClick={() => promote(r)} title={r.positionStatus === "archived" ? "Revive archived position" : "Create a position and run triage"}>
+                      <Btn size="xs" variant="ghost" onClick={() => promote(r)} title={r.positionStatus === "archived" ? "Revive archived position" : noKey ? "Create a position. Scoring waits until a model key is set." : "Create a position and run triage"}>
                         <ArrowUpRight className="h-3 w-3" /> {r.positionStatus === "archived" ? "Revive" : "Promote"}
                       </Btn>
                     ) : null}
