@@ -7,7 +7,7 @@ import { StatusMenu, useStatusChange } from "@/components/status-menu";
 import { useChatScope } from "@/frame/store";
 import { qs, STATUSES, useApi, useApiMeta, type PipelineStatus, type PositionRow, type Profile, type SystemInfo } from "@/lib/api";
 import { homeMarket } from "@job-scout/shared";
-import { defaultPipelinePreset, pipelineSortFallback } from "./pipeline-defaults";
+import { defaultPipelinePreset, pipelineSortFallback, pipelineSortOptions } from "./pipeline-defaults";
 import { familyLocationLabel } from "./pipeline-location";
 import { ago, jdChangedAt, money } from "@/lib/format";
 import { archiveReasonLabel } from "@/lib/gate-reason";
@@ -135,15 +135,11 @@ export function PipelinePage() {
             <option value="unknown">unknown</option>
           </FilterSelect>
           <FilterSelect value={s.sort || "updated_desc"} onChange={(v) => set({ sort: v })} label="sort">
-            <option value="updated_desc">recently updated</option>
-            <option value="score_desc">triage score</option>
-            <option value="first_seen_desc">first seen</option>
-            <option value="posted_desc">posted</option>
-            <option value="last_changed_desc">last changed</option>
-            <option value="company_asc">company</option>
-            <option value="status_asc">status</option>
-            <option value="title_asc">title</option>
-            <option value="location_asc">location</option>
+            {pipelineSortOptions(s.sort).map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </FilterSelect>
           {s.company ? (
             <Btn variant="ghost" size="xs" onClick={() => set({ company: undefined })}>

@@ -26,7 +26,8 @@ export function ago(iso: string | null | undefined): string {
   const d = Math.round(h / 24);
   if (d < 60) return `${d}d`;
   const mo = Math.round(d / 30);
-  return `${mo}mo`;
+  if (mo < 24) return `${mo}mo`;
+  return `${Math.floor(d / 365)}y`;
 }
 
 export function dateShort(iso: string | null | undefined): string {
