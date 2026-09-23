@@ -534,7 +534,7 @@ describe("greenhouse office remote signal", () => {
       regionOffice: false,
     });
     expect(greenhouseListingLocation("Distributed", ["Atlanta, GA", "Austin, TX", "Canada"])).toEqual({
-      locationRaw: "Atlanta, GA · Austin, TX · Canada",
+      locationRaw: "Distributed · Atlanta, GA · Austin, TX · Canada",
       regionOffice: false,
     });
     expect(greenhouseListingLocation("Remote", ["Remote"])).toEqual({ locationRaw: "Remote", regionOffice: false });

@@ -250,7 +250,10 @@ export function classifyListing(input: {
   let workplace = workplaceOf(input.workplaceType, input.isRemote, [locationClean, input.title || ""].filter(Boolean).join(" "));
   // A city office stays an office even when an earlier pass stored "remote" from the title.
   // A country on its own ("United States") can still be a remote hiring region.
-  if (workplace !== "hybrid" && isCityOffice(locationClean)) workplace = "onsite";
+  // "Distributed · Austin, TX · …" is a list of places you may live, not a desk.
+  const leadingModality = /^(remote|distributed)\b/i.test(locationClean);
+  if (leadingModality && workplace !== "hybrid") workplace = "remote";
+  else if (workplace !== "hybrid" && isCityOffice(locationClean)) workplace = "onsite";
   else if (workplace === "unknown" && isNamedOffice(locationClean)) workplace = "onsite";
   if (workplace === "unknown" && /^(amer|emea|apac|apj|latam|na|distributed)$/i.test(locationClean)) workplace = "remote";
   if (workplace === "unknown" && !locationClean && /#LI-Remote\b/i.test(input.descriptionText || "")) workplace = "remote";

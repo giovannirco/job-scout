@@ -251,7 +251,11 @@ export function greenhouseListingLocation(
     if (officeText && regionsDisagree(name, officeText)) return { locationRaw: officeText, regionOffice: false };
     if (!placeKey(name)) {
       const joined = joinOffices(usable);
-      if (joined) return { locationRaw: joined, regionOffice: false };
+      if (joined) {
+        const modality = name.trim();
+        const locationRaw = new RegExp(`\\b${modality.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(joined) ? joined : `${modality} · ${joined}`;
+        return { locationRaw, regionOffice: false };
+      }
     }
     const expanded = oneOfficeAmongMany(name, usable);
     if (expanded) return { locationRaw: expanded, regionOffice: false };
