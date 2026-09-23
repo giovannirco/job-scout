@@ -288,7 +288,7 @@ export async function regateRecentDiscovery(hours = 24 * 7): Promise<{
         const q = await enqueueJob(
           "scan_url",
           { url: row.url, companyName: row.company ?? undefined },
-          { dedupeKey: `scan_url:${row.externalIdentity || row.url}`, priority: 50 },
+          { dedupeKey: `scan_url:${row.externalIdentity || row.url}`, priority: 200 },
         );
         if (!q.deduped) promoted++;
       }

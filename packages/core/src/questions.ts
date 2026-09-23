@@ -21,8 +21,12 @@ export async function harvestQuestions(positionId: string, prompts: QuestionProm
   const existing = await db.select().from(applicationQuestions).where(eq(applicationQuestions.positionId, positionId));
   const byQ = new Map(existing.map((r) => [r.question.toLowerCase(), r]));
   let upserted = 0;
+  const seen = new Set<string>();
   for (const [i, p] of prompts.entries()) {
-    const prev = byQ.get(p.question.toLowerCase());
+    const key = p.question.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const prev = byQ.get(key);
     if (!prev) {
       await db.insert(applicationQuestions).values({
         id: id("aq"),
