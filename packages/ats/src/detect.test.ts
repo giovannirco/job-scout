@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   detectAts,
+  greenhouseBoardToken,
   greenhouseListingNeedsBoardFetch,
   isPlaceholderAtsDetection,
   isPlaceholderJobId,
@@ -30,6 +31,18 @@ describe("detectAts", () => {
     );
     expect(d.provider).toBe("greenhouse");
     expect(d.jobId).toBe("7799066003");
+  });
+
+  it("resolves a vanity greenhouse URL to the company board", () => {
+    const boards = [
+      { company: "Datadog", token: "datadog", careersUrl: "https://careers.datadoghq.com" },
+      { company: "Elastic", token: "elastic", careersUrl: "https://www.elastic.co/careers" },
+      { company: "Other", token: "other", careersUrl: "https://jobs.example.com" },
+    ];
+    expect(greenhouseBoardToken(boards, { companyName: "Datadog" })).toBe("datadog");
+    expect(greenhouseBoardToken(boards, { url: "https://careers.datadoghq.com/detail/3851935/?gh_jid=3851935" })).toBe("datadog");
+    expect(greenhouseBoardToken(boards, { url: "https://jobs.elastic.co/jobs?gh_jid=7982100&gh_jid=7982100" })).toBe("elastic");
+    expect(greenhouseBoardToken(boards, { companyName: "Nope", url: "https://example.com/jobs?gh_jid=1" })).toBeNull();
   });
 
   it("does not use the jobs host label as a greenhouse board token", () => {

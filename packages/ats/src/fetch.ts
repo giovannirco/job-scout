@@ -136,6 +136,11 @@ function salaryFromGhContent(html: string): string | undefined {
   return extractSalaryRaw(stripHtml(html));
 }
 
+/** An office named Remote or Distributed is a remote signal. A city office still wins later. */
+export function greenhouseOfficeIsRemote(offices: string[]): boolean {
+  return offices.some((name) => /\b(remote|distributed|global|anywhere)\b/i.test(name));
+}
+
 export async function fetchGreenhouseJob(
   token: string,
   jobId: string,
@@ -193,6 +198,9 @@ export async function fetchGreenhouseJob(
     .map((s) => s.trim())
     .filter(Boolean)
     .slice(0, 40);
+  const offices = (data.offices || [])
+    .map((o) => o.name || o.location || "")
+    .filter(Boolean);
   return {
     provider: "greenhouse",
     boardToken: token,
@@ -207,9 +215,8 @@ export async function fetchGreenhouseJob(
     descriptionText: text,
     salaryRaw: salaryFromGhContent(html),
     departments: (data.departments || []).map((d) => d.name || "").filter(Boolean),
-    offices: (data.offices || [])
-      .map((o) => o.name || o.location || "")
-      .filter(Boolean),
+    offices,
+    isRemote: greenhouseOfficeIsRemote(offices) || undefined,
     requisitionId: data.requisition_id,
     postedAt: data.first_published,
     updatedAt: data.updated_at,

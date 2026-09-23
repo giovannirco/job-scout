@@ -1,6 +1,6 @@
 import { and, desc, eq, gte, inArray, isNull, lt, or, sql } from "drizzle-orm";
-import { boardDeltas, boardSnapshots, boardSources, discoveryFeed, getDb, id, positions } from "@job-scout/db";
-import { detectAts, externalIdentityFromDetect, fetchGreenhouseJob, greenhouseListingNeedsBoardFetch, listBoard, type AtsJob, type BoardJobSummary } from "@job-scout/ats";
+import { boardDeltas, boardSnapshots, boardSources, companies, discoveryFeed, getDb, id, positions } from "@job-scout/db";
+import { detectAts, externalIdentityFromDetect, fetchGreenhouseJob, greenhouseBoardToken, greenhouseListingNeedsBoardFetch, listBoard, type AtsJob, type BoardJobSummary } from "@job-scout/ats";
 import { fetchJob as fetchJobFromUrl } from "./fetch-job.js";
 import { applyProfileToGate, classifyListing, cleanJobTitle, craftFamily, gateListing, geoClass, homeMarket, isNoiseJobTitle, missesHomeMarket, parseClipListing, type GateConfig, type GateVerdict } from "@job-scout/shared";
 import { enqueueJob } from "./jobs.js";
@@ -630,15 +630,97 @@ export async function followUpIntake(
   return { triageJobId: null };
 }
 
+/** A gh_jid careers URL has no board token. The company board has the location and the JD. */
+async function fetchListingForIntake(url: string, companyName?: string): Promise<AtsJob> {
+  const detected = detectAts(url);
+  if (detected.provider === "greenhouse" && detected.jobId && !detected.boardToken) {
+    const token = await greenhouseTokenFor(url, companyName);
+    if (token) {
+      try {
+        const direct = await fetchGreenhouseJob(token, detected.jobId);
+        if (direct.title || direct.descriptionText?.trim()) {
+          return { ...direct, url, company: direct.company || companyName };
+        }
+      } catch (e) {
+        log.warn("intake.greenhouse_board_failed", { url, token, err: e instanceof Error ? e.message : String(e) });
+      }
+    }
+  }
+  return fetchJobFromUrl(url);
+}
+
+async function greenhouseTokenFor(url: string, companyName?: string): Promise<string | null> {
+  const db = await getDb();
+  const boards = await db
+    .select({ company: boardSources.company, token: boardSources.token, careersUrl: boardSources.careersUrl })
+    .from(boardSources)
+    .where(eq(boardSources.provider, "greenhouse"));
+  return greenhouseBoardToken(boards, { companyName, url });
+}
+
+async function openScanFiling(url: string): Promise<{ id: string } | undefined> {
+  const db = await getDb();
+  const byUrl = (
+    await db.select({ id: positions.id, status: positions.status }).from(positions).where(eq(positions.primaryUrl, url)).limit(1)
+  )[0];
+  if (byUrl?.status === "triaged") return byUrl;
+  const jobId = detectAts(url).jobId;
+  if (!jobId) return undefined;
+  const byJob = (
+    await db.select({ id: positions.id, status: positions.status }).from(positions).where(eq(positions.atsJobId, jobId)).limit(1)
+  )[0];
+  return byJob?.status === "triaged" ? byJob : undefined;
+}
+
+/** Filings saved from a careers page with no location get the board job, then the gate. */
+export async function refetchBlankGreenhouseFilings(): Promise<{ checked: number; updated: number; withdrawn: number; failed: number }> {
+  const db = await getDb();
+  const rows = await db
+    .select({
+      url: positions.primaryUrl,
+      company: companies.name,
+      provider: positions.atsProvider,
+      location: sql<string | null>`(select location_raw from jd_revisions jr where jr.position_id = ${positions.id} order by jr.revision desc limit 1)`,
+    })
+    .from(positions)
+    .innerJoin(companies, eq(positions.companyId, companies.id))
+    .where(eq(positions.status, "triaged"));
+  const blank = rows.filter((row) => row.url && row.provider === "greenhouse" && !(row.location || "").trim());
+  let updated = 0;
+  let withdrawn = 0;
+  let failed = 0;
+  for (const row of blank) {
+    try {
+      const result = await intakeUrl(row.url!, { companyName: row.company, source: "scan:discovery" });
+      if ("skipped" in result && result.skipped) withdrawn++;
+      else if (result.position) updated++;
+    } catch (e) {
+      failed++;
+      log.warn("intake.blank_greenhouse_failed", { url: row.url, err: e instanceof Error ? e.message : String(e) });
+    }
+  }
+  if (blank.length && failed === blank.length) throw new Error("greenhouse location refetch failed");
+  return { checked: blank.length, updated, withdrawn, failed };
+}
+
 /** Manual intake: URL -> position (status triaged) -> triage job. */
 export async function intakeUrl(url: string, opts: { companyName?: string; status?: "triaged" | "review"; source?: string } = {}) {
-  const job = await fetchJobFromUrl(url);
+  const job = await fetchListingForIntake(url, opts.companyName);
   if ((opts.source || "").startsWith("scan:")) {
     const settings = await getSettings();
     const verdict = listingGate(job, settings.gate, await profileGate(), { listedNow: true });
     if (!verdict.pass) {
       const db = await getDb();
       await db.update(discoveryFeed).set({ lane: "filtered", gateReason: verdict.reason }).where(eq(discoveryFeed.url, url));
+      const existing = await openScanFiling(url);
+      if (existing) {
+        const { position } = await upsertFromJob(job, {
+          source: opts.source || "scan:discovery",
+          companyName: opts.companyName,
+          status: "triaged",
+        });
+        await withdrawUntouchedScanPosition(position.id, settings.gate, { reason: verdict.reason ?? undefined });
+      }
       return { position: null, created: false, revived: false, triageJobId: null, skipped: true as const, reason: verdict.reason };
     }
   }

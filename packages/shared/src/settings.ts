@@ -249,6 +249,8 @@ export const Settings = z.object({
   profileGateVersion: z.string().nullable().optional(),
   /** One-shot: re-gate after city offices and graduate titles classify correctly. */
   placeSplitVersion: z.string().nullable().optional(),
+  /** One-shot: careers-page filings with no location are refetched from the greenhouse board. */
+  blankGreenhouseVersion: z.string().nullable().optional(),
 });
 export type Settings = z.infer<typeof Settings>;
 

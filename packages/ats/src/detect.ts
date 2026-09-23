@@ -49,6 +49,37 @@ export function genericBoardLabel(token: string | undefined): boolean {
   return GENERIC_BOARD_LABELS.has((token || "").toLowerCase());
 }
 
+export type GreenhouseBoardRef = { company: string; token: string; careersUrl?: string | null };
+
+/** Pick the greenhouse board behind a vanity careers URL. Ambiguous matches stay unresolved. */
+export function greenhouseBoardToken(
+  boards: GreenhouseBoardRef[],
+  opts: { companyName?: string | null; url?: string | null },
+): string | null {
+  const company = (opts.companyName || "").trim().toLowerCase();
+  const byName = company
+    ? boards.filter((board) => board.token && board.company.trim().toLowerCase() === company)
+    : [];
+  if (byName.length === 1) return byName[0]!.token;
+  let host = "";
+  try {
+    host = new URL(opts.url || "").hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    host = "";
+  }
+  if (!host) return null;
+  const byHost = boards.filter((board) => {
+    if (!board.token || !board.careersUrl) return false;
+    try {
+      const careers = new URL(board.careersUrl).hostname.toLowerCase().replace(/^www\./, "");
+      return Boolean(careers) && (host === careers || host.endsWith(`.${careers}`));
+    } catch {
+      return false;
+    }
+  });
+  return byHost.length === 1 ? byHost[0]!.token : null;
+}
+
 /** A careers vanity URL can carry a long page of nav and JSON while the board API has the JD. */
 export function greenhouseListingNeedsBoardFetch(
   job: { boardToken?: string | null } | null | undefined,
