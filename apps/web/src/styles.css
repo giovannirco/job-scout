@@ -317,3 +317,8 @@ html.light {
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* Preflight sets ul/ol to display:block, which beats the browser rule that hides a closed details. */
+details:not([open]) > :not(summary) {
+  display: none;
+}
