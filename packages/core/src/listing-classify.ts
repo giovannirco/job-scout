@@ -1,6 +1,6 @@
 import { and, desc, eq, ne, sql } from "drizzle-orm";
 import { createHash } from "node:crypto";
-import { companies, getDb, jdRevisions, positions } from "@job-scout/db";
+import { companies, discoveryFeed, getDb, jdRevisions, positions } from "@job-scout/db";
 import {
   classifyListing,
   listingClassifyNeeded,
@@ -167,7 +167,8 @@ export async function runListingClassify(positionId: string) {
 }
 
 export async function backfillListingFacts(opts: { force?: boolean } = {}) {
-  const BACKFILL_VERSION = "2";
+  // v3: a named country or city is hard_geo. v2 left Spain, Ireland, Seattle, and San Francisco as unknown.
+  const BACKFILL_VERSION = "3";
   const s = await getSettings({ fresh: true });
   if (!opts.force && s.listingFactsBackfillVersion === BACKFILL_VERSION) {
     return { skipped: true as const, archivedSkipped: 0, updated: 0, enqueued: 0 };
@@ -218,6 +219,7 @@ export async function backfillListingFacts(opts: { force?: boolean } = {}) {
         updatedAt: new Date(),
       })
       .where(and(eq(positions.id, row.id), sql`${positions.status} <> 'archived'`));
+    await db.update(discoveryFeed).set({ geoClass: facts.geoClass }).where(eq(discoveryFeed.positionId, row.id));
     updated++;
     const q = await maybeEnqueueListingClassify(row.id, facts);
     if (q.enqueued) enqueued++;

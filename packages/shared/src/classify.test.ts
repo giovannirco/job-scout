@@ -73,6 +73,33 @@ describe("geo_class", () => {
   it("keeps exclusivity language as hard_geo even on a country list", () => {
     expect(geoClass("United Kingdom, Ireland, Portugal only", "remote")).toBe("hard_geo");
   });
+
+  it("treats a named country or US city as a place, not unknown", () => {
+    for (const location of [
+      "Spain",
+      "Ireland",
+      "Greece",
+      "Portugal",
+      "Poland",
+      "Romania",
+      "Australia",
+      "Norway",
+      "Seattle, WA",
+      "San Francisco",
+      "San Francisco, CA",
+      "Bay Area, CA, United States of America",
+      "New York, New York, USA",
+      "Palo Alto, California, United States",
+      "Melbourne, Australia",
+      "Remote, Poland",
+      "Remote - APAC",
+    ]) {
+      expect(geoClass(location), location).toBe("hard_geo");
+    }
+    expect(geoClass("San Francisco, CA · New York City, NY")).toBe("hard_geo");
+    expect(geoClass("Germany · Portugal · France · Spain · Italy · The Netherlands")).toBe("hard_geo");
+    expect(geoClass("San Francisco · London, UK")).toBe("hard_geo");
+  });
 });
 
 describe("quick_score_hint", () => {
