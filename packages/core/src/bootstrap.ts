@@ -119,11 +119,11 @@ export async function bootstrap(opts: { seedBoards?: boolean } = {}) {
         })
         .catch((e) => log.error("bootstrap.craft-gate.failed", { err: e }));
     }
-    if (stored.usPlaceGeoVersion !== "1") {
+    if (stored.usPlaceGeoVersion !== "2") {
       const { reclassifyUsPlaceLists } = await import("./scan.js");
       await reclassifyUsPlaceLists()
         .then(async (r) => {
-          await updateSettings({ usPlaceGeoVersion: "1" });
+          await updateSettings({ usPlaceGeoVersion: "2" });
           if (r.positions || r.discovery) log.info("bootstrap.us-place-geo", r);
         })
         .catch((e) => log.error("bootstrap.us-place-geo.failed", { err: e }));
