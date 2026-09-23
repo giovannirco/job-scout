@@ -43,6 +43,12 @@ export function isPlaceholderAtsDetection(d: DetectedAts): boolean {
   return false;
 }
 
+const GENERIC_BOARD_LABELS = new Set(["jobs", "careers", "boards", "www", "job", "apply"]);
+
+export function genericBoardLabel(token: string | undefined): boolean {
+  return GENERIC_BOARD_LABELS.has((token || "").toLowerCase());
+}
+
 export function detectAts(url: string): DetectedAts {
   try {
     const u = new URL(url);
@@ -81,12 +87,13 @@ export function detectAts(url: string): DetectedAts {
     }
     if (ghJid && /^\d+$/.test(ghJid)) {
       const tokenGuess = host.replace(/^www\./, "").split(".")[0];
+      const generic = genericBoardLabel(tokenGuess);
       return {
         provider: "greenhouse",
-        boardToken: tokenGuess,
+        boardToken: generic ? undefined : tokenGuess,
         jobId: ghJid,
         url,
-        confidence: "medium",
+        confidence: generic ? "low" : "medium",
       };
     }
     m = path.match(/\/jobs\/(\d+)/);
