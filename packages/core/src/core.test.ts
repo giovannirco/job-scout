@@ -1073,4 +1073,41 @@ describe("core on pglite", () => {
     expect(all.items[0]?.positionsOpen).toBe(0);
     expect(all.items[0]?.positionsTotal).toBe(1);
   });
+
+  it("home geo filter keeps a US place and drops a foreign one", async () => {
+    const { upsertFromJob, listPositions } = await import("./positions.js");
+    const { updateProfile } = await import("./profile.js");
+    await updateProfile({ location: "Austin, TX" });
+    const us = await upsertFromJob(
+      job({
+        jobId: "home-us",
+        externalIdentity: "greenhouse:acme:home-us",
+        url: "https://boards.greenhouse.io/acme/jobs/home-us",
+        title: "Backend Engineer",
+        company: "Acme",
+        locationRaw: "Remote - USA",
+      }),
+      { source: "test", companyName: "Acme" },
+    );
+    const poland = await upsertFromJob(
+      job({
+        jobId: "home-pl",
+        externalIdentity: "greenhouse:acme:home-pl",
+        url: "https://boards.greenhouse.io/acme/jobs/home-pl",
+        title: "Backend Engineer Poland",
+        company: "Acme",
+        locationRaw: "Remote, Poland",
+      }),
+      { source: "test", companyName: "Acme" },
+    );
+    const { getDb, positions } = await import("@job-scout/db");
+    const { eq } = await import("drizzle-orm");
+    const db = await getDb();
+    await db.update(positions).set({ geoClass: "hard_geo" }).where(eq(positions.id, us.position.id));
+    await db.update(positions).set({ geoClass: "hard_geo" }).where(eq(positions.id, poland.position.id));
+    const home = await listPositions({ geoClass: "home", includeArchived: "true", pageSize: "200" });
+    const ids = home.items.map((row) => row.id);
+    expect(ids).toContain(us.position.id);
+    expect(ids).not.toContain(poland.position.id);
+  });
 });

@@ -30,7 +30,7 @@ import {
   HOT_STATUSES,
   PipelineStatus,
   isNoiseJobTitle, cleanJobTitle, cleanLocation, canonicalExternalIdentity, normalizePostingUrl,
-  searchWords, likeContains,
+  searchWords, likeContains, fitsHomeMarket, homeMarket,
   employerFromPosting, unresolvedCompany, UNRESOLVED_COMPANY, requisitionId,
 } from "@job-scout/shared";
 import { resolveCompanyForName } from "./companies.js";
@@ -164,7 +164,9 @@ export async function listPositions(q: ListPositionsQuery) {
       conds.push(rest.length ? or(sql`${positions.triageVerdict} is null`, inArray(positions.triageVerdict, rest as never))! : sql`${positions.triageVerdict} is null`);
     } else if (v.length) conds.push(inArray(positions.triageVerdict, v as never));
   }
-  if (q.geoClass) conds.push(eq(positions.geoClass, q.geoClass));
+  const homeOnly = q.geoClass === "home";
+  if (homeOnly) conds.push(eq(positions.geoClass, "hard_geo"));
+  else if (q.geoClass) conds.push(eq(positions.geoClass, q.geoClass));
   if (q.workplace) conds.push(eq(positions.workplace, q.workplace));
   if (q.listingStatus) conds.push(eq(positions.listingStatus, q.listingStatus));
   if (q.minScore) conds.push(gte(positions.triageScore, Number(q.minScore)));
@@ -231,22 +233,33 @@ export async function listPositions(q: ListPositionsQuery) {
                       ]
                     : [d(positions.updatedAt), desc(positions.id)];
 
-  const rows = await db
+  const queried = await db
     .select(LIST_ROW)
     .from(positions)
     .innerJoin(companies, eq(positions.companyId, companies.id))
     .where(where)
     .orderBy(...order)
-    .limit(pageSize)
-    .offset(q.cursor ? 0 : (page - 1) * pageSize);
+    .limit(homeOnly ? 2000 : pageSize)
+    .offset(homeOnly || q.cursor ? 0 : (page - 1) * pageSize);
 
-  const total = (
-    await db
-      .select({ c: sql<number>`count(*)::int` })
-      .from(positions)
-      .innerJoin(companies, eq(positions.companyId, companies.id))
-      .where(where)
-  )[0]?.c ?? 0;
+  let listed = queried;
+  let total = 0;
+  if (homeOnly) {
+    const home = profile.location || "";
+    const matched = homeMarket(home) ? queried.filter((row) => fitsHomeMarket("hard_geo", row.locationRaw, home)) : [];
+    total = matched.length;
+    const start = (page - 1) * pageSize;
+    listed = matched.slice(start, start + pageSize);
+  } else {
+    total = (
+      await db
+        .select({ c: sql<number>`count(*)::int` })
+        .from(positions)
+        .innerJoin(companies, eq(positions.companyId, companies.id))
+        .where(where)
+    )[0]?.c ?? 0;
+  }
+  const rows = listed;
 
   const last = rows[rows.length - 1];
   const nextCursor = field === "updated" && dir === "desc" && rows.length === pageSize && last ? `${last.updatedAt.toISOString()}|${last.id}` : null;
