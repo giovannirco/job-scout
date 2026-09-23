@@ -129,6 +129,12 @@ export function startWorker(opts: WorkerOptions = {}) {
       if (gate && ((e as LlmGateError).code === "cap_reached" || (e as LlmGateError).code === "budget_reached")) {
         outcome = "parked";
         await failJob(job.id, msg, { retryInMs: 60 * 60_000 });
+      } else if (job.type === "scan_url" && msg === "unparseable job title") {
+        await completeJob(job.id, { skipped: "junk_title" });
+        jobDuration.labels({ type: job.type }).observe(ms / 1000);
+        jobsProcessed.labels({ type: job.type, outcome: "ok" }).inc();
+        jlog.info("job.skipped", { ms, reason: "junk_title" });
+        return;
       } else if (!gate && LLM_TYPES.includes(job.type) && job.attempts < 3 && /timeout|429|5\d\d|ECONN|fetch failed/i.test(msg)) {
         outcome = "retry";
         await failJob(job.id, msg, { retryInMs: 2 * 60_000 * job.attempts });
