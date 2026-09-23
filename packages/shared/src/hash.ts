@@ -262,23 +262,62 @@ function levenshteinish(a: string, b: string): number {
   return diff;
 }
 
+const DIFF_FIELD_LABEL: Record<string, string> = {
+  title: "Title",
+  location_raw: "Location",
+  salary_raw: "Pay",
+  description_text: "Description",
+  listing_status: "Listing",
+  salary_min: "Pay min",
+  salary_max: "Pay max",
+  salary_currency: "Currency",
+  geo_class: "Geo",
+  remote_class: "Remote",
+};
+
+const CHANGE_KIND_LABEL: Record<string, string> = {
+  first_seen: "first seen",
+  noise_rebase: "cleanup",
+  title: "title",
+  comp: "pay",
+  geo: "location",
+  closed: "closed",
+  reopened: "reopened",
+  status: "status",
+  content: "description",
+};
+
+export function diffFieldLabel(path: string): string {
+  return DIFF_FIELD_LABEL[path] || path.replace(/_/g, " ");
+}
+
+export function changeKindLabel(kind: string): string {
+  return CHANGE_KIND_LABEL[kind] || kind.replace(/_/g, " ");
+}
+
+/** Stored summaries still use field names such as location_raw. */
+export function humanDiffSummary(summary: string): string {
+  return summary.replace(/\b(location_raw|description_text|salary_raw|listing_status|salary_min|salary_max|salary_currency|geo_class|remote_class)\b/g, (field) => diffFieldLabel(field));
+}
+
 export function summarizeDiffs(diffs: FieldDiff[]): string {
   if (!diffs.length) return "no field changes";
-  return diffs
+  return humanDiffSummary(diffs
     .map((d) => {
+      const label = diffFieldLabel(d.path);
       if (d.path === "description_text") {
         if (isFormattingOnlyTextChange(d.before, d.after)) {
-          return "description_text: formatting only";
+          return `${label}: formatting only`;
         }
         const b = d.before ? truncate(stripMarkupForCompare(d.before), 40) : "∅";
         const a = d.after ? truncate(stripMarkupForCompare(d.after), 40) : "∅";
-        return `description_text: ${b} → ${a}`;
+        return `${label}: ${b} → ${a}`;
       }
       const b = d.before ? truncate(d.before, 40) : "∅";
       const a = d.after ? truncate(d.after, 40) : "∅";
-      return `${d.path}: ${b} → ${a}`;
+      return `${label}: ${b} → ${a}`;
     })
-    .join("; ");
+    .join("; "));
 }
 
 /** Drop pure-formatting description diffs; re-summarize remaining. */

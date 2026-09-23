@@ -10,6 +10,8 @@ import {
   normalizeDescription,
   stripMarkupForCompare,
   summarizeDiffs,
+  changeKindLabel,
+  humanDiffSummary,
 } from "./hash.js";
 
 describe("contentHash", () => {
@@ -47,6 +49,12 @@ describe("materiality", () => {
     const m = classifyMateriality(diffs);
     expect(m.material).toBe(true);
     expect(m.change_kind).toBe("title");
+  });
+
+  it("names a location fill-in in plain language", () => {
+    expect(changeKindLabel("noise_rebase")).toBe("cleanup");
+    expect(humanDiffSummary("location_raw: N/A → US")).toBe("Location: N/A → US");
+    expect(summarizeDiffs([{ path: "location_raw", before: "N/A", after: "US" }])).toBe("Location: N/A → US");
   });
 
   it("a stringified salary object is snapshot cleanup", () => {
@@ -94,7 +102,7 @@ describe("formatting-only description (F-23)", () => {
     const s = summarizeDiffs([
       { path: "description_text", before: escaped, after: clean },
     ]);
-    expect(s).toBe("description_text: formatting only");
+    expect(s).toBe("Description: formatting only");
     expect(s).not.toContain("&lt;");
   });
 
