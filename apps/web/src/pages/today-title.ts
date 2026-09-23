@@ -6,3 +6,8 @@ export function todayTitle(input: { needs: number; untriaged: number; llmConfigu
   }
   return "Nothing needs you right now";
 }
+
+/** The stage is named Triaged, and "untriaged" means no verdict. When they are the same pile, say so once. */
+export function unscoredStage(triaged: number, untriaged: number): boolean {
+  return triaged > 0 && untriaged === triaged;
+}
