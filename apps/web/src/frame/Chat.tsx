@@ -1,9 +1,10 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { ArrowUp, ChevronDown, Globe, Plus, Square, Trash2, Wrench } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { toast } from "sonner";
 import { Markdown } from "@/components/markdown";
-import { api, client, del, post, type ChatMessage, type ChatThread, type ChatThreadRow } from "@/lib/api";
+import { api, client, del, post, useApi, type ChatMessage, type ChatThread, type ChatThreadRow, type SystemInfo } from "@/lib/api";
 import { ago } from "@/lib/format";
 import { Btn, IconBtn, Kbd, cn } from "@/ui/kit";
 import { useUi, type ChatScopeCtx } from "./store";
@@ -23,6 +24,8 @@ function scopeQuery(s: ChatScopeCtx) {
 
 export function ChatPanel() {
   const { chatScope } = useUi();
+  const sys = useApi<SystemInfo>(["system"], "/api/v1/settings/system", { staleTime: 30_000 });
+  const noKey = sys.data?.llmConfigured === false;
   const qc = useQueryClient();
   const scopeKey = JSON.stringify(chatScope);
 
@@ -73,7 +76,7 @@ export function ChatPanel() {
 
   const send = useCallback(async () => {
     const msg = text.trim();
-    if (!msg || stream) return;
+    if (!msg || stream || noKey) return;
     let id = threadId;
     try {
       if (!id) id = await newThread();
@@ -145,7 +148,7 @@ export function ChatPanel() {
       void qc.invalidateQueries({ queryKey: ["chat", "threads", scopeKey] });
       void qc.invalidateQueries({ queryKey: ["today"] });
     }
-  }, [text, stream, threadId, newThread, qc, scopeKey]);
+  }, [text, stream, threadId, newThread, qc, scopeKey, noKey]);
 
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -202,7 +205,13 @@ export function ChatPanel() {
 
       {/* transcript */}
       <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-3">
-        {!threadId && !thread.isLoading ? <Starter scope={chatScope} onPick={(t) => setText(t)} /> : null}
+        {!threadId && !thread.isLoading && !noKey ? <Starter scope={chatScope} onPick={(t) => setText(t)} /> : null}
+        {noKey && !threadId ? (
+          <div className="text-[12px] text-muted leading-relaxed">
+            Chat needs a model key before it can answer.{" "}
+            <Link to="/settings" search={{ tab: "ai" }} className="text-accent hover:underline">Add one in Settings</Link>.
+          </div>
+        ) : null}
         {messages.map((m) => (
           <Bubble key={m.id} m={m} />
         ))}
@@ -230,13 +239,18 @@ export function ChatPanel() {
             onChange={(e) => setText(e.target.value)}
             onKeyDown={onKey}
             rows={2}
-            placeholder={chatScope.scope === "global" ? "Ask about your pipeline, or tell it to do something…" : `Ask about ${scopeLabel}…`}
-            className="w-full bg-transparent px-3 pt-2 pb-1 text-[12.5px] outline-none resize-none placeholder:text-faint"
+            disabled={noKey}
+            placeholder={noKey ? "Add a model key to use chat" : chatScope.scope === "global" ? "Ask about your pipeline, or tell it to do something…" : `Ask about ${scopeLabel}…`}
+            className="w-full bg-transparent px-3 pt-2 pb-1 text-[12.5px] outline-none resize-none placeholder:text-faint disabled:opacity-60"
           />
           <div className="flex items-center gap-1 px-2 pb-1.5">
-            <span className="text-[10.5px] text-faint inline-flex items-center gap-1">
-              <Globe className="h-3 w-3" /> browser · <Wrench className="h-3 w-3" /> tools
-            </span>
+            {noKey ? (
+              <span className="text-[10.5px] text-faint">No model key is set.</span>
+            ) : (
+              <span className="text-[10.5px] text-faint inline-flex items-center gap-1">
+                <Globe className="h-3 w-3" /> browser · <Wrench className="h-3 w-3" /> tools
+              </span>
+            )}
             <div className="flex-1" />
             <Kbd>↵</Kbd>
             {stream ? (
@@ -244,7 +258,7 @@ export function ChatPanel() {
                 <Square className="h-3 w-3" /> Stop
               </Btn>
             ) : (
-              <Btn size="xs" variant="primary" disabled={!text.trim()} onClick={() => void send()}>
+              <Btn size="xs" variant="primary" disabled={noKey || !text.trim()} onClick={() => void send()}>
                 <ArrowUp className="h-3 w-3" /> Send
               </Btn>
             )}
