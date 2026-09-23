@@ -153,6 +153,12 @@ export function departmentLabel(departments: string[] | null | undefined): strin
   return null;
 }
 
+/** Remote OK sometimes ends a description on a cut-off word and then its own footer. */
+export function boardTruncatedJd(text: string | null | undefined): boolean {
+  const flat = (text || "").replace(/\s+/g, " ").trim();
+  return /\b\w{1,3}\s+Apply now and work remotely at \w+/i.test(flat);
+}
+
 /** Collapse the blank runs some boards leave between JD sections. */
 export function readableJd(text: string | null | undefined): string {
   return (text || "").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();

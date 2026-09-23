@@ -71,8 +71,8 @@ settingsRoutes.patch("/profile", async (c) => {
   const next = await updateProfile(patch);
   const rolesChanged =
     Array.isArray(patch.targetRoles) &&
-    JSON.stringify(titleIncludesFromRoles(before.targetRoles)) !== JSON.stringify(titleIncludesFromRoles(next.targetRoles));
-  const synced = rolesChanged ? await syncGateFromTargetRoles(next.targetRoles) : null;
+    JSON.stringify(titleIncludesFromRoles(before.targetRoles ?? [])) !== JSON.stringify(titleIncludesFromRoles(next.targetRoles ?? []));
+  const synced = rolesChanged ? await syncGateFromTargetRoles(next.targetRoles ?? []) : null
   const locationChanged = (before.location || "") !== (next.location || "");
   const northStarChanged = (before.northStar || "") !== (next.northStar || "");
   const home = locationChanged ? await repairHomeMarketFilings() : null;

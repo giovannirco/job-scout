@@ -33,6 +33,7 @@ radarRoutes.post("/discovery/:id/promote", async (c) => {
   if (!row.url) return fail(c, "VALIDATION_ERROR", "row has no url");
   try {
     const r = await intakeUrl(row.url, { companyName: row.company || undefined });
+    if (!r.position) throw new Error("position missing");
     await db.update(discoveryFeed).set({ positionId: r.position.id, lane: "passed", gateReason: "promoted" }).where(eq(discoveryFeed.id, row.id));
     return ok(c, r.position, { created: r.created, revived: r.revived, triageJobId: r.triageJobId });
   } catch (e) {

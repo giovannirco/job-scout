@@ -30,6 +30,7 @@ export async function handleClip(c: Context) {
     const snapshot = c.req.method === "POST";
     if (snapshot && !title.trim() && !text.trim()) return fail(c, "VALIDATION_ERROR", "snapshot empty");
     const r = snapshot ? await core.intakeClipSnapshot({ url, title, text }) : await core.intakeUrl(url);
+    if (!r.position) throw new Error("position missing");
     const slug = r.position.slug;
     if (!slug) throw new Error("position missing slug");
     return c.redirect(`/positions/${encodeURIComponent(slug)}`, 302);

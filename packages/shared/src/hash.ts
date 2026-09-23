@@ -277,7 +277,7 @@ const DIFF_FIELD_LABEL: Record<string, string> = {
 
 const CHANGE_KIND_LABEL: Record<string, string> = {
   first_seen: "first seen",
-  noise_rebase: "cleanup",
+  noise_rebase: "rewritten here",
   title: "title",
   comp: "pay",
   geo: "location",

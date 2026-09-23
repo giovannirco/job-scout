@@ -6,7 +6,7 @@ import {
   isPlaceholderJobId,
 } from "./detect.js";
 import type { AtsJob, BoardJobSummary, DetectedAts } from "./types.js";
-import { greenhouseQuestionPrompts, parseApplicationQuestions } from "./application-form.js";
+import { greenhouseQuestionPrompts, parseApplicationQuestions, type QuestionPrompt } from "./application-form.js";
 
 const UA =
   process.env.ATS_USER_AGENT ||
@@ -487,9 +487,9 @@ export async function fetchAshbyJob(org: string, jobId: string, opts: { render?:
         }
         const locationsJoined = ashbyListingLocation(job.location, job.secondaryLocations, job.address);
         const applyUrl = job.applyUrl || job.jobUrl || pageUrl;
-        let questions: string[] | undefined;
-        let questionPrompts: ReturnType<typeof parseApplicationQuestions> | undefined;
-        try {
+        let questionPrompts: QuestionPrompt[] | undefined = await fetchAshbyApplicationPrompts(org, jobId);
+        let questions: string[] | undefined = questionPrompts.length ? questionPrompts.map((prompt) => prompt.question) : undefined;
+        if (!questions?.length) try {
           const form = await fetchText(applyUrl, { accept: "text/html" });
           if (form.ok) {
             const parsed = parseApplicationQuestions(form.body);
@@ -864,6 +864,9 @@ export async function fetchJobFromUrl(url: string, opts: { render?: HtmlRenderer
   if (detected.provider === "lever" && detected.boardToken && detected.jobId) {
     return fetchLeverJob(detected.boardToken, detected.jobId);
   }
+  if (detected.provider === "bamboohr" && detected.boardToken && detected.jobId) {
+    return fetchBambooHrJob(detected.boardToken, detected.jobId);
+  }
 
   // Workday / SmartRecruiters / Workable / LinkedIn / etc. → HTML + JSON-LD,
   // falling back to a rendered page when the plain fetch is a JS shell.
@@ -1082,6 +1085,135 @@ function isRemotiveBoard(provider: string, token: string): boolean {
   return provider === "market" && token.toLowerCase() === "remotive";
 }
 
+type BambooOpening = {
+  id?: string | number;
+  jobOpeningName?: string;
+  departmentLabel?: string | null;
+  employmentStatusLabel?: string | null;
+  locationType?: string | number | null;
+  isRemote?: boolean | null;
+  location?: { city?: string | null; state?: string | null; addressCountry?: string | null } | null;
+};
+
+export function bambooHrPlace(job: BambooOpening): { locationRaw?: string; isRemote?: boolean } {
+  const loc = job.location || {};
+  const place = [loc.city, loc.state, loc.addressCountry].map((part) => (part || "").trim()).filter(Boolean).join(", ");
+  const remote = job.isRemote === true || String(job.locationType) === "1";
+  if (!place) return { locationRaw: remote ? "Remote" : undefined, isRemote: remote || undefined };
+  return { locationRaw: place, isRemote: remote || undefined };
+}
+
+export async function listBambooHrBoard(token: string, company: string): Promise<{ jobs: BoardJobSummary[]; total: number }> {
+  const url = `https://${encodeURIComponent(token)}.bamboohr.com/careers/list`;
+  const { status, body, ok } = await fetchText(url, { accept: "application/json" });
+  if (!ok) throw new Error(`bamboohr board ${token}: ${status}`);
+  const data = JSON.parse(body) as { result?: BambooOpening[]; meta?: { totalCount?: number } };
+  const jobs = (data.result || []).map((job) => {
+    const place = bambooHrPlace(job);
+    const id = String(job.id || "");
+    return {
+      provider: "bamboohr",
+      boardToken: token,
+      jobId: id,
+      externalIdentity: `bamboohr:${token}:${id}`,
+      title: job.jobOpeningName || "",
+      url: `https://${token}.bamboohr.com/careers/${id}`,
+      locationRaw: place.locationRaw,
+      isRemote: place.isRemote,
+      company,
+    };
+  }).filter((job) => job.jobId && job.title);
+  return { jobs, total: data.meta?.totalCount || jobs.length };
+}
+
+export async function fetchBambooHrJob(token: string, jobId: string): Promise<AtsJob> {
+  const pageUrl = `https://${token}.bamboohr.com/careers/${jobId}`;
+  const { status, body, ok } = await fetchText(`https://${token}.bamboohr.com/careers/${jobId}/detail`, { accept: "application/json" });
+  if (status === 404) {
+    return { provider: "bamboohr", boardToken: token, jobId, externalIdentity: `bamboohr:${token}:${jobId}`, title: "", url: pageUrl, listingStatus: "closed" };
+  }
+  if (!ok) throw new Error(`bamboohr job ${token}/${jobId}: ${status}`);
+  const opening = (JSON.parse(body) as { result?: { jobOpening?: BambooOpening & { description?: string; jobOpeningStatus?: string } } }).result?.jobOpening;
+  if (!opening) throw new Error(`bamboohr job ${token}/${jobId}: empty`);
+  const place = bambooHrPlace(opening);
+  const html = opening.description || "";
+  return {
+    provider: "bamboohr",
+    boardToken: token,
+    jobId: String(opening.id || jobId),
+    externalIdentity: `bamboohr:${token}:${opening.id || jobId}`,
+    title: opening.jobOpeningName || "",
+    url: pageUrl,
+    applyUrl: pageUrl,
+    locationRaw: place.locationRaw,
+    isRemote: place.isRemote,
+    workplaceType: place.isRemote ? "remote" : undefined,
+    descriptionHtml: html,
+    descriptionText: stripHtml(html),
+    employmentType: opening.employmentStatusLabel || undefined,
+    departments: opening.departmentLabel ? [opening.departmentLabel] : [],
+    listingStatus: /closed/i.test(opening.jobOpeningStatus || "") ? "closed" : "open",
+  };
+}
+
+type AshbyFormField = {
+  title?: string;
+  type?: string;
+  isDeactivated?: boolean;
+  isPrivate?: boolean;
+  selectableValues?: Array<{ label?: string }>;
+};
+
+export function ashbyFieldPrompts(entries: Array<{ isRequired?: boolean; field?: AshbyFormField | string | null }>): QuestionPrompt[] {
+  const out: QuestionPrompt[] = [];
+  const seen = new Set<string>();
+  for (const entry of entries) {
+    let field = entry.field;
+    if (typeof field === "string") {
+      try { field = JSON.parse(field) as AshbyFormField; } catch { continue; }
+    }
+    if (!field || field.isDeactivated || field.isPrivate) continue;
+    const question = (field.title || "").replace(/\s+/g, " ").trim();
+    if (!question || seen.has(question.toLowerCase())) continue;
+    seen.add(question.toLowerCase());
+    const type = field.type || "";
+    const options = (field.selectableValues || []).map((value) => (value.label || "").trim()).filter(Boolean);
+    let inputType = "text";
+    if (type === "File") inputType = "file";
+    else if (type === "LongText") inputType = "textarea";
+    else if (type === "MultiValueSelect") inputType = "multi";
+    else if (type === "ValueSelect") inputType = "select";
+    out.push({ question, required: Boolean(entry.isRequired), inputType, ...(options.length ? { options } : {}) });
+  }
+  return out;
+}
+
+async function fetchAshbyApplicationPrompts(org: string, jobId: string): Promise<QuestionPrompt[]> {
+  const query = `query ApiJobPosting($organizationHostedJobsPageName: String!, $jobPostingId: String!) {
+    jobPosting(organizationHostedJobsPageName: $organizationHostedJobsPageName, jobPostingId: $jobPostingId) {
+      applicationForm { sections { fieldEntries { isRequired field } } }
+    }
+  }`;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 25000);
+  try {
+    const res = await fetch("https://jobs.ashbyhq.com/api/non-user-graphql?op=ApiJobPosting", {
+      method: "POST",
+      headers: { "User-Agent": UA, Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify({ operationName: "ApiJobPosting", query, variables: { organizationHostedJobsPageName: org, jobPostingId: jobId } }),
+      signal: ctrl.signal,
+    });
+    if (!res.ok) return [];
+    const data = await res.json() as { data?: { jobPosting?: { applicationForm?: { sections?: Array<{ fieldEntries?: Array<{ isRequired?: boolean; field?: AshbyFormField }> }> } } } };
+    const entries = (data.data?.jobPosting?.applicationForm?.sections || []).flatMap((section) => section.fieldEntries || []);
+    return ashbyFieldPrompts(entries);
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function listBoard(
   provider: string,
   token: string,
@@ -1090,6 +1222,7 @@ export async function listBoard(
   if (provider === "greenhouse") return listGreenhouseBoard(token, company);
   if (provider === "ashby") return listAshbyBoard(token, company);
   if (provider === "lever") return listLeverBoard(token, company);
+  if (provider === "bamboohr") return listBambooHrBoard(token, company);
   if (isRemoteOkBoard(provider, token)) return listRemoteOk(token, company);
   if (isWeWorkRemotelyBoard(provider, token)) return listWeWorkRemotely(token, company);
   if (isRemotiveBoard(provider, token)) return listRemotive(token, company);

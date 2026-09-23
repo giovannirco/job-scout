@@ -85,16 +85,33 @@ export function familySalaryBand(group: Array<Pick<GroupRow, "salaryMin" | "sala
   return { salaryMin, salaryMax, salaryCurrency: currency, familySalarySpan: true };
 }
 
+export type FamilySalaryBand = { salaryMin: number; salaryMax: number; salaryCurrency: string };
+
+/** One band per currency when a collapsed family posted more than one. */
+export function familySalaryBands(group: Array<Pick<GroupRow, "salaryMin" | "salaryMax" | "salaryCurrency">>): FamilySalaryBand[] | null {
+  const known = group.filter((r): r is typeof r & { salaryMin: number; salaryCurrency: string } => r.salaryMin != null && Boolean(r.salaryCurrency));
+  const currencies = [...new Set(known.map((r) => r.salaryCurrency))];
+  if (currencies.length < 2) return null;
+  return currencies.map((currency) => {
+    const rows = known.filter((r) => r.salaryCurrency === currency);
+    const salaryMin = Math.min(...rows.map((r) => r.salaryMin));
+    const salaryMax = Math.max(...rows.map((r) => r.salaryMax ?? r.salaryMin));
+    return { salaryMin, salaryMax, salaryCurrency: currency };
+  });
+}
+
 export function groupSummary(group: GroupRow[]) {
   const representative = group[0];
   const visible = group.some((r) => r.status !== "archived") ? group.filter((r) => r.status !== "archived") : group;
   const band = familySalaryBand(visible);
+  const salaryBands = familySalaryBands(visible);
   return {
     roleFamilyId: representative.id,
     siblingCount: visible.length,
     locations: [...new Set(visible.map(r => r.locationRaw).filter(Boolean))],
     siblings: visible.map(r => ({ id: r.id, title: r.title, status: r.status, location: r.locationRaw, url: r.primaryUrl })),
     ...(band || {}),
+    ...(salaryBands ? { salaryBands } : {}),
   };
 }
 

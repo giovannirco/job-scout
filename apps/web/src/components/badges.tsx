@@ -1,4 +1,4 @@
-import { fitsHomeMarket } from "@job-scout/shared";
+import { listedAtHome } from "@job-scout/shared";
 import type { PipelineStatus, Verdict } from "@/lib/api";
 import { Chip, Dot, Meter, cn, type Tone } from "@/ui/kit";
 
@@ -84,7 +84,7 @@ export function WorkplaceChip({ workplace, className }: { workplace: string | nu
 export function GeoChip({ geo, remote, location, home, className }: { geo: string | null; remote?: string | null; location?: string | null; home?: string | null; className?: string }) {
   const raw = geo && geo !== "unknown" ? geo : remote && remote !== "unknown" ? remote : null;
   if (!raw) return <span className="text-faint">—</span>;
-  if (fitsHomeMarket(geo, location, home)) return <span className={cn("font-mono text-[11px] text-good", className)} title="This place restriction matches your profile location">home</span>;
+  if (listedAtHome(geo, location, home)) return <span className={cn("font-mono text-[11px] text-good", className)} title="This place matches your profile location">home</span>;
   const label = raw.replace(/_/g, " ").replace("worldwideish", "worldwide");
   const cls =
     geo === "brazil_friendly" || geo === "worldwideish"

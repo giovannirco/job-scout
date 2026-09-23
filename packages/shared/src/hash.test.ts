@@ -52,7 +52,7 @@ describe("materiality", () => {
   });
 
   it("names a location fill-in in plain language", () => {
-    expect(changeKindLabel("noise_rebase")).toBe("cleanup");
+    expect(changeKindLabel("noise_rebase")).toBe("rewritten here");
     expect(humanDiffSummary("location_raw: N/A → US")).toBe("Location: N/A → US");
     expect(summarizeDiffs([{ path: "location_raw", before: "N/A", after: "US" }])).toBe("Location: N/A → US");
   });

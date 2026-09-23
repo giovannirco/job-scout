@@ -483,7 +483,7 @@ export async function syncGateArchiveLanes(): Promise<{ updated: number }> {
       .update(discoveryFeed)
       .set({ lane: "filtered", gateReason: reason })
       .where(and(eq(discoveryFeed.positionId, row.id), eq(discoveryFeed.lane, "passed")))
-      .returning({ id: discoveryFeed.id });
+      .returning();
     updated += changed.length;
   }
   return { updated };

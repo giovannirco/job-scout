@@ -377,9 +377,9 @@ export function SortHead({
     </button>
   );
 }
-export function Td({ children, className, right, mono, colSpan }: { children?: ReactNode; className?: string; right?: boolean; mono?: boolean; colSpan?: number }) {
+export function Td({ children, className, right, mono, colSpan, title }: { children?: ReactNode; className?: string; right?: boolean; mono?: boolean; colSpan?: number; title?: string }) {
   return (
-    <td colSpan={colSpan} className={cn("px-3 py-1.5 border-b border-border/60 align-middle", right && "text-right", mono && "font-mono tabular text-[11.5px]", className)}>
+    <td title={title} colSpan={colSpan} className={cn("px-3 py-1.5 border-b border-border/60 align-middle", right && "text-right", mono && "font-mono tabular text-[11.5px]", className)}>
       {children}
     </td>
   );

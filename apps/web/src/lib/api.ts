@@ -65,6 +65,8 @@ export type PositionRow = {
   duplicateCount?: number;
   siblingCount?: number;
   familySalarySpan?: boolean;
+  salaryBands?: Array<{ salaryMin: number; salaryMax: number; salaryCurrency: string }>;
+  archiveReason?: string | null;
   locations?: string[];
   siblings?: Array<{ id: string; title: string; status: string; location: string | null; url: string | null }>;
   repostOfId?: string | null;

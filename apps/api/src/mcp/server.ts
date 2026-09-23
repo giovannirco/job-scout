@@ -523,6 +523,7 @@ export function createJobScoutMcpServer() {
           const r = await upsertFromJob({ provider: "other", title: a.role, company: a.company, url: a.url, listingStatus: "unknown" }, { source: "career-ops", companyName: a.company, status: "review" });
           position = r.position;
         }
+        if (!position) throw new Error("position missing");
         const mapped = mapCareerOpsStatus(a.status);
         const patch: Record<string, unknown> = {};
         if (mapped && mapped !== position.status) patch.status = mapped;
