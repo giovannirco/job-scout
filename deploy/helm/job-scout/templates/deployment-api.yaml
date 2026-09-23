@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "job-scout.fullname" . }}-api
+  labels:
+    {{- include "job-scout.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  replicas: {{ .Values.api.replicas }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "job-scout.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        {{- include "job-scout.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: api
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- include "job-scout.metricsAnnotations" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "job-scout.fullname" . }}
+      {{- include "job-scout.podSecurityContext" . | nindent 6 }}
+      {{- include "job-scout.podScheduling" . | nindent 6 }}
+      containers:
+        - name: api
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- include "job-scout.containerSecurityContext" . | nindent 10 }}
+          args: ["node", "--import", "tsx", "apps/api/src/index.ts"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+            {{- include "job-scout.metricsPort" . | nindent 12 }}
+          {{- include "job-scout.envFrom" . | nindent 10 }}
+          env:
+            - name: EMBED_WORKER
+              value: "0"
+            {{- include "job-scout.metricsEnv" . | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /api/v1/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}

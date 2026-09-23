@@ -1,0 +1,4 @@
+# Same stack as the repository-root compose.yaml.
+# From the repo root, `docker compose up --build` is enough.
+include:
+  - path: ../compose.yaml

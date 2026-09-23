@@ -1,0 +1,11 @@
+{
+  "name": "@job-scout/worker",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@job-scout/core": "workspace:*",
+    "@job-scout/db": "workspace:*",
+    "@job-scout/shared": "workspace:*"
+  }
+}

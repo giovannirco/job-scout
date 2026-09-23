@@ -1,0 +1,137 @@
+{
+  "version": 1,
+  "description": "Public crypto and fintech career sources. Prefer ATS board tokens when available; otherwise inspect the public careers page.",
+  "updated": "2026-08-05",
+  "crypto_job_boards": {
+    "cadence": "hourly",
+    "note": "Aggregators are lead-only; verify employer ATS before promoting. Run on every watch hour and deep scout \u2014 not weekly-only.",
+    "sources": [
+      {
+        "name": "Bitcoiner Jobs",
+        "url": "https://bitcoinerjobs.com/",
+        "tier": 2
+      },
+      {
+        "name": "Cryptocurrency Jobs",
+        "url": "https://cryptocurrencyjobs.co/",
+        "tier": 2
+      },
+      {
+        "name": "Web3.Career",
+        "url": "https://web3.career/web3-jobs/devops",
+        "tier": 2
+      },
+      {
+        "name": "CryptoJobsList",
+        "url": "https://cryptojobslist.com/",
+        "tier": 2
+      }
+    ]
+  },
+  "company_roots": [
+    {
+      "company": "Exodus",
+      "careers_url": "https://job-boards.greenhouse.io/exodus54",
+      "careers_url_alt": "https://www.exodus.com/careers",
+      "ats": "greenhouse",
+      "token": "exodus54",
+      "note": "GH board exodus54; currently General Application only (Remote - Global)"
+    },
+    {
+      "company": "Strike",
+      "ats": "greenhouse",
+      "token": "strike",
+      "careers_url": "https://strike.me/careers"
+    },
+    {
+      "company": "Bitso",
+      "ats": "greenhouse",
+      "token": "bitso",
+      "careers_url": "https://bitso.com/careers"
+    },
+    {
+      "company": "Alpaca",
+      "ats": "greenhouse",
+      "token": "alpaca",
+      "careers_url": "https://alpaca.markets/careers"
+    },
+    {
+      "company": "Kraken",
+      "ats": "ashby",
+      "token": "kraken.com",
+      "careers_url": "https://jobs.ashbyhq.com/kraken.com"
+    },
+    {
+      "company": "Coinbase",
+      "ats": "greenhouse",
+      "token": "coinbase",
+      "careers_url": "https://www.coinbase.com/careers"
+    },
+    {
+      "company": "Ripple",
+      "ats": "greenhouse",
+      "token": "ripple",
+      "careers_url": "https://ripple.com/careers/"
+    },
+    {
+      "company": "Blockstream",
+      "ats": "ashby",
+      "token": "blockstream",
+      "careers_url": "https://jobs.ashbyhq.com/blockstream"
+    },
+    {
+      "company": "BitGo",
+      "ats": "greenhouse",
+      "token": "bitgo",
+      "careers_url": "https://www.bitgo.com/careers/"
+    },
+    {
+      "company": "Fireblocks",
+      "ats": "greenhouse",
+      "token": "fireblocks",
+      "careers_url": "https://www.fireblocks.com/careers"
+    },
+    {
+      "company": "Gemini",
+      "ats": "greenhouse",
+      "token": "gemini",
+      "careers_url": "https://www.gemini.com/careers"
+    },
+    {
+      "company": "Anchorage Digital",
+      "ats": "lever",
+      "token": "anchorage",
+      "careers_url": "https://www.anchorage.com/careers"
+    },
+    {
+      "company": "Paxos",
+      "ats": "ashby",
+      "token": "paxos",
+      "careers_url": "https://jobs.ashbyhq.com/paxos"
+    },
+    {
+      "company": "Braiins",
+      "ats": "ashby",
+      "token": "Braiins",
+      "careers_url": "https://jobs.ashbyhq.com/Braiins"
+    },
+    {
+      "company": "Alchemy",
+      "ats": "ashby",
+      "token": "alchemy",
+      "careers_url": "https://www.alchemy.com/careers"
+    },
+    {
+      "company": "Binance",
+      "ats": "greenhouse",
+      "token": "binance",
+      "careers_url": ""
+    },
+    {
+      "company": "Phantom",
+      "ats": "ashby",
+      "token": "phantom",
+      "careers_url": "https://jobs.ashbyhq.com/phantom"
+    }
+  ]
+}

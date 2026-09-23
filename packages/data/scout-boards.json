@@ -1,0 +1,3045 @@
+{
+  "version": 5,
+  "description": "Official ATS boards for deterministic discovery. Greenhouse + Ashby + Lever. Includes career-ops harvest of boards that produced craft-title hits.",
+  "title_filter_note": "Filters live in career/ops/lib/career_discovery/classify.py (shared). Board scan and delta must not fork title rules.",
+  "boards": [
+    {
+      "company": "1Password",
+      "provider": "ashby",
+      "token": "1password",
+      "careers_url": "https://1password.com/jobs/"
+    },
+    {
+      "company": "9fin",
+      "provider": "ashby",
+      "token": "9fin",
+      "careers_url": "https://jobs.ashbyhq.com/9fin",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "abby-care",
+      "provider": "ashby",
+      "token": "abby-care",
+      "careers_url": "https://jobs.ashbyhq.com/abby-care",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Airbyte",
+      "provider": "ashby",
+      "token": "airbyte",
+      "careers_url": "https://airbyte.com/careers"
+    },
+    {
+      "company": "airwallex",
+      "provider": "ashby",
+      "token": "airwallex",
+      "careers_url": "https://jobs.ashbyhq.com/airwallex",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Alchemy",
+      "provider": "ashby",
+      "token": "alchemy",
+      "careers_url": "https://www.alchemy.com/careers"
+    },
+    {
+      "company": "algo1",
+      "provider": "ashby",
+      "token": "algo1",
+      "careers_url": "https://jobs.ashbyhq.com/algo1",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Andela",
+      "provider": "ashby",
+      "token": "andela",
+      "careers_url": ""
+    },
+    {
+      "company": "Anyscale",
+      "provider": "ashby",
+      "token": "anyscale",
+      "careers_url": "https://www.anyscale.com/careers"
+    },
+    {
+      "company": "Apollo GraphQL",
+      "provider": "ashby",
+      "token": "apollo-graphql",
+      "careers_url": "https://jobs.ashbyhq.com/apollo-graphql",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "arketa",
+      "provider": "ashby",
+      "token": "arketa",
+      "careers_url": "https://jobs.ashbyhq.com/arketa",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Artsy",
+      "provider": "ashby",
+      "token": "artsy",
+      "careers_url": "https://www.artsy.net/jobs"
+    },
+    {
+      "company": "astronomer",
+      "provider": "ashby",
+      "token": "astronomer",
+      "careers_url": "https://jobs.ashbyhq.com/astronomer",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "atlan",
+      "provider": "ashby",
+      "token": "atlan",
+      "careers_url": "https://jobs.ashbyhq.com/atlan",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "base-power",
+      "provider": "ashby",
+      "token": "base-power",
+      "careers_url": "https://jobs.ashbyhq.com/base-power",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Baseten",
+      "provider": "ashby",
+      "token": "baseten",
+      "careers_url": ""
+    },
+    {
+      "company": "beaconai",
+      "provider": "ashby",
+      "token": "beaconai",
+      "careers_url": "https://jobs.ashbyhq.com/beaconai",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "bestow",
+      "provider": "ashby",
+      "token": "bestow",
+      "careers_url": "https://jobs.ashbyhq.com/bestow",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Bland AI",
+      "provider": "ashby",
+      "token": "bland",
+      "careers_url": "https://jobs.ashbyhq.com/bland",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Blockstream",
+      "provider": "ashby",
+      "token": "blockstream",
+      "careers_url": "https://jobs.ashbyhq.com/blockstream"
+    },
+    {
+      "company": "Braiins",
+      "provider": "ashby",
+      "token": "Braiins",
+      "careers_url": "https://jobs.ashbyhq.com/Braiins"
+    },
+    {
+      "company": "brellium",
+      "provider": "ashby",
+      "token": "brellium",
+      "careers_url": "https://jobs.ashbyhq.com/brellium",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "camunda",
+      "provider": "ashby",
+      "token": "camunda",
+      "careers_url": "https://jobs.ashbyhq.com/camunda",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Cerebras",
+      "provider": "ashby",
+      "token": "cerebras",
+      "careers_url": ""
+    },
+    {
+      "company": "Character.AI",
+      "provider": "ashby",
+      "token": "character",
+      "careers_url": ""
+    },
+    {
+      "company": "Checkly",
+      "provider": "ashby",
+      "token": "checkly",
+      "careers_url": "https://www.checklyhq.com/careers/"
+    },
+    {
+      "company": "Checkout.com",
+      "provider": "ashby",
+      "token": "checkout.com",
+      "careers_url": "https://www.checkout.com/careers"
+    },
+    {
+      "company": "choco",
+      "provider": "ashby",
+      "token": "choco",
+      "careers_url": "https://jobs.ashbyhq.com/choco",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Clay Labs",
+      "provider": "ashby",
+      "token": "claylabs",
+      "careers_url": "https://jobs.ashbyhq.com/claylabs",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "clinicallyai",
+      "provider": "ashby",
+      "token": "clinicallyai",
+      "careers_url": "https://jobs.ashbyhq.com/clinicallyai",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "cogent-security",
+      "provider": "ashby",
+      "token": "cogent-security",
+      "careers_url": "https://jobs.ashbyhq.com/cogent-security",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Cohere",
+      "provider": "ashby",
+      "token": "cohere",
+      "careers_url": ""
+    },
+    {
+      "company": "Confluent",
+      "provider": "ashby",
+      "token": "confluent",
+      "careers_url": "https://www.confluent.io/careers/"
+    },
+    {
+      "company": "Cortea AI",
+      "provider": "ashby",
+      "token": "cortea",
+      "careers_url": "https://jobs.ashbyhq.com/cortea",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Corti",
+      "provider": "ashby",
+      "token": "corti",
+      "careers_url": "https://jobs.ashbyhq.com/corti",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "crusoe",
+      "provider": "ashby",
+      "token": "crusoe",
+      "careers_url": "https://jobs.ashbyhq.com/crusoe",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Cursor",
+      "provider": "ashby",
+      "token": "cursor",
+      "careers_url": "https://jobs.ashbyhq.com/cursor"
+    },
+    {
+      "company": "Decagon",
+      "provider": "ashby",
+      "token": "decagon",
+      "careers_url": "https://jobs.ashbyhq.com/decagon",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Deepgram",
+      "provider": "ashby",
+      "token": "deepgram",
+      "careers_url": "https://jobs.ashbyhq.com/deepgram",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "DeepL",
+      "provider": "ashby",
+      "token": "DeepL",
+      "careers_url": "https://jobs.ashbyhq.com/DeepL",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Delinea",
+      "provider": "ashby",
+      "token": "delinea",
+      "careers_url": "https://jobs.ashbyhq.com/delinea",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "deliveroo",
+      "provider": "ashby",
+      "token": "deliveroo",
+      "careers_url": "https://jobs.ashbyhq.com/deliveroo",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "designworkstalent",
+      "provider": "ashby",
+      "token": "designworkstalent",
+      "careers_url": "https://jobs.ashbyhq.com/designworkstalent",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Docker",
+      "provider": "ashby",
+      "token": "docker",
+      "careers_url": "https://www.docker.com/careers/"
+    },
+    {
+      "company": "docplanner",
+      "provider": "ashby",
+      "token": "docplanner",
+      "careers_url": "https://jobs.ashbyhq.com/docplanner",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Doppler",
+      "provider": "ashby",
+      "token": "doppler",
+      "careers_url": "https://www.doppler.com/careers"
+    },
+    {
+      "company": "dyna-robotics",
+      "provider": "ashby",
+      "token": "dyna-robotics",
+      "careers_url": "https://jobs.ashbyhq.com/dyna-robotics",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "E2B",
+      "provider": "ashby",
+      "token": "e2b",
+      "careers_url": "https://jobs.ashbyhq.com/e2b",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "ElevenLabs",
+      "provider": "ashby",
+      "token": "elevenlabs",
+      "careers_url": "https://jobs.ashbyhq.com/elevenlabs",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Elliptic",
+      "provider": "ashby",
+      "token": "elliptic",
+      "careers_url": "https://www.elliptic.co/careers"
+    },
+    {
+      "company": "Faculty",
+      "provider": "ashby",
+      "token": "faculty",
+      "careers_url": "https://jobs.ashbyhq.com/faculty",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Filigran",
+      "provider": "ashby",
+      "token": "filigran",
+      "careers_url": "https://filigran.io/careers/"
+    },
+    {
+      "company": "Fireworks AI",
+      "provider": "ashby",
+      "token": "fireworks",
+      "careers_url": ""
+    },
+    {
+      "company": "friendliai",
+      "provider": "ashby",
+      "token": "friendliai",
+      "careers_url": "https://jobs.ashbyhq.com/friendliai",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "fundingcircle",
+      "provider": "ashby",
+      "token": "fundingcircle",
+      "careers_url": "https://jobs.ashbyhq.com/fundingcircle",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "furiosa-ai",
+      "provider": "ashby",
+      "token": "furiosa-ai",
+      "careers_url": "https://jobs.ashbyhq.com/furiosa-ai",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "gallatin",
+      "provider": "ashby",
+      "token": "gallatin",
+      "careers_url": "https://jobs.ashbyhq.com/gallatin",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Glia",
+      "provider": "ashby",
+      "token": "glia",
+      "careers_url": "https://jobs.ashbyhq.com/glia",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Govwell",
+      "provider": "ashby",
+      "token": "GovWell",
+      "careers_url": "https://jobs.ashbyhq.com/GovWell",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "halter",
+      "provider": "ashby",
+      "token": "halter",
+      "careers_url": "https://jobs.ashbyhq.com/halter",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Haus",
+      "provider": "ashby",
+      "token": "haus",
+      "careers_url": "https://jobs.ashbyhq.com/haus",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Hinge Health",
+      "provider": "ashby",
+      "token": "hinge-health",
+      "careers_url": "https://jobs.ashbyhq.com/hinge-health",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "hubstaff",
+      "provider": "ashby",
+      "token": "hubstaff",
+      "careers_url": "https://jobs.ashbyhq.com/hubstaff",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Incident.io",
+      "provider": "ashby",
+      "token": "incident",
+      "careers_url": "https://incident.io/careers"
+    },
+    {
+      "company": "ineffable",
+      "provider": "ashby",
+      "token": "ineffable",
+      "careers_url": "https://jobs.ashbyhq.com/ineffable",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "InfluxData",
+      "provider": "ashby",
+      "token": "influxdata",
+      "careers_url": "https://www.influxdata.com/careers/"
+    },
+    {
+      "company": "Inngest",
+      "provider": "ashby",
+      "token": "inngest",
+      "careers_url": "https://jobs.ashbyhq.com/inngest",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "jobber",
+      "provider": "ashby",
+      "token": "jobber",
+      "careers_url": "https://jobs.ashbyhq.com/jobber",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "junipersquare",
+      "provider": "ashby",
+      "token": "junipersquare",
+      "careers_url": "https://jobs.ashbyhq.com/junipersquare",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Kittl",
+      "provider": "ashby",
+      "token": "kittl",
+      "careers_url": "https://jobs.ashbyhq.com/kittl",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "kojo",
+      "provider": "ashby",
+      "token": "kojo",
+      "careers_url": "https://jobs.ashbyhq.com/kojo",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Kong",
+      "provider": "ashby",
+      "token": "kong",
+      "careers_url": "https://konghq.com/careers"
+    },
+    {
+      "company": "Kraken",
+      "provider": "ashby",
+      "token": "kraken.com",
+      "careers_url": "https://jobs.ashbyhq.com/kraken.com"
+    },
+    {
+      "company": "Lambda Labs",
+      "provider": "ashby",
+      "token": "lambda",
+      "careers_url": ""
+    },
+    {
+      "company": "LangChain",
+      "provider": "ashby",
+      "token": "langchain",
+      "careers_url": "https://jobs.ashbyhq.com/langchain",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "langdock",
+      "provider": "ashby",
+      "token": "langdock",
+      "careers_url": "https://jobs.ashbyhq.com/langdock",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "latamcent",
+      "provider": "ashby",
+      "token": "latamcent",
+      "careers_url": "https://jobs.ashbyhq.com/latamcent",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Ledger",
+      "provider": "ashby",
+      "token": "ledger",
+      "careers_url": "https://www.ledger.com/careers"
+    },
+    {
+      "company": "Legora",
+      "provider": "ashby",
+      "token": "legora",
+      "careers_url": "https://jobs.ashbyhq.com/legora",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "lemonade",
+      "provider": "ashby",
+      "token": "lemonade",
+      "careers_url": "https://jobs.ashbyhq.com/lemonade",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Lightning Labs",
+      "provider": "ashby",
+      "token": "lightning",
+      "careers_url": "https://lightning.engineering/"
+    },
+    {
+      "company": "Lightspark",
+      "provider": "ashby",
+      "token": "lightspark",
+      "careers_url": ""
+    },
+    {
+      "company": "limble",
+      "provider": "ashby",
+      "token": "limble",
+      "careers_url": "https://jobs.ashbyhq.com/limble",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Linear",
+      "provider": "ashby",
+      "token": "linear",
+      "careers_url": "https://linear.app/careers"
+    },
+    {
+      "company": "loancrate",
+      "provider": "ashby",
+      "token": "loancrate",
+      "careers_url": "https://jobs.ashbyhq.com/loancrate",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Lovable",
+      "provider": "ashby",
+      "token": "lovable",
+      "careers_url": "https://jobs.ashbyhq.com/lovable",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Magic Eden",
+      "provider": "ashby",
+      "token": "magiceden",
+      "careers_url": "https://magiceden.io/careers"
+    },
+    {
+      "company": "maven-agi",
+      "provider": "ashby",
+      "token": "maven-agi",
+      "careers_url": "https://jobs.ashbyhq.com/maven-agi",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "mercor",
+      "provider": "ashby",
+      "token": "mercor",
+      "careers_url": "https://jobs.ashbyhq.com/mercor",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "meridianlink",
+      "provider": "ashby",
+      "token": "meridianlink",
+      "careers_url": "https://jobs.ashbyhq.com/meridianlink",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "mindrobotics",
+      "provider": "ashby",
+      "token": "mindrobotics",
+      "careers_url": "https://jobs.ashbyhq.com/mindrobotics",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Miro",
+      "provider": "ashby",
+      "token": "miro",
+      "careers_url": "https://miro.com/careers/"
+    },
+    {
+      "company": "Modal",
+      "provider": "ashby",
+      "token": "modal",
+      "careers_url": "https://modal.com/careers"
+    },
+    {
+      "company": "Modern Treasury",
+      "provider": "ashby",
+      "token": "moderntreasury",
+      "careers_url": "https://www.moderntreasury.com/careers"
+    },
+    {
+      "company": "modernfi",
+      "provider": "ashby",
+      "token": "modernfi",
+      "careers_url": "https://jobs.ashbyhq.com/modernfi",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "mollie",
+      "provider": "ashby",
+      "token": "mollie",
+      "careers_url": "https://jobs.ashbyhq.com/mollie",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "n8n",
+      "provider": "ashby",
+      "token": "n8n",
+      "careers_url": "https://jobs.ashbyhq.com/n8n",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Neon",
+      "provider": "ashby",
+      "token": "neon",
+      "careers_url": "https://jobs.ashbyhq.com/neon"
+    },
+    {
+      "company": "Nexus Cognitive",
+      "provider": "ashby",
+      "token": "nexus-cognitive",
+      "careers_url": "https://jobs.ashbyhq.com/nexus-cognitive",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "nooks",
+      "provider": "ashby",
+      "token": "nooks",
+      "careers_url": "https://jobs.ashbyhq.com/nooks",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "northwoodspace",
+      "provider": "ashby",
+      "token": "northwoodspace",
+      "careers_url": "https://jobs.ashbyhq.com/northwoodspace",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Notion",
+      "provider": "ashby",
+      "token": "notion",
+      "careers_url": "https://www.notion.so/careers"
+    },
+    {
+      "company": "oneapp",
+      "provider": "ashby",
+      "token": "oneapp",
+      "careers_url": "https://jobs.ashbyhq.com/oneapp",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Onebrief",
+      "provider": "ashby",
+      "token": "onebrief",
+      "careers_url": "https://jobs.ashbyhq.com/onebrief",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "OpenAI",
+      "provider": "ashby",
+      "token": "openai",
+      "careers_url": "https://openai.com/careers"
+    },
+    {
+      "company": "opengov",
+      "provider": "ashby",
+      "token": "opengov",
+      "careers_url": "https://jobs.ashbyhq.com/opengov",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "OpenSea",
+      "provider": "ashby",
+      "token": "opensea",
+      "careers_url": "https://opensea.io/careers"
+    },
+    {
+      "company": "Optimism",
+      "provider": "ashby",
+      "token": "oplabs",
+      "careers_url": "https://jobs.ashbyhq.com/oplabs"
+    },
+    {
+      "company": "ostium",
+      "provider": "ashby",
+      "token": "ostium",
+      "careers_url": "https://jobs.ashbyhq.com/ostium",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Outpost",
+      "provider": "ashby",
+      "token": "Outpost",
+      "careers_url": "https://jobs.ashbyhq.com/Outpost"
+    },
+    {
+      "company": "Oyster",
+      "provider": "ashby",
+      "token": "oyster",
+      "careers_url": ""
+    },
+    {
+      "company": "parafin",
+      "provider": "ashby",
+      "token": "parafin",
+      "careers_url": "https://jobs.ashbyhq.com/parafin",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Paxos",
+      "provider": "ashby",
+      "token": "paxos",
+      "careers_url": "https://jobs.ashbyhq.com/paxos"
+    },
+    {
+      "company": "Perplexity",
+      "provider": "ashby",
+      "token": "perplexity",
+      "careers_url": ""
+    },
+    {
+      "company": "Phantom",
+      "provider": "ashby",
+      "token": "phantom",
+      "careers_url": "https://phantom.com/careers"
+    },
+    {
+      "company": "Pinecone",
+      "provider": "ashby",
+      "token": "pinecone",
+      "careers_url": "https://jobs.ashbyhq.com/pinecone",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Plaid",
+      "provider": "ashby",
+      "token": "plaid",
+      "careers_url": "https://plaid.com/careers/"
+    },
+    {
+      "company": "Pliant",
+      "provider": "ashby",
+      "token": "pliant",
+      "careers_url": "https://jobs.ashbyhq.com/pliant",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Poolside",
+      "provider": "ashby",
+      "token": "poolside",
+      "careers_url": "https://jobs.ashbyhq.com/poolside",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "PostHog",
+      "provider": "ashby",
+      "token": "posthog",
+      "careers_url": "https://jobs.ashbyhq.com/posthog"
+    },
+    {
+      "company": "pragmatike",
+      "provider": "ashby",
+      "token": "pragmatike",
+      "careers_url": "https://jobs.ashbyhq.com/pragmatike",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Prefect",
+      "provider": "ashby",
+      "token": "prefect",
+      "careers_url": "https://www.prefect.io/careers"
+    },
+    {
+      "company": "Primer",
+      "provider": "ashby",
+      "token": "primer.io",
+      "careers_url": "https://jobs.ashbyhq.com/primer.io",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "quartermaster",
+      "provider": "ashby",
+      "token": "quartermaster",
+      "careers_url": "https://jobs.ashbyhq.com/quartermaster",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "QuickNode",
+      "provider": "ashby",
+      "token": "quicknode",
+      "careers_url": ""
+    },
+    {
+      "company": "quindar",
+      "provider": "ashby",
+      "token": "quindar",
+      "careers_url": "https://jobs.ashbyhq.com/quindar",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Radar",
+      "provider": "ashby",
+      "token": "radar",
+      "careers_url": "https://jobs.ashbyhq.com/radar",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "radiant-industries",
+      "provider": "ashby",
+      "token": "radiant-industries",
+      "careers_url": "https://jobs.ashbyhq.com/radiant-industries",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Railway",
+      "provider": "ashby",
+      "token": "railway",
+      "careers_url": "https://jobs.ashbyhq.com/railway"
+    },
+    {
+      "company": "Ramp",
+      "provider": "ashby",
+      "token": "ramp",
+      "careers_url": "https://ramp.com/careers"
+    },
+    {
+      "company": "Redis",
+      "provider": "ashby",
+      "token": "redis",
+      "careers_url": "https://redis.com/company/careers/"
+    },
+    {
+      "company": "reflectionai",
+      "provider": "ashby",
+      "token": "reflectionai",
+      "careers_url": "https://jobs.ashbyhq.com/reflectionai",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Relevance AI",
+      "provider": "ashby",
+      "token": "relevanceai",
+      "careers_url": "https://jobs.ashbyhq.com/relevanceai",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Render",
+      "provider": "ashby",
+      "token": "render",
+      "careers_url": "https://render.com/careers"
+    },
+    {
+      "company": "Replit",
+      "provider": "ashby",
+      "token": "replit",
+      "careers_url": "https://replit.com/site/careers"
+    },
+    {
+      "company": "Resend",
+      "provider": "ashby",
+      "token": "resend",
+      "careers_url": "https://jobs.ashbyhq.com/resend",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "ridealso",
+      "provider": "ashby",
+      "token": "ridealso",
+      "careers_url": "https://jobs.ashbyhq.com/ridealso",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Roboflow",
+      "provider": "ashby",
+      "token": "roboflow",
+      "careers_url": ""
+    },
+    {
+      "company": "sandboxaq",
+      "provider": "ashby",
+      "token": "sandboxaq",
+      "careers_url": "https://jobs.ashbyhq.com/sandboxaq",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "SatoshiLabs / Trezor",
+      "provider": "ashby",
+      "token": "satoshilabs",
+      "careers_url": "https://satoshilabs.com/jobs/"
+    },
+    {
+      "company": "Sentry",
+      "provider": "ashby",
+      "token": "sentry",
+      "careers_url": "https://jobs.ashbyhq.com/sentry"
+    },
+    {
+      "company": "Sierra",
+      "provider": "ashby",
+      "token": "sierra",
+      "careers_url": "https://jobs.ashbyhq.com/sierra",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "skydio",
+      "provider": "ashby",
+      "token": "skydio",
+      "careers_url": "https://jobs.ashbyhq.com/skydio",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Snowflake",
+      "provider": "ashby",
+      "token": "snowflake",
+      "careers_url": "https://careers.snowflake.com/"
+    },
+    {
+      "company": "solace",
+      "provider": "ashby",
+      "token": "solace",
+      "careers_url": "https://jobs.ashbyhq.com/solace",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Solana Labs",
+      "provider": "ashby",
+      "token": "solanalabs",
+      "careers_url": "https://solana.com/careers"
+    },
+    {
+      "company": "Spiral",
+      "provider": "ashby",
+      "token": "spiral",
+      "careers_url": ""
+    },
+    {
+      "company": "stuut-ai",
+      "provider": "ashby",
+      "token": "stuut-ai",
+      "careers_url": "https://jobs.ashbyhq.com/stuut-ai",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Supabase",
+      "provider": "ashby",
+      "token": "supabase",
+      "careers_url": "https://jobs.ashbyhq.com/supabase"
+    },
+    {
+      "company": "Swan Bitcoin",
+      "provider": "ashby",
+      "token": "swan",
+      "careers_url": ""
+    },
+    {
+      "company": "Synthesia",
+      "provider": "ashby",
+      "token": "synthesia",
+      "careers_url": "https://jobs.ashbyhq.com/synthesia",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Taxfix",
+      "provider": "ashby",
+      "token": "taxfix.com",
+      "careers_url": "https://jobs.ashbyhq.com/taxfix.com",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Teleport",
+      "provider": "ashby",
+      "token": "goteleport",
+      "careers_url": "https://goteleport.com/careers/"
+    },
+    {
+      "company": "telus-digital",
+      "provider": "ashby",
+      "token": "telus-digital",
+      "careers_url": "https://jobs.ashbyhq.com/telus-digital",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "tempo-io",
+      "provider": "ashby",
+      "token": "tempo-io",
+      "careers_url": "https://jobs.ashbyhq.com/tempo-io",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Temporal",
+      "provider": "ashby",
+      "token": "temporal",
+      "careers_url": "https://jobs.ashbyhq.com/temporal"
+    },
+    {
+      "company": "The Exploration Company",
+      "provider": "ashby",
+      "token": "the-exploration-company",
+      "careers_url": "https://jobs.ashbyhq.com/the-exploration-company",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "themindcompany",
+      "provider": "ashby",
+      "token": "themindcompany",
+      "careers_url": "https://jobs.ashbyhq.com/themindcompany",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Tiger Data",
+      "provider": "ashby",
+      "token": "tigerdata",
+      "careers_url": "https://www.tigerdata.com/careers",
+      "note": "formerly Timescale; pending name Timescale"
+    },
+    {
+      "company": "TRM Labs",
+      "provider": "ashby",
+      "token": "trm-labs",
+      "careers_url": "https://www.trmlabs.com/careers"
+    },
+    {
+      "company": "Uniswap Labs",
+      "provider": "ashby",
+      "token": "uniswap",
+      "careers_url": "https://careers.uniswap.org/"
+    },
+    {
+      "company": "upside",
+      "provider": "ashby",
+      "token": "upside",
+      "careers_url": "https://jobs.ashbyhq.com/upside",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "vanta",
+      "provider": "ashby",
+      "token": "vanta",
+      "careers_url": "https://jobs.ashbyhq.com/vanta",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Vapi",
+      "provider": "ashby",
+      "token": "vapi",
+      "careers_url": "https://jobs.ashbyhq.com/vapi",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Vercel",
+      "provider": "ashby",
+      "token": "vercel",
+      "careers_url": "https://vercel.com/careers"
+    },
+    {
+      "company": "Viz.ai",
+      "provider": "ashby",
+      "token": "Viz.ai",
+      "careers_url": "https://jobs.ashbyhq.com/Viz.ai",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Vultr",
+      "provider": "ashby",
+      "token": "vultr",
+      "careers_url": ""
+    },
+    {
+      "company": "WorkOS",
+      "provider": "ashby",
+      "token": "workos",
+      "careers_url": "https://jobs.ashbyhq.com/workos",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Writer",
+      "provider": "ashby",
+      "token": "writer",
+      "careers_url": "https://jobs.ashbyhq.com/writer",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "xero",
+      "provider": "ashby",
+      "token": "xero",
+      "careers_url": "https://jobs.ashbyhq.com/xero",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Zapier",
+      "provider": "ashby",
+      "token": "zapier",
+      "careers_url": "https://zapier.com/jobs"
+    },
+    {
+      "company": "2k",
+      "provider": "greenhouse",
+      "token": "2k",
+      "careers_url": "https://job-boards.greenhouse.io/2k",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "accenturefederalservices",
+      "provider": "greenhouse",
+      "token": "accenturefederalservices",
+      "careers_url": "https://boards.greenhouse.io/accenturefederalservices",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Adyen",
+      "provider": "greenhouse",
+      "token": "adyen",
+      "careers_url": "https://careers.adyen.com/"
+    },
+    {
+      "company": "affirm",
+      "provider": "greenhouse",
+      "token": "affirm",
+      "careers_url": "https://job-boards.greenhouse.io/affirm",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Afresh Technologies",
+      "provider": "greenhouse",
+      "token": "afresh",
+      "careers_url": "https://boards.greenhouse.io/afresh",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "aippublishing",
+      "provider": "greenhouse",
+      "token": "aippublishing",
+      "careers_url": "https://job-boards.greenhouse.io/aippublishing",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Airtable",
+      "provider": "greenhouse",
+      "token": "airtable",
+      "careers_url": "https://job-boards.greenhouse.io/airtable",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Alpaca",
+      "provider": "greenhouse",
+      "token": "alpaca",
+      "careers_url": "https://alpaca.markets/careers"
+    },
+    {
+      "company": "alphasense",
+      "provider": "greenhouse",
+      "token": "alphasense",
+      "careers_url": "https://job-boards.greenhouse.io/alphasense",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Amplemarket",
+      "provider": "greenhouse",
+      "token": "amplemarket",
+      "careers_url": "https://job-boards.eu.greenhouse.io/amplemarket",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Amplitude",
+      "provider": "greenhouse",
+      "token": "amplitude",
+      "careers_url": "https://amplitude.com/careers"
+    },
+    {
+      "company": "amtechsoftware",
+      "provider": "greenhouse",
+      "token": "amtechsoftware",
+      "careers_url": "https://job-boards.greenhouse.io/amtechsoftware",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "andurilindustries",
+      "provider": "greenhouse",
+      "token": "andurilindustries",
+      "careers_url": "https://boards.greenhouse.io/andurilindustries",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Anthropic",
+      "provider": "greenhouse",
+      "token": "anthropic",
+      "careers_url": "https://www.anthropic.com/careers"
+    },
+    {
+      "company": "arcesiumllc",
+      "provider": "greenhouse",
+      "token": "arcesiumllc",
+      "careers_url": "https://job-boards.greenhouse.io/arcesiumllc",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Armis",
+      "provider": "greenhouse",
+      "token": "armissecurity",
+      "careers_url": "https://boards.greenhouse.io/armissecurity",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Asana",
+      "provider": "greenhouse",
+      "token": "asana",
+      "careers_url": "https://asana.com/jobs"
+    },
+    {
+      "company": "asteralabs",
+      "provider": "greenhouse",
+      "token": "asteralabs",
+      "careers_url": "https://job-boards.greenhouse.io/asteralabs",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "attentive",
+      "provider": "greenhouse",
+      "token": "attentive",
+      "careers_url": "https://job-boards.greenhouse.io/attentive",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "autoscout24",
+      "provider": "greenhouse",
+      "token": "autoscout24",
+      "careers_url": "https://job-boards.greenhouse.io/autoscout24",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "axon",
+      "provider": "greenhouse",
+      "token": "axon",
+      "careers_url": "https://job-boards.greenhouse.io/axon",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Backblaze",
+      "provider": "greenhouse",
+      "token": "backblaze",
+      "careers_url": "https://www.backblaze.com/company/careers.html"
+    },
+    {
+      "company": "Binance",
+      "provider": "greenhouse",
+      "token": "binance",
+      "careers_url": ""
+    },
+    {
+      "company": "BitGo",
+      "provider": "greenhouse",
+      "token": "bitgo",
+      "careers_url": "https://www.bitgo.com/careers/"
+    },
+    {
+      "company": "Bitso",
+      "provider": "greenhouse",
+      "token": "bitso",
+      "careers_url": "https://bitso.com/careers"
+    },
+    {
+      "company": "Black Forest Labs",
+      "provider": "greenhouse",
+      "token": "blackforestlabs",
+      "careers_url": "https://job-boards.greenhouse.io/blackforestlabs",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Blockchain.com",
+      "provider": "greenhouse",
+      "token": "blockchain",
+      "careers_url": "https://www.blockchain.com/careers"
+    },
+    {
+      "company": "brandwatch",
+      "provider": "greenhouse",
+      "token": "brandwatch",
+      "careers_url": "https://job-boards.eu.greenhouse.io/brandwatch",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "braze",
+      "provider": "greenhouse",
+      "token": "braze",
+      "careers_url": "https://boards.greenhouse.io/braze",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Brex",
+      "provider": "greenhouse",
+      "token": "brex",
+      "careers_url": "https://www.brex.com/careers"
+    },
+    {
+      "company": "Bybit",
+      "provider": "greenhouse",
+      "token": "bybit",
+      "careers_url": ""
+    },
+    {
+      "company": "C6 Bank",
+      "provider": "greenhouse",
+      "token": "c6bank",
+      "careers_url": ""
+    },
+    {
+      "company": "Canonical",
+      "provider": "greenhouse",
+      "token": "canonical",
+      "careers_url": "https://canonical.com/careers"
+    },
+    {
+      "company": "capco",
+      "provider": "greenhouse",
+      "token": "capco",
+      "careers_url": "https://job-boards.greenhouse.io/capco",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Carta",
+      "provider": "greenhouse",
+      "token": "carta",
+      "careers_url": "https://carta.com/careers/"
+    },
+    {
+      "company": "catawiki",
+      "provider": "greenhouse",
+      "token": "catawiki",
+      "careers_url": "https://job-boards.greenhouse.io/catawiki",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Chainguard",
+      "provider": "greenhouse",
+      "token": "chainguard",
+      "careers_url": "https://www.chainguard.dev/careers"
+    },
+    {
+      "company": "chime",
+      "provider": "greenhouse",
+      "token": "chime",
+      "careers_url": "https://boards.greenhouse.io/chime",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "CircleCI",
+      "provider": "greenhouse",
+      "token": "circleci",
+      "careers_url": "https://circleci.com/careers/"
+    },
+    {
+      "company": "clarityinnovates",
+      "provider": "greenhouse",
+      "token": "clarityinnovates",
+      "careers_url": "https://job-boards.greenhouse.io/clarityinnovates",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "clearstreet",
+      "provider": "greenhouse",
+      "token": "clearstreet",
+      "careers_url": "https://job-boards.greenhouse.io/clearstreet",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Cleerly",
+      "provider": "greenhouse",
+      "token": "cleerlyhealth",
+      "careers_url": "https://boards.greenhouse.io/cleerlyhealth",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "ClickHouse",
+      "provider": "greenhouse",
+      "token": "clickhouse",
+      "careers_url": "https://clickhouse.com/careers"
+    },
+    {
+      "company": "Cloudflare",
+      "provider": "greenhouse",
+      "token": "cloudflare",
+      "careers_url": "https://www.cloudflare.com/careers/"
+    },
+    {
+      "company": "Cobre",
+      "provider": "greenhouse",
+      "token": "cobre",
+      "careers_url": "https://www.cobre.co/careers"
+    },
+    {
+      "company": "Cockroach Labs",
+      "provider": "greenhouse",
+      "token": "cockroachlabs",
+      "careers_url": "https://www.cockroachlabs.com/careers/"
+    },
+    {
+      "company": "Coinbase",
+      "provider": "greenhouse",
+      "token": "coinbase",
+      "careers_url": "https://www.coinbase.com/careers"
+    },
+    {
+      "company": "commercetools",
+      "provider": "greenhouse",
+      "token": "commercetools",
+      "careers_url": "https://boards.greenhouse.io/commercetools",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "CompanyCam",
+      "provider": "greenhouse",
+      "token": "companycam",
+      "careers_url": "https://boards.greenhouse.io/companycam",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Conga",
+      "provider": "greenhouse",
+      "token": "conga",
+      "careers_url": "https://boards.greenhouse.io/conga",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Consensys",
+      "provider": "greenhouse",
+      "token": "consensys",
+      "careers_url": "https://consensys.io/careers"
+    },
+    {
+      "company": "Contentful",
+      "provider": "greenhouse",
+      "token": "contentful",
+      "careers_url": "https://www.contentful.com/careers/"
+    },
+    {
+      "company": "CoreView",
+      "provider": "greenhouse",
+      "token": "coreview",
+      "careers_url": "https://boards.greenhouse.io/coreview",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "CoreWeave",
+      "provider": "greenhouse",
+      "token": "coreweave",
+      "careers_url": ""
+    },
+    {
+      "company": "cranialtechnologies",
+      "provider": "greenhouse",
+      "token": "cranialtechnologies",
+      "careers_url": "https://job-boards.greenhouse.io/cranialtechnologies",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Cribl",
+      "provider": "greenhouse",
+      "token": "cribl",
+      "careers_url": "https://cribl.io/careers/"
+    },
+    {
+      "company": "Databricks",
+      "provider": "greenhouse",
+      "token": "databricks",
+      "careers_url": "https://www.databricks.com/company/careers"
+    },
+    {
+      "company": "Datadog",
+      "provider": "greenhouse",
+      "token": "datadog",
+      "careers_url": "https://careers.datadoghq.com/"
+    },
+    {
+      "company": "defenseunicorns",
+      "provider": "greenhouse",
+      "token": "defenseunicorns",
+      "careers_url": "https://job-boards.greenhouse.io/defenseunicorns",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "dexory",
+      "provider": "greenhouse",
+      "token": "dexory",
+      "careers_url": "https://job-boards.eu.greenhouse.io/dexory",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Dialpad",
+      "provider": "greenhouse",
+      "token": "dialpad",
+      "careers_url": "https://boards.greenhouse.io/dialpad",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "didi",
+      "provider": "greenhouse",
+      "token": "didi",
+      "careers_url": "https://job-boards.greenhouse.io/didi",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "discord",
+      "provider": "greenhouse",
+      "token": "discord",
+      "careers_url": "https://job-boards.greenhouse.io/discord",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "doctolib",
+      "provider": "greenhouse",
+      "token": "doctolib",
+      "careers_url": "https://job-boards.greenhouse.io/doctolib",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Dotmatics",
+      "provider": "greenhouse",
+      "token": "dotmatics",
+      "careers_url": "https://boards.greenhouse.io/dotmatics",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Dremio",
+      "provider": "greenhouse",
+      "token": "dremio",
+      "careers_url": "https://boards.greenhouse.io/dremio",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "drweng",
+      "provider": "greenhouse",
+      "token": "drweng",
+      "careers_url": "https://job-boards.greenhouse.io/drweng",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "EBANX",
+      "provider": "greenhouse",
+      "token": "ebanx",
+      "careers_url": "https://ebanx.com/careers/"
+    },
+    {
+      "company": "ebury",
+      "provider": "greenhouse",
+      "token": "ebury",
+      "careers_url": "https://job-boards.eu.greenhouse.io/ebury",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Elastic",
+      "provider": "greenhouse",
+      "token": "elastic",
+      "careers_url": "https://www.elastic.co/careers"
+    },
+    {
+      "company": "Enumerate",
+      "provider": "greenhouse",
+      "token": "enumerate",
+      "careers_url": "https://job-boards.greenhouse.io/enumerate"
+    },
+    {
+      "company": "evismart",
+      "provider": "greenhouse",
+      "token": "evismart",
+      "careers_url": "https://job-boards.greenhouse.io/evismart",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Exiger",
+      "provider": "greenhouse",
+      "token": "exiger",
+      "careers_url": "https://boards.greenhouse.io/exiger",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Exodus",
+      "provider": "greenhouse",
+      "token": "exodus54",
+      "careers_url": "https://job-boards.greenhouse.io/exodus54"
+    },
+    {
+      "company": "ezCater",
+      "provider": "greenhouse",
+      "token": "ezcaterinc",
+      "careers_url": "https://boards.greenhouse.io/ezcaterinc",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "fanaticsfbg",
+      "provider": "greenhouse",
+      "token": "fanaticsfbg",
+      "careers_url": "https://job-boards.greenhouse.io/fanaticsfbg",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Fastly",
+      "provider": "greenhouse",
+      "token": "fastly",
+      "careers_url": "https://www.fastly.com/about/careers"
+    },
+    {
+      "company": "Figma",
+      "provider": "greenhouse",
+      "token": "figma",
+      "careers_url": "https://www.figma.com/careers/"
+    },
+    {
+      "company": "Figure",
+      "provider": "greenhouse",
+      "token": "figure",
+      "careers_url": "https://www.figure.com/careers/"
+    },
+    {
+      "company": "Fireblocks",
+      "provider": "greenhouse",
+      "token": "fireblocks",
+      "careers_url": "https://www.fireblocks.com/careers"
+    },
+    {
+      "company": "Fora",
+      "provider": "greenhouse",
+      "token": "foratravel",
+      "careers_url": "https://boards.greenhouse.io/foratravel",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Galaxy",
+      "provider": "greenhouse",
+      "token": "galaxy",
+      "careers_url": "https://www.galaxy.com/careers"
+    },
+    {
+      "company": "Gemini",
+      "provider": "greenhouse",
+      "token": "gemini",
+      "careers_url": "https://www.gemini.com/careers"
+    },
+    {
+      "company": "geniussports",
+      "provider": "greenhouse",
+      "token": "geniussports",
+      "careers_url": "https://boards.greenhouse.io/geniussports",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "GetYourGuide",
+      "provider": "greenhouse",
+      "token": "getyourguide",
+      "careers_url": "https://job-boards.greenhouse.io/getyourguide",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "GitLab",
+      "provider": "greenhouse",
+      "token": "gitlab",
+      "careers_url": "https://about.gitlab.com/jobs/"
+    },
+    {
+      "company": "Glean",
+      "provider": "greenhouse",
+      "token": "gleanwork",
+      "careers_url": "https://job-boards.greenhouse.io/gleanwork",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "gr8tech",
+      "provider": "greenhouse",
+      "token": "gr8tech",
+      "careers_url": "https://job-boards.eu.greenhouse.io/gr8tech",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Gradial",
+      "provider": "greenhouse",
+      "token": "gradial",
+      "careers_url": "https://boards.greenhouse.io/gradial",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Grafana Labs",
+      "provider": "greenhouse",
+      "token": "grafanalabs",
+      "careers_url": "https://grafana.com/about/careers/"
+    },
+    {
+      "company": "gravitonresearchcapital",
+      "provider": "greenhouse",
+      "token": "gravitonresearchcapital",
+      "careers_url": "https://boards.greenhouse.io/gravitonresearchcapital",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Gusto",
+      "provider": "greenhouse",
+      "token": "gusto",
+      "careers_url": "https://gusto.com/about/careers"
+    },
+    {
+      "company": "Gympass/Wellhub",
+      "provider": "greenhouse",
+      "token": "gympass",
+      "careers_url": ""
+    },
+    {
+      "company": "Honeycomb",
+      "provider": "greenhouse",
+      "token": "honeycomb",
+      "careers_url": "https://www.honeycomb.io/careers"
+    },
+    {
+      "company": "Hume AI",
+      "provider": "greenhouse",
+      "token": "humeai",
+      "careers_url": "https://job-boards.greenhouse.io/humeai",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Hut 8",
+      "provider": "greenhouse",
+      "token": "hut8",
+      "careers_url": "https://hut8.com/careers/"
+    },
+    {
+      "company": "ifoodcarreiras",
+      "provider": "greenhouse",
+      "token": "ifoodcarreiras",
+      "careers_url": "https://job-boards.greenhouse.io/ifoodcarreiras",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "imc",
+      "provider": "greenhouse",
+      "token": "imc",
+      "careers_url": "https://job-boards.eu.greenhouse.io/imc",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "impact",
+      "provider": "greenhouse",
+      "token": "impact",
+      "careers_url": "https://job-boards.greenhouse.io/impact",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Intercom",
+      "provider": "greenhouse",
+      "token": "intercom",
+      "careers_url": "https://job-boards.greenhouse.io/intercom",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Isomorphic Labs",
+      "provider": "greenhouse",
+      "token": "isomorphiclabs",
+      "careers_url": "https://job-boards.greenhouse.io/isomorphiclabs",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "JFrog",
+      "provider": "greenhouse",
+      "token": "jfrog",
+      "careers_url": "https://jfrog.com/careers/"
+    },
+    {
+      "company": "Jump Crypto",
+      "provider": "greenhouse",
+      "token": "jumpcrypto",
+      "careers_url": "https://jumpcrypto.com/"
+    },
+    {
+      "company": "Jump Trading",
+      "provider": "greenhouse",
+      "token": "jumptrading",
+      "careers_url": "https://www.jumptrading.com/careers/"
+    },
+    {
+      "company": "Kaseya",
+      "provider": "greenhouse",
+      "token": "kaseya",
+      "careers_url": "https://boards.greenhouse.io/kaseya",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "kikoff",
+      "provider": "greenhouse",
+      "token": "kikoff",
+      "careers_url": "https://job-boards.greenhouse.io/kikoff",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Labelbox",
+      "provider": "greenhouse",
+      "token": "labelbox",
+      "careers_url": ""
+    },
+    {
+      "company": "Later",
+      "provider": "greenhouse",
+      "token": "later",
+      "careers_url": "https://job-boards.greenhouse.io/later",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "LaunchDarkly",
+      "provider": "greenhouse",
+      "token": "launchdarkly",
+      "careers_url": "https://launchdarkly.com/careers/"
+    },
+    {
+      "company": "LeoLabs",
+      "provider": "greenhouse",
+      "token": "leolabsinc",
+      "careers_url": "https://boards.greenhouse.io/leolabsinc",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Lifted",
+      "provider": "greenhouse",
+      "token": "lifted",
+      "careers_url": "https://job-boards.greenhouse.io/lifted"
+    },
+    {
+      "company": "lightfeatheriollc",
+      "provider": "greenhouse",
+      "token": "lightfeatheriollc",
+      "careers_url": "https://job-boards.greenhouse.io/lightfeatheriollc",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "lighthouse",
+      "provider": "greenhouse",
+      "token": "lighthouse",
+      "careers_url": "https://job-boards.eu.greenhouse.io/lighthouse",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "liveperson",
+      "provider": "greenhouse",
+      "token": "liveperson",
+      "careers_url": "https://job-boards.greenhouse.io/liveperson",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Loka",
+      "provider": "greenhouse",
+      "token": "lokajobs",
+      "careers_url": "https://www.loka.com/careers"
+    },
+    {
+      "company": "lucidmotors",
+      "provider": "greenhouse",
+      "token": "lucidmotors",
+      "careers_url": "https://job-boards.greenhouse.io/lucidmotors",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Marqeta",
+      "provider": "greenhouse",
+      "token": "marqeta",
+      "careers_url": "https://www.marqeta.com/company/careers"
+    },
+    {
+      "company": "Mattermost",
+      "provider": "greenhouse",
+      "token": "mattermost",
+      "careers_url": "https://mattermost.com/careers/"
+    },
+    {
+      "company": "Mercury",
+      "provider": "greenhouse",
+      "token": "mercury",
+      "careers_url": "https://mercury.com/jobs"
+    },
+    {
+      "company": "meriton",
+      "provider": "greenhouse",
+      "token": "meriton",
+      "careers_url": "https://job-boards.greenhouse.io/meriton",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Mixpanel",
+      "provider": "greenhouse",
+      "token": "mixpanel",
+      "careers_url": "https://mixpanel.com/jobs/"
+    },
+    {
+      "company": "MongoDB",
+      "provider": "greenhouse",
+      "token": "mongodb",
+      "careers_url": "https://www.mongodb.com/careers"
+    },
+    {
+      "company": "Monzo",
+      "provider": "greenhouse",
+      "token": "monzo",
+      "careers_url": "https://monzo.com/careers/"
+    },
+    {
+      "company": "Motive",
+      "provider": "greenhouse",
+      "token": "gomotive",
+      "careers_url": "https://boards.greenhouse.io/gomotive",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "mrbeastyoutube",
+      "provider": "greenhouse",
+      "token": "mrbeastyoutube",
+      "careers_url": "https://job-boards.greenhouse.io/mrbeastyoutube",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "mxtechnologiesinc",
+      "provider": "greenhouse",
+      "token": "mxtechnologiesinc",
+      "careers_url": "https://job-boards.greenhouse.io/mxtechnologiesinc",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "N-iX",
+      "provider": "greenhouse",
+      "token": "nix",
+      "careers_url": "https://careers.n-ix.com/"
+    },
+    {
+      "company": "N26",
+      "provider": "greenhouse",
+      "token": "n26",
+      "careers_url": "https://n26.com/en-eu/careers"
+    },
+    {
+      "company": "Netlify",
+      "provider": "greenhouse",
+      "token": "netlify",
+      "careers_url": "https://www.netlify.com/careers/"
+    },
+    {
+      "company": "New Relic",
+      "provider": "greenhouse",
+      "token": "newrelic",
+      "careers_url": "https://newrelic.com/careers"
+    },
+    {
+      "company": "newsbreak",
+      "provider": "greenhouse",
+      "token": "newsbreak",
+      "careers_url": "https://job-boards.greenhouse.io/newsbreak",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "nimblerobotics",
+      "provider": "greenhouse",
+      "token": "nimblerobotics",
+      "careers_url": "https://job-boards.greenhouse.io/nimblerobotics",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Nortal",
+      "provider": "greenhouse",
+      "token": "nortal",
+      "careers_url": "https://nortal.com/careers/",
+      "note": "LATAM Senior DevOps live on GH (1424/1522/EG0017); Workday tenant separate under workday_boards (often 422)"
+    },
+    {
+      "company": "Nubank",
+      "provider": "greenhouse",
+      "token": "nubank",
+      "careers_url": "https://international.nubank.com.br/careers/"
+    },
+    {
+      "company": "Okta",
+      "provider": "greenhouse",
+      "token": "okta",
+      "careers_url": "https://www.okta.com/company/careers/"
+    },
+    {
+      "company": "OKX",
+      "provider": "greenhouse",
+      "token": "okx",
+      "careers_url": ""
+    },
+    {
+      "company": "opentable",
+      "provider": "greenhouse",
+      "token": "opentable",
+      "careers_url": "https://job-boards.greenhouse.io/opentable",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "optoinvest",
+      "provider": "greenhouse",
+      "token": "optoinvest",
+      "careers_url": "https://job-boards.greenhouse.io/optoinvest",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Orca Security",
+      "provider": "greenhouse",
+      "token": "orcasecurity",
+      "careers_url": "https://orca.security/careers/"
+    },
+    {
+      "company": "PagerDuty",
+      "provider": "greenhouse",
+      "token": "pagerduty",
+      "careers_url": "https://www.pagerduty.com/careers/"
+    },
+    {
+      "company": "Parachute Health",
+      "provider": "greenhouse",
+      "token": "parachutehealth",
+      "careers_url": "https://boards.greenhouse.io/parachutehealth",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Parloa",
+      "provider": "greenhouse",
+      "token": "parloa",
+      "careers_url": "https://job-boards.eu.greenhouse.io/parloa",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "peregrinetechnologies",
+      "provider": "greenhouse",
+      "token": "peregrinetechnologies",
+      "careers_url": "https://job-boards.greenhouse.io/peregrinetechnologies",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "phantomai",
+      "provider": "greenhouse",
+      "token": "phantomai",
+      "careers_url": "https://job-boards.greenhouse.io/phantomai",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "phData",
+      "provider": "greenhouse",
+      "token": "phdata",
+      "careers_url": "https://www.phdata.io/careers/"
+    },
+    {
+      "company": "PhysicsX",
+      "provider": "greenhouse",
+      "token": "physicsx",
+      "careers_url": "https://job-boards.eu.greenhouse.io/physicsx",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "pingidentity",
+      "provider": "greenhouse",
+      "token": "pingidentity",
+      "careers_url": "https://job-boards.greenhouse.io/pingidentity",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "PlanetScale",
+      "provider": "greenhouse",
+      "token": "planetscale",
+      "careers_url": "https://planetscale.com/careers"
+    },
+    {
+      "company": "Platform.sh",
+      "provider": "greenhouse",
+      "token": "platformsh",
+      "careers_url": "https://platform.sh/careers/"
+    },
+    {
+      "company": "Postman",
+      "provider": "greenhouse",
+      "token": "postman",
+      "careers_url": "https://boards.greenhouse.io/postman",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Precisely",
+      "provider": "greenhouse",
+      "token": "preciselyinternationaljobs",
+      "careers_url": "https://boards.greenhouse.io/preciselyinternationaljobs",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Precisely",
+      "provider": "greenhouse",
+      "token": "preciselyusjobs",
+      "careers_url": "https://boards.greenhouse.io/preciselyusjobs",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Prisma",
+      "provider": "greenhouse",
+      "token": "prisma",
+      "careers_url": "https://www.prisma.io/careers"
+    },
+    {
+      "company": "Private Identity",
+      "provider": "greenhouse",
+      "token": "privateidentity",
+      "careers_url": "https://job-boards.greenhouse.io/privateidentity"
+    },
+    {
+      "company": "Profluent",
+      "provider": "greenhouse",
+      "token": "profluent",
+      "careers_url": "https://boards.greenhouse.io/profluent",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "proton",
+      "provider": "greenhouse",
+      "token": "proton",
+      "careers_url": "https://job-boards.eu.greenhouse.io/proton",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "QphoX",
+      "provider": "greenhouse",
+      "token": "qphox",
+      "careers_url": "https://boards.greenhouse.io/qphox",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "quberesearchandtechnologies",
+      "provider": "greenhouse",
+      "token": "quberesearchandtechnologies",
+      "careers_url": "https://job-boards.greenhouse.io/quberesearchandtechnologies",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "QuintoAndar",
+      "provider": "greenhouse",
+      "token": "quintoandar",
+      "careers_url": ""
+    },
+    {
+      "company": "railsware",
+      "provider": "greenhouse",
+      "token": "railsware",
+      "careers_url": "https://job-boards.eu.greenhouse.io/railsware",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "rebuildmanufacturing",
+      "provider": "greenhouse",
+      "token": "rebuildmanufacturing",
+      "careers_url": "https://job-boards.greenhouse.io/rebuildmanufacturing",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "reddit",
+      "provider": "greenhouse",
+      "token": "reddit",
+      "careers_url": "https://job-boards.greenhouse.io/reddit",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "redwoodmaterials",
+      "provider": "greenhouse",
+      "token": "redwoodmaterials",
+      "careers_url": "https://boards.greenhouse.io/redwoodmaterials",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "referralsuseonly",
+      "provider": "greenhouse",
+      "token": "referralsuseonly",
+      "careers_url": "https://job-boards.greenhouse.io/referralsuseonly",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "relativity",
+      "provider": "greenhouse",
+      "token": "relativity",
+      "careers_url": "https://boards.greenhouse.io/relativity",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Remote.com",
+      "provider": "greenhouse",
+      "token": "remotecom",
+      "careers_url": "https://remote.com/careers"
+    },
+    {
+      "company": "resortpass",
+      "provider": "greenhouse",
+      "token": "resortpass",
+      "careers_url": "https://job-boards.greenhouse.io/resortpass",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "revivn",
+      "provider": "greenhouse",
+      "token": "revivn",
+      "careers_url": "https://job-boards.greenhouse.io/revivn",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Ripple",
+      "provider": "greenhouse",
+      "token": "ripple",
+      "careers_url": "https://ripple.com/careers/"
+    },
+    {
+      "company": "Robinhood",
+      "provider": "greenhouse",
+      "token": "robinhood",
+      "careers_url": "https://careers.robinhood.com/"
+    },
+    {
+      "company": "robotsandpencils",
+      "provider": "greenhouse",
+      "token": "robotsandpencils",
+      "careers_url": "https://job-boards.greenhouse.io/robotsandpencils",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "SalesLoft",
+      "provider": "greenhouse",
+      "token": "salesloft",
+      "careers_url": "https://boards.greenhouse.io/salesloft",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "sbusa",
+      "provider": "greenhouse",
+      "token": "sbusa",
+      "careers_url": "https://job-boards.greenhouse.io/sbusa",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Scale AI",
+      "provider": "greenhouse",
+      "token": "scaleai",
+      "careers_url": ""
+    },
+    {
+      "company": "SecurityScorecard",
+      "provider": "greenhouse",
+      "token": "securityscorecard",
+      "careers_url": "https://securityscorecard.com/company/careers/"
+    },
+    {
+      "company": "Sedna",
+      "provider": "greenhouse",
+      "token": "sedna",
+      "careers_url": "https://boards.greenhouse.io/sedna",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "SentinelOne",
+      "provider": "greenhouse",
+      "token": "sentinellabs",
+      "careers_url": "https://boards.greenhouse.io/sentinellabs",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "simplisafe",
+      "provider": "greenhouse",
+      "token": "simplisafe",
+      "careers_url": "https://job-boards.greenhouse.io/simplisafe",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "SimScale",
+      "provider": "greenhouse",
+      "token": "simscale",
+      "careers_url": "https://boards.greenhouse.io/simscale",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "SingleStore",
+      "provider": "greenhouse",
+      "token": "singlestore",
+      "careers_url": "https://boards.greenhouse.io/singlestore",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "smarterdx",
+      "provider": "greenhouse",
+      "token": "smarterdx",
+      "careers_url": "https://job-boards.greenhouse.io/smarterdx",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "SoFi",
+      "provider": "greenhouse",
+      "token": "sofi",
+      "careers_url": "https://www.sofi.com/careers/"
+    },
+    {
+      "company": "Sourcegraph",
+      "provider": "greenhouse",
+      "token": "sourcegraph91",
+      "careers_url": "https://boards.greenhouse.io/sourcegraph91",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "spin",
+      "provider": "greenhouse",
+      "token": "spin",
+      "careers_url": "https://job-boards.greenhouse.io/spin",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "springhealth66",
+      "provider": "greenhouse",
+      "token": "springhealth66",
+      "careers_url": "https://job-boards.greenhouse.io/springhealth66",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Square/Block",
+      "provider": "greenhouse",
+      "token": "block",
+      "careers_url": "https://block.xyz/careers"
+    },
+    {
+      "company": "stackav",
+      "provider": "greenhouse",
+      "token": "stackav",
+      "careers_url": "https://job-boards.greenhouse.io/stackav",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "StackBlitz",
+      "provider": "greenhouse",
+      "token": "stackblitz",
+      "careers_url": "https://boards.greenhouse.io/stackblitz",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "startree",
+      "provider": "greenhouse",
+      "token": "startree",
+      "careers_url": "https://job-boards.greenhouse.io/startree",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Stone",
+      "provider": "greenhouse",
+      "token": "stone",
+      "careers_url": "https://stone.com.br/"
+    },
+    {
+      "company": "Strike",
+      "provider": "greenhouse",
+      "token": "strike",
+      "careers_url": "https://strike.me/careers/"
+    },
+    {
+      "company": "Stripe",
+      "provider": "greenhouse",
+      "token": "stripe",
+      "careers_url": "https://stripe.com/jobs"
+    },
+    {
+      "company": "Sumo Logic",
+      "provider": "greenhouse",
+      "token": "sumologic",
+      "careers_url": "https://www.sumologic.com/careers/"
+    },
+    {
+      "company": "Tailscale",
+      "provider": "greenhouse",
+      "token": "tailscale",
+      "careers_url": "https://tailscale.com/careers"
+    },
+    {
+      "company": "tatari",
+      "provider": "greenhouse",
+      "token": "tatari",
+      "careers_url": "https://job-boards.greenhouse.io/tatari",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "techholding",
+      "provider": "greenhouse",
+      "token": "techholding",
+      "careers_url": "https://job-boards.greenhouse.io/techholding",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "temporaltechnologies",
+      "provider": "greenhouse",
+      "token": "temporaltechnologies",
+      "careers_url": "https://job-boards.greenhouse.io/temporaltechnologies",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "thenewyorktimes",
+      "provider": "greenhouse",
+      "token": "thenewyorktimes",
+      "careers_url": "https://job-boards.greenhouse.io/thenewyorktimes",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "thetradedesk",
+      "provider": "greenhouse",
+      "token": "thetradedesk",
+      "careers_url": "https://job-boards.greenhouse.io/thetradedesk",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Thoughtworks",
+      "provider": "greenhouse",
+      "token": "thoughtworks",
+      "careers_url": ""
+    },
+    {
+      "company": "thoughtworksreferral",
+      "provider": "greenhouse",
+      "token": "thoughtworksreferral",
+      "careers_url": "https://job-boards.greenhouse.io/thoughtworksreferral",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Tide",
+      "provider": "greenhouse",
+      "token": "tide",
+      "careers_url": "https://boards.greenhouse.io/tide",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Together AI",
+      "provider": "greenhouse",
+      "token": "togetherai",
+      "careers_url": "https://www.together.ai/careers"
+    },
+    {
+      "company": "torcrobotics",
+      "provider": "greenhouse",
+      "token": "torcrobotics",
+      "careers_url": "https://job-boards.greenhouse.io/torcrobotics",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "toshibaglobalcommercesolutions",
+      "provider": "greenhouse",
+      "token": "toshibaglobalcommercesolutions",
+      "careers_url": "https://job-boards.greenhouse.io/toshibaglobalcommercesolutions",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "TrueLayer",
+      "provider": "greenhouse",
+      "token": "truelayer",
+      "careers_url": "https://truelayer.com/careers/"
+    },
+    {
+      "company": "Tulip Interfaces",
+      "provider": "greenhouse",
+      "token": "tulip",
+      "careers_url": "https://boards.greenhouse.io/tulip",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "turbineone",
+      "provider": "greenhouse",
+      "token": "turbineone",
+      "careers_url": "https://job-boards.greenhouse.io/turbineone",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Turing",
+      "provider": "greenhouse",
+      "token": "turing",
+      "careers_url": ""
+    },
+    {
+      "company": "Twilio",
+      "provider": "greenhouse",
+      "token": "twilio",
+      "careers_url": "https://www.twilio.com/company/jobs"
+    },
+    {
+      "company": "Upbound",
+      "provider": "greenhouse",
+      "token": "upbound",
+      "careers_url": "https://www.upbound.io/careers"
+    },
+    {
+      "company": "upgrade",
+      "provider": "greenhouse",
+      "token": "upgrade",
+      "careers_url": "https://job-boards.greenhouse.io/upgrade",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "vannevarlabs",
+      "provider": "greenhouse",
+      "token": "vannevarlabs",
+      "careers_url": "https://job-boards.greenhouse.io/vannevarlabs",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Veeam Software",
+      "provider": "greenhouse",
+      "token": "veeamsoftware",
+      "careers_url": "https://boards.greenhouse.io/veeamsoftware",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Vercel",
+      "provider": "greenhouse",
+      "token": "vercel",
+      "careers_url": "https://job-boards.greenhouse.io/vercel",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "vianttechnology",
+      "provider": "greenhouse",
+      "token": "vianttechnology",
+      "careers_url": "https://job-boards.greenhouse.io/vianttechnology",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "vonage",
+      "provider": "greenhouse",
+      "token": "vonage",
+      "careers_url": "https://job-boards.greenhouse.io/vonage",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "webflow",
+      "provider": "greenhouse",
+      "token": "webflow",
+      "careers_url": "https://job-boards.greenhouse.io/webflow",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "wppmedia",
+      "provider": "greenhouse",
+      "token": "wppmedia",
+      "careers_url": "https://job-boards.greenhouse.io/wppmedia",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "wrike",
+      "provider": "greenhouse",
+      "token": "wrike",
+      "careers_url": "https://job-boards.greenhouse.io/wrike",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "xAI",
+      "provider": "greenhouse",
+      "token": "xai",
+      "careers_url": ""
+    },
+    {
+      "company": "xebiacee",
+      "provider": "greenhouse",
+      "token": "xebiacee",
+      "careers_url": "https://job-boards.greenhouse.io/xebiacee",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "yoodliinc",
+      "provider": "greenhouse",
+      "token": "yoodliinc",
+      "careers_url": "https://job-boards.greenhouse.io/yoodliinc",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "yurtsai",
+      "provider": "greenhouse",
+      "token": "yurtsai",
+      "careers_url": "https://job-boards.greenhouse.io/yurtsai",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "zetaglobal",
+      "provider": "greenhouse",
+      "token": "zetaglobal",
+      "careers_url": "https://job-boards.greenhouse.io/zetaglobal",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "zscaler",
+      "provider": "greenhouse",
+      "token": "zscaler",
+      "careers_url": "https://job-boards.greenhouse.io/zscaler",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "acceldata",
+      "provider": "lever",
+      "token": "acceldata",
+      "careers_url": "https://jobs.lever.co/acceldata",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Anchorage Digital",
+      "provider": "lever",
+      "token": "anchorage",
+      "careers_url": "https://www.anchorage.com/careers"
+    },
+    {
+      "company": "base-flowa",
+      "provider": "lever",
+      "token": "base-flowa",
+      "careers_url": "https://jobs.lever.co/base-flowa",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "BlaBlaCar",
+      "provider": "lever",
+      "token": "blablacar",
+      "careers_url": "https://jobs.lever.co/blablacar",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "careernowbrands",
+      "provider": "lever",
+      "token": "careernowbrands",
+      "careers_url": "https://jobs.lever.co/careernowbrands",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "centuria",
+      "provider": "lever",
+      "token": "centuria",
+      "careers_url": "https://jobs.lever.co/centuria",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "CI&T",
+      "provider": "lever",
+      "token": "ciandt",
+      "careers_url": "https://ciandt.com/us/en-us/careers"
+    },
+    {
+      "company": "circadiahealth",
+      "provider": "lever",
+      "token": "circadiahealth",
+      "careers_url": "https://jobs.lever.co/circadiahealth",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "CleanSpark",
+      "provider": "lever",
+      "token": "cleanspark",
+      "careers_url": "https://www.cleanspark.com/careers/"
+    },
+    {
+      "company": "Cloudwalk",
+      "provider": "lever",
+      "token": "cloudwalk",
+      "careers_url": "https://www.cloudwalk.io/"
+    },
+    {
+      "company": "Coda",
+      "provider": "lever",
+      "token": "Coda",
+      "careers_url": "https://jobs.lever.co/Coda",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Crypto.com",
+      "provider": "lever",
+      "token": "crypto",
+      "careers_url": "https://crypto.com/careers"
+    },
+    {
+      "company": "dLocal",
+      "provider": "lever",
+      "token": "dlocal",
+      "careers_url": "https://www.dlocal.com/careers/"
+    },
+    {
+      "company": "Doxel",
+      "provider": "lever",
+      "token": "doxel",
+      "careers_url": "https://jobs.lever.co/doxel",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "esper",
+      "provider": "lever",
+      "token": "esper",
+      "careers_url": "https://jobs.lever.co/esper",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "everbridge",
+      "provider": "lever",
+      "token": "everbridge",
+      "careers_url": "https://jobs.lever.co/everbridge",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "filevine",
+      "provider": "lever",
+      "token": "filevine",
+      "careers_url": "https://jobs.lever.co/filevine",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "goswift",
+      "provider": "lever",
+      "token": "goswift",
+      "careers_url": "https://jobs.lever.co/goswift",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "gravisrobotics",
+      "provider": "lever",
+      "token": "gravisrobotics",
+      "careers_url": "https://jobs.lever.co/gravisrobotics",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Kpler",
+      "provider": "lever",
+      "token": "kpler",
+      "careers_url": "https://jobs.lever.co/kpler",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "kyivstar",
+      "provider": "lever",
+      "token": "kyivstar",
+      "careers_url": "https://jobs.lever.co/kyivstar",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Logz.io",
+      "provider": "lever",
+      "token": "logz",
+      "careers_url": "https://logz.io/careers/"
+    },
+    {
+      "company": "lumotive",
+      "provider": "lever",
+      "token": "lumotive",
+      "careers_url": "https://jobs.lever.co/lumotive",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Luxury Presence",
+      "provider": "lever",
+      "token": "luxurypresence",
+      "careers_url": "https://jobs.lever.co/luxurypresence"
+    },
+    {
+      "company": "magnetforensics",
+      "provider": "lever",
+      "token": "magnetforensics",
+      "careers_url": "https://jobs.lever.co/magnetforensics",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "mcaconnect",
+      "provider": "lever",
+      "token": "mcaconnect",
+      "careers_url": "https://jobs.lever.co/mcaconnect",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "megaport",
+      "provider": "lever",
+      "token": "megaport",
+      "careers_url": "https://jobs.lever.co/megaport",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "moonpay",
+      "provider": "lever",
+      "token": "moonpay",
+      "careers_url": "https://jobs.lever.co/moonpay",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Offchain Labs",
+      "provider": "lever",
+      "token": "offchainlabs",
+      "careers_url": "https://offchainlabs.com/careers"
+    },
+    {
+      "company": "ogury",
+      "provider": "lever",
+      "token": "ogury",
+      "careers_url": "https://jobs.lever.co/ogury",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "oxylabs",
+      "provider": "lever",
+      "token": "oxylabs",
+      "careers_url": "https://jobs.lever.co/oxylabs",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Palantir",
+      "provider": "lever",
+      "token": "palantir",
+      "careers_url": "https://www.palantir.com/careers/"
+    },
+    {
+      "company": "Pigment",
+      "provider": "lever",
+      "token": "pigment",
+      "careers_url": "https://jobs.lever.co/pigment",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Pipedrive",
+      "provider": "lever",
+      "token": "pipedrive",
+      "careers_url": "https://www.pipedrive.com/en/jobs"
+    },
+    {
+      "company": "qualysoft",
+      "provider": "lever",
+      "token": "qualysoft",
+      "careers_url": "https://jobs.lever.co/qualysoft",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "redhorsecorp",
+      "provider": "lever",
+      "token": "redhorsecorp",
+      "careers_url": "https://jobs.lever.co/redhorsecorp",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "rgi",
+      "provider": "lever",
+      "token": "rgi",
+      "careers_url": "https://jobs.lever.co/rgi",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "saviynt",
+      "provider": "lever",
+      "token": "saviynt",
+      "careers_url": "https://jobs.lever.co/saviynt",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Scaleway",
+      "provider": "lever",
+      "token": "scaleway",
+      "careers_url": "https://www.scaleway.com/en/jobs/"
+    },
+    {
+      "company": "shieldai",
+      "provider": "lever",
+      "token": "shieldai",
+      "careers_url": "https://jobs.lever.co/shieldai",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "shyftlabs",
+      "provider": "lever",
+      "token": "shyftlabs",
+      "careers_url": "https://jobs.lever.co/shyftlabs",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "SonarSource",
+      "provider": "lever",
+      "token": "sonarsource",
+      "careers_url": "https://jobs.lever.co/sonarsource",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Sonatype",
+      "provider": "lever",
+      "token": "sonatype",
+      "careers_url": "https://www.sonatype.com/company/careers"
+    },
+    {
+      "company": "Spotify",
+      "provider": "lever",
+      "token": "spotify",
+      "careers_url": "https://www.lifeatspotify.com/jobs"
+    },
+    {
+      "company": "synergyecp",
+      "provider": "lever",
+      "token": "synergyecp",
+      "careers_url": "https://jobs.lever.co/synergyecp",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "Sysdig",
+      "provider": "lever",
+      "token": "sysdig",
+      "careers_url": "https://sysdig.com/careers/"
+    },
+    {
+      "company": "truezerotech",
+      "provider": "lever",
+      "token": "truezerotech",
+      "careers_url": "https://jobs.lever.co/truezerotech",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "vo2-group",
+      "provider": "lever",
+      "token": "vo2-group",
+      "careers_url": "https://jobs.lever.co/vo2-group",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "wisecode",
+      "provider": "lever",
+      "token": "wisecode",
+      "careers_url": "https://jobs.lever.co/wisecode",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "yuno",
+      "provider": "lever",
+      "token": "yuno",
+      "careers_url": "https://jobs.lever.co/yuno",
+      "source": "career-ops-harvest"
+    },
+    {
+      "company": "zaimler",
+      "provider": "lever",
+      "token": "zaimler",
+      "careers_url": "https://jobs.lever.co/zaimler",
+      "source": "career-ops-harvest"
+    }
+  ],
+  "pending_token_discovery": [
+    "Aiven",
+    "Atlassian",
+    "Auth0",
+    "Buoyant",
+    "Cal.com",
+    "Chainalysis",
+    "Chainlink Labs",
+    "Chronosphere",
+    "Circle",
+    "Dagster Labs",
+    "dbt Labs",
+    "DigitalOcean",
+    "EPAM",
+    "Fly.io",
+    "GitHub",
+    "Globant",
+    "Groq",
+    "HashiCorp",
+    "Heroku",
+    "Hugging Face",
+    "iFood",
+    "Isovalent",
+    "Lacework",
+    "Mercado Libre",
+    "Meta",
+    "Mistral",
+    "NVIDIA",
+    "Pulumi",
+    "Rappi",
+    "Red Hat",
+    "Replicate",
+    "Retool",
+    "Revolut",
+    "Rippling",
+    "Salesforce",
+    "Sourcegraph",
+    "Splunk",
+    "Weights & Biases",
+    "Wise"
+  ],
+  "workday_watch": [
+    {
+      "company": "Visa (Pismo)",
+      "note": "No public board blast API; keep in WATCH.md and optional CXS single-job fetch",
+      "example_cxs": "https://visa.wd5.myworkdayjobs.com/wday/cxs/visa/Visa/job/BR---Remote---Brazil/Sr-Site-Reliability-Engineer_REF079180W"
+    }
+  ],
+  "workday_boards": [
+    {
+      "company": "Visa",
+      "tenant": "visa",
+      "site": "Visa",
+      "base": "https://visa.wd5.myworkdayjobs.com",
+      "careers_url": "https://visa.wd5.myworkdayjobs.com/Visa",
+      "search_text": "reliability OR platform OR devops OR kubernetes OR sre OR infrastructure"
+    },
+    {
+      "company": "Nortal",
+      "tenant": "nortal",
+      "site": "Nortal",
+      "base": "https://nortal.wd3.myworkdayjobs.com",
+      "careers_url": "https://nortal.wd3.myworkdayjobs.com/Nortal",
+      "search_text": "devops OR platform OR sre OR reliability OR kubernetes"
+    },
+    {
+      "company": "Block",
+      "tenant": "block",
+      "site": "Block",
+      "base": "https://block.wd1.myworkdayjobs.com",
+      "careers_url": "https://block.wd1.myworkdayjobs.com/en-US/Block",
+      "search_text": "sre OR platform OR devops OR infrastructure OR kubernetes",
+      "enabled": false,
+      "note": "token unknown; enable when CXS path verified"
+    }
+  ]
+}

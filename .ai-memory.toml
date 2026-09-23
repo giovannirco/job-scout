@@ -1,0 +1,10 @@
+workspace = "default"
+project = "job-scout"
+
+# Explicit project so static MCP clients (Grok) pass this pair.
+# project_strategy is ignored while project is set; worktrees
+# outside this tree still need their own marker.
+
+[briefing]
+inject_on_session_start = "true"
+max_chars = 8000

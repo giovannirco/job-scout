@@ -1,0 +1,6 @@
+apiVersion: v2
+name: job-scout
+description: job-scout — career control plane (api + worker + cronjobs)
+type: application
+version: 2.8.4
+appVersion: "2.8.4"

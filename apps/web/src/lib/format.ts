@@ -1,0 +1,65 @@
+export function ago(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const ms = Date.now() - new Date(iso).getTime();
+  if (Number.isNaN(ms)) return "—";
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.round(m / 60);
+  if (h < 48) return `${h}h`;
+  const d = Math.round(h / 24);
+  if (d < 60) return `${d}d`;
+  const mo = Math.round(d / 30);
+  return `${mo}mo`;
+}
+
+export function dateShort(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+export function dateTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+export function money(min: number | null, max: number | null, cur: string | null): string {
+  if (min == null && max == null) return "";
+  const c = cur || "USD";
+  const f = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(n));
+  const sym = c === "USD" ? "$" : c === "EUR" ? "€" : c === "GBP" ? "£" : c === "BRL" ? "R$" : `${c} `;
+  if (min != null && max != null && min !== max) return `${sym}${f(min)}–${f(max)}`;
+  return `${sym}${f((min ?? max) as number)}`;
+}
+
+export function score(n: number | null | undefined): string {
+  if (n == null) return "—";
+  return n.toFixed(1);
+}
+
+export function compact(n: number | null | undefined): string {
+  if (n == null) return "0";
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 10_000) return `${Math.round(n / 1000)}k`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return String(n);
+}
+
+export function titleCase(s: string | null | undefined): string {
+  if (!s) return "";
+  return s.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
+}
+
+export function host(url: string | null | undefined): string {
+  if (!url) return "";
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}

@@ -1,0 +1,15 @@
+{{- if .Values.dashboard.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "job-scout.fullname" . }}-dashboard
+  labels:
+    {{- include "job-scout.labels" . | nindent 4 }}
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: {{ .Values.dashboard.folder | quote }}
+    k8s-sidecar-target-directory: /tmp/dashboards/{{ .Values.dashboard.folder }}
+data:
+  job-scout.json: |-
+{{ .Files.Get "dashboards/job-scout.json" | indent 4 }}
+{{- end }}
