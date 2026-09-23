@@ -1,7 +1,7 @@
 import { Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Markdown } from "@/components/markdown";
-import { post, useApi, type Interview } from "@/lib/api";
+import { post, useApi, type Interview, type SystemInfo } from "@/lib/api";
 import { Btn } from "@/ui/kit";
 
 export function InterviewRoundBody({
@@ -16,6 +16,8 @@ export function InterviewRoundBody({
   tall?: boolean;
 }) {
   const q = useApi<Interview>(["interview", positionId, row.id], `/api/v1/positions/${positionId}/interviews/${row.id}`);
+  const sys = useApi<SystemInfo>(["system"], "/api/v1/settings/system", { staleTime: 30_000 });
+  const noKey = sys.data?.llmConfigured === false;
   const i = q.data;
   if (q.isLoading && !i) return <div className="mt-2 text-[11px] text-faint">Loading round…</div>;
   if (!i) return <div className="mt-2 text-[11px] text-bad">Could not load round.</div>;
@@ -57,7 +59,7 @@ export function InterviewRoundBody({
         </div>
       ) : null}
       <div className="flex justify-end">
-        <Btn size="xs" onClick={() => void brief()} disabled={!canBrief}>
+        <Btn size="xs" onClick={() => void brief()} disabled={!canBrief || noKey} title={noKey ? "Add a model key in Settings" : undefined}>
           <Sparkles className="h-3 w-3" /> {i.aiBriefMarkdown ? "Re-run AI brief" : "AI brief"}
         </Btn>
       </div>

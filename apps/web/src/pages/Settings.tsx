@@ -310,7 +310,7 @@ function GateTab() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <Input label="Max posting age (days, 0 = ignore)" type="number" value={gate.maxPostingAgeDays} onChange={(e) => setGate({ ...gate, maxPostingAgeDays: Number(e.target.value) })} />
           <Select label="Unknown geo" value={gate.allowUnknownGeo ? "pass" : "filter"} onChange={(e) => setGate({ ...gate, allowUnknownGeo: e.target.value === "pass" })}>
-            <option value="pass">send to triage</option>
+            <option value="pass">keep the listing</option>
             <option value="filter">filter out</option>
           </Select>
           <Input label="Triage PASS ≥" type="number" step="0.1" value={triage.passThreshold} onChange={(e) => setTriage({ ...triage, passThreshold: Number(e.target.value) })} />
