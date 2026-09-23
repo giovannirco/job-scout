@@ -10,6 +10,7 @@ import { StatusBadge } from "@/components/badges";
 import { ChatPanel } from "./Chat";
 import { useToday } from "./Frame";
 import { setUi, useUi, type DockTab } from "./store";
+import { foldWire } from "./wire-fold";
 
 export function Dock() {
   const ui = useUi();
@@ -111,7 +112,7 @@ function Wire({ rows, queue }: { rows: ActivityRow[]; queue: { status: string; t
         <div className="p-4 text-[12px] text-faint">Nothing has happened yet. Add a position or run discovery and the machine's work shows up here.</div>
       ) : (
         <ol className="py-1">
-          {rows.map((r, i) => {
+          {foldWire(rows).map(({ row: r, count }, i) => {
             const tone = toneFor(r.kind);
             return (
               <li key={r.id} className={cn("px-3 py-1.5 flex gap-2.5 text-[12px] hover:bg-surface-2/60", i === 0 && isNew && "wire-in")}>
@@ -127,7 +128,10 @@ function Wire({ rows, queue }: { rows: ActivityRow[]; queue: { status: string; t
                     <Link to="/positions/$id" params={{ id: r.slug }} className="block truncate text-[11px] text-muted hover:text-fg">
                       {r.company ? <span className="text-faint">{r.company} · </span> : null}
                       {r.positionTitle}
+                      {count > 1 ? <span className="text-faint"> ×{count}</span> : null}
                     </Link>
+                  ) : count > 1 ? (
+                    <div className="text-[11px] text-faint">×{count}</div>
                   ) : null}
                   <div className="font-mono text-[10px] text-faint">
                     {r.kind}
