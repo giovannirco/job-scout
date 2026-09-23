@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, lt, or, sql } from "drizzle-orm";
 import { boardDeltas, boardSnapshots, boardSources, discoveryFeed, getDb, id, positions } from "@job-scout/db";
 import { detectAts, externalIdentityFromDetect, listBoard, type AtsJob, type BoardJobSummary } from "@job-scout/ats";
 import { fetchJob as fetchJobFromUrl } from "./fetch-job.js";
@@ -241,6 +241,65 @@ export async function enqueueDueBoardScans(opts: { limit?: number; all?: boolean
     if (!q.deduped) enqueued++;
   }
   return { due: due.length, enqueued };
+}
+
+/** Re-apply the current gate to listings already stored in discovery. Newly passing rows are queued for intake. */
+export async function regateRecentDiscovery(hours = 24 * 7): Promise<{
+  checked: number;
+  nowPassed: number;
+  nowFiltered: number;
+  promoted: number;
+}> {
+  const db = await getDb();
+  const settings = await getSettings({ fresh: true });
+  const since = new Date(Date.now() - hours * 3_600_000);
+  const rows = await db
+    .select({
+      id: discoveryFeed.id,
+      title: discoveryFeed.title,
+      locationRaw: discoveryFeed.locationRaw,
+      postedAt: discoveryFeed.postedAt,
+      lane: discoveryFeed.lane,
+      gateReason: discoveryFeed.gateReason,
+      url: discoveryFeed.url,
+      positionId: discoveryFeed.positionId,
+      company: discoveryFeed.company,
+      externalIdentity: discoveryFeed.externalIdentity,
+    })
+    .from(discoveryFeed)
+    .where(gte(discoveryFeed.observedAt, since));
+
+  let nowPassed = 0;
+  let nowFiltered = 0;
+  let promoted = 0;
+  for (const row of rows) {
+    const verdict: GateVerdict = isNoiseJobTitle(row.title)
+      ? { pass: false, reason: "junk_title", matchedInclude: null }
+      : gateListing({ title: row.title, locationRaw: row.locationRaw, postedAt: row.postedAt }, settings.gate);
+    const lane = verdict.pass ? "passed" : "filtered";
+    if (lane === row.lane && (verdict.reason ?? null) === (row.gateReason ?? null)) continue;
+    await db
+      .update(discoveryFeed)
+      .set({ lane, gateReason: verdict.reason, metadata: { matchedInclude: verdict.matchedInclude } })
+      .where(eq(discoveryFeed.id, row.id));
+    if (lane === "passed" && row.lane !== "passed") {
+      nowPassed++;
+      if (!row.positionId && row.url) {
+        const q = await enqueueJob(
+          "scan_url",
+          { url: row.url, companyName: row.company ?? undefined },
+          { dedupeKey: `scan_url:${row.externalIdentity || row.url}`, priority: 50 },
+        );
+        if (!q.deduped) promoted++;
+      }
+    } else if (lane === "filtered" && row.lane === "passed") {
+      nowFiltered++;
+    }
+  }
+  if (nowPassed || nowFiltered) {
+    log.info("scan.regate", { checked: rows.length, nowPassed, nowFiltered, promoted, hours });
+  }
+  return { checked: rows.length, nowPassed, nowFiltered, promoted };
 }
 
 export async function followUpIntake(

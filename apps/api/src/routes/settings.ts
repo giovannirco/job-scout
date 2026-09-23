@@ -28,6 +28,7 @@ import {
   autopilotSummary,
   browserStatus,
   totalsToday,
+  regateRecentDiscovery,
 } from "@job-scout/core";
 import { applyAutopilotPreset, AUTOPILOT_PRESET_VALUES, LLM_OPERATION_IDS } from "@job-scout/shared";
 import { body, fail, ok } from "../envelope.js";
@@ -48,7 +49,12 @@ settingsRoutes.post("/notifications/test", async (c) => {
 
 settingsRoutes.patch("/", async (c) => {
   try {
-    return ok(c, await updateSettings(await body(c)));
+    const patch = await body(c);
+    const before = await getSettings({ fresh: true });
+    const next = await updateSettings(patch);
+    const gateChanged = patch.gate != null && JSON.stringify(before.gate) !== JSON.stringify(next.gate);
+    const regate = gateChanged ? await regateRecentDiscovery() : null;
+    return ok(c, next, regate ? { regate } : {});
   } catch (e) {
     return fail(c, "VALIDATION_ERROR", e instanceof Error ? e.message : String(e));
   }

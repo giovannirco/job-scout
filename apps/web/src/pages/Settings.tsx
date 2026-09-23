@@ -260,17 +260,15 @@ function GateTab() {
   async function save() {
     await patch("/api/v1/settings", { gate, triage, scan });
     void qc.invalidateQueries({ queryKey: ["settings"] });
-    toast.success("Gate saved");
+    void qc.invalidateQueries({ queryKey: ["radar"] });
+    void qc.invalidateQueries({ queryKey: ["today"] });
+    toast.success(JSON.stringify(gate) !== JSON.stringify(q.data?.gate) ? "Gate saved. Recent listings were checked again." : "Gate saved");
   }
 
   return (
     <div className="space-y-4 max-w-5xl">
       <p className="text-[12.5px] text-muted">
-        A listing must match one <b className="text-fg font-medium">title include</b> term, no <b className="text-fg font-medium">exclude</b> term, and no geo block. Rejects still show in{" "}
-        <Link to="/radar" search={{ lane: "filtered" }} className="text-accent hover:underline">
-          Radar › Filtered
-        </Link>
-        . Matching is case-insensitive substring.
+        A listing must match one <b className="text-fg font-medium">title include</b> term and no <b className="text-fg font-medium">exclude</b> term or geo block. A single word matches a whole word, so <span className="font-mono">java</span> does not match JavaScript. Saving rechecks listings seen in the last 7 days.
       </p>
       <div className="grid md:grid-cols-2 gap-3">
         <Panel title="Title include">
