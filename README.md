@@ -6,8 +6,8 @@
 |--|--|
 | **Stack** | TypeScript · Postgres (PGlite for dev/tests) · Hono API + embedded MCP · React 19 + Tailwind 4 · queue worker |
 | **LLM** | any OpenAI-compatible `/v1` (`OPENAI_BASE_URL`, `OPENAI_API_KEY`). One model per operation, chosen in Settings › AI from the gateway's live `/v1/models` |
-| **Browser** | optional dedicated [Steel Browser](https://github.com/steel-dev/steel-browser) + Playwright MCP (`apps/browser-job-scout`); render fallback for JS-only ATS pages and tools for the chat agent. Not the shared human Chrome at `the shared browser` |
-| **Live** | `http://localhost:8080` · MCP at `/mcp` (Bearer) |
+| **Browser** | optional [Steel Browser](https://github.com/steel-dev/steel-browser) + Playwright MCP. Empty `STEEL_BASE_URL` / `BROWSER_MCP_URL` means plain HTTP fetches |
+| **Local** | `http://localhost:8080` · MCP at `/mcp` (Bearer) |
 
 ## How a listing flows
 
@@ -38,18 +38,9 @@ How much runs unattended is a policy (Settings › Autopilot). Three presets plu
 
 Pipeline status never changes without an approval. A global daily call/token budget sits above the per-operation caps. Details in [docs/AI.md](./docs/AI.md).
 
-## WhatsApp (a WAHA server)
+## WhatsApp
 
-Product alerts go to dedicated groups via in-cluster WAHA (`WAHA_BASE_URL` + out-of-band `WAHA_API_KEY`). Settings › Notifications toggles events, chatIds, quiet hours (alerts delay overnight in America/Sao_Paulo; chat still replies), and a test send. **job-scout chat** inbound is a ClusterIP webhook (`POST /api/v1/webhooks/waha`, `X-Api-Key` = `WAHA_WEBHOOK_KEY`); only the `message` event is handled (`message.any` is ignored so one GOWS delivery does not double-reply). The desk agent runs on **grok-4.6** (intake a JD URL, talk process). It never applies.
-
-| group | chatId | traffic |
-|--|--|--|
-| **job-scout desk** | `` | PASS to decide, approvals, interview reminders, stale applied |
-| **job-scout new** | `` | triage PASS only |
-| **job-scout process** | `` | applied/screen/interview/offer, JD change or listing closed on hot |
-| **job-scout research** | `` | company research pack landed |
-| **job-scout chat** | `` | inbound desk agent |
-| **an engineering-only room** | `` | engineering loop only — **never** product alerts |
+Optional. Notifications are off until you set group chat ids under Settings › Notifications and provide `WAHA_BASE_URL` plus `WAHA_API_KEY`. Inbound desk chat is `POST /api/v1/webhooks/waha` with `X-Api-Key` = `WAHA_WEBHOOK_KEY`. Only the `message` event is handled. The agent can intake a job URL. It never applies.
 
 ## UI
 

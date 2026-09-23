@@ -60,7 +60,7 @@ WhatsApp **job-scout chat** (`packages/core/src/whatsapp-inbox.ts`) is the same 
 
 ## Browser plane
 
-Optional and **dedicated** to job-scout. `platform-gitops/apps/browser-job-scout` deploys [Steel Browser](https://github.com/steel-dev/steel-browser) with a [Playwright MCP](https://github.com/microsoft/playwright-mcp) sidecar in the same pod (Chrome's DevTools protocol only accepts `localhost` hosts, hence the sidecar). The shared human/Cursor/Grok Chrome stays at `platform-gitops/apps/browser` (`the shared browser UI`) and is not this process.
+Optional. Point `STEEL_BASE_URL` at a [Steel Browser](https://github.com/steel-dev/steel-browser) reserved for job-scout, and `BROWSER_MCP_URL` at a [Playwright MCP](https://github.com/microsoft/playwright-mcp) attached to that same browser. Chrome's DevTools socket only accepts `localhost`, so the MCP process has to sit next to that browser. Leave both variables empty to skip the browser.
 
 | env | used by | for |
 |--|--|--|

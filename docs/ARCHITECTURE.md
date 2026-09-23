@@ -60,9 +60,9 @@ Both api and worker import `@job-scout/core`; there is no HTTP between them, the
 |--|--|
 | **Postgres** | positions, JD revisions, evaluations, materials, timeline, boards/snapshots/deltas, discovery feed, jobs, LLM runs, settings, approvals, chat threads, notification outbox |
 | **Settings row** | one JSON document (`settings` table) validated by `packages/shared/src/settings.ts`: gate, triage thresholds, per-operation models, autopilot policy, chat permissions, WhatsApp notifications, retention, scan cadence |
-| **WhatsApp** | a WAHA server session `default`. ConfigMap `WAHA_BASE_URL`/`WAHA_SESSION`; Secret `job-scout-waha` (`WAHA_API_KEY`, `WAHA_WEBHOOK_KEY`). Outbound = worker `sendText` flush of `notification_outbox`. Inbound = ClusterIP webhook `POST /api/v1/webhooks/waha` (`message` only; `message.any` is ignored). GOWS GET `/messages` is fromMe-only so poll cannot see allowlisted senders. Groups: desk / new / process / research / chat. **an engineering-only room** is engineering-only |
-| **career-ops** (separate repo) | its own markdown tracker and reports; linked to positions through `positions.metadata.careerOps` |
-| **Browser plane** | dedicated GitOps app (`platform-gitops/apps/browser-job-scout`): job-scout Steel + Playwright MCP sidecar. Shared human Chrome is `apps/browser`. job-scout only holds its URLs in env |
+| **WhatsApp** | optional WAHA server. `WAHA_BASE_URL` / `WAHA_SESSION` plus Secret keys `WAHA_API_KEY` and `WAHA_WEBHOOK_KEY`. Outbound = worker `sendText` flush of `notification_outbox`. Inbound = `POST /api/v1/webhooks/waha` (`message` only). Groups are whatever chat ids you save in Settings |
+| **External tracker** | optional. Positions can store a link in `positions.metadata.careerOps` |
+| **Browser plane** | optional Steel Browser plus a Playwright MCP next to it. job-scout only holds the URLs in env |
 
 ## Auth
 
