@@ -282,6 +282,7 @@ positionsRoutes.post("/:id/interviews/:interviewId/brief", async (c) => {
   const interviewId = c.req.param("interviewId");
   const sync = c.req.query("sync") === "1";
   try {
+    if (!llmConfigured()) return fail(c, "VALIDATION_ERROR", "No model key is set. Add one in Settings before this can run.");
     if (!sync) {
       const q = await enqueueInterviewBrief(p.id, interviewId);
       if (!q) return fail(c, "NOT_FOUND", "interview not found");

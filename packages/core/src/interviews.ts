@@ -317,6 +317,8 @@ export async function getInterviewById(interviewId: string) {
 
 async function maybeEnqueueBrief(positionId: string, interviewId: string, transcript: string | null, skip?: boolean) {
   if (skip || !transcript?.trim()) return null;
+  const { llmConfigured } = await import("./llm.js");
+  if (!llmConfigured()) return null;
   const q = await enqueueJob("interview_brief", { positionId, interviewId }, { dedupeKey: `interview_brief:${interviewId}`, priority: 25 });
   return q.id;
 }
