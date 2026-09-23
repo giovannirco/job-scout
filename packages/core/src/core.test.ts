@@ -300,6 +300,32 @@ describe("core on pglite", () => {
     expect(queued.some((r) => (r.payload as { url?: string }).url?.includes("java-regate"))).toBe(true);
   });
 
+  it("uses target roles as the title gate and rechecks a stored java listing", async () => {
+    const { titleIncludesFromRoles, syncGateFromTargetRoles } = await import("./profile.js");
+    const { getSettings } = await import("./settings.js");
+    const { getDb, discoveryFeed, id } = await import("@job-scout/db");
+    const { eq } = await import("drizzle-orm");
+    expect(titleIncludesFromRoles([" Java Engineer ", "java engineer", "SRE", "a"])).toEqual(["java engineer", "sre"]);
+    const db = await getDb();
+    const rowId = id("df");
+    await db.insert(discoveryFeed).values({
+      id: rowId,
+      externalIdentity: "greenhouse:acme:role-sync",
+      company: "Acme",
+      title: "Senior Java Engineer",
+      url: "https://boards.greenhouse.io/acme/jobs/role-sync",
+      locationRaw: "Remote",
+      lane: "filtered",
+      gateReason: "title_no_include",
+      observedAt: new Date(),
+    });
+    const synced = await syncGateFromTargetRoles(["Java Engineer"]);
+    expect(synced?.titleInclude).toEqual(["java engineer"]);
+    expect((await getSettings({ fresh: true })).gate.titleInclude).toEqual(["java engineer"]);
+    const row = (await db.select().from(discoveryFeed).where(eq(discoveryFeed.id, rowId)))[0];
+    expect(row?.lane).toBe("passed");
+  });
+
   it("listDiscovery attaches an existing position by ATS identity when positionId is missing", async () => {
     const { upsertFromJob } = await import("./positions.js");
     const { listDiscovery } = await import("./radar.js");
