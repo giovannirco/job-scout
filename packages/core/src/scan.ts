@@ -105,6 +105,8 @@ export async function scanBoard(boardId: string, opts: { force?: boolean } = {})
           locationRaw: j.locationRaw || null,
           lane,
           gateReason: verdict.reason,
+          geoClass: geoClass(j.locationRaw || ""),
+          craftFamily: craftFamily(j.title),
           observedAt: nowIso,
           postedAt: j.postedAt ? new Date(j.postedAt) : null,
         },

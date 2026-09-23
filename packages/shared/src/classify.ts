@@ -15,7 +15,19 @@ const GEO_FRIENDLY_RE =
 const GEO_AMBIGUOUS_MARKERS = /\bremote\b|\bremoto\b|\bdistributed\b|\bremote[\s-]*first\b|^all$/i;
 
 const BRAZIL_PLACE = /\b(brazil|brasil|s[aã]o paulo|rio de janeiro|belo horizonte|curitiba|porto alegre|recife|florian[oó]polis|bras[ií]lia)\b/i;
-const FOREIGN_REGION = /\b(namer|north america|united states|us|usa|canada|uk|eu|emea|europe|india|united kingdom|netherlands|argentina|chile|colombia|peru|uruguay|paraguay|mexico|bolivia|ecuador|turkey|t[uü]rkiye)\b/i;
+const FOREIGN_REGION = /\b(namer|north america|united states|us|usa|canada|uk|eu|emea|europe|apac|india|united kingdom|netherlands|argentina|chile|colombia|peru|uruguay|paraguay|mexico|bolivia|ecuador|turkey|t[uü]rkiye|spain|ireland|greece|portugal|poland|romania|australia|norway|israel|switzerland|germany|france|italy|hungary|japan|sweden|denmark|finland|belgium|austria|czechia|czech republic|south africa|new zealand|south korea|korea|taiwan|hong kong|singapore)\b/i;
+
+// Cities the board list names without "only" or "onsite". A single named place is a restriction.
+const HARD_CITY =
+  /\b(seattle|san francisco|new york|bay area|palo alto|bangalore|bengaluru|melbourne|boston|austin|los angeles|mountain view|redmond|bellevue)\b/i;
+
+const US_STATE_ABBR = new Set(
+  "AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC".split(
+    " ",
+  ),
+);
+
+const FRIENDLY_PLACE = /\b(latam|latin america|americas|worldwide|anywhere|global)\b/i;
 
 const GEO_EXCLUSIVITY_RE = /\b(only|must\s+reside|must\s+be\s+located|must\s+live)\b/i;
 
@@ -86,6 +98,15 @@ export function isTzOverlapLocation(location = ""): boolean {
   return locationSegments(location).length >= 3;
 }
 
+function segmentIsUsState(segment: string): boolean {
+  const s = segment.trim();
+  return US_STATE_ABBR.has(s);
+}
+
+function specificPlace(location: string): boolean {
+  return FOREIGN_REGION.test(location) || HARD_CITY.test(location) || locationSegments(location).some(segmentIsUsState);
+}
+
 export function geoClass(
   location = "",
   workplace = "",
@@ -97,7 +118,8 @@ export function geoClass(
   if (GEO_EXCLUSIVITY_RE.test(blob) && FOREIGN_REGION.test(blob) && !BRAZIL_PLACE.test(blob)) return "hard_geo";
   if (BRAZIL_PLACE.test(location)) return "brazil_friendly";
   if (/\b(amer|samer|south america)\b/i.test(blob)) return "worldwideish";
-  if (FOREIGN_REGION.test(location) && !isTzOverlapLocation(location) && !/\b(latam|latin america|americas|worldwide|anywhere|global)\b/i.test(location)) return "hard_geo";
+  // One country or city is a place restriction. A friendly token (LATAM, worldwide) still wins.
+  if (specificPlace(location) && !isTzOverlapLocation(location) && !FRIENDLY_PLACE.test(location)) return "hard_geo";
   // Hard geo can appear with "remote" — check hard before ambiguous, but after brazil/worldwide friendly
   if (GEO_FRIENDLY_RE.test(blob)) {
     return /brazil|brasil|latam|latin\s*america/i.test(blob)
@@ -107,6 +129,8 @@ export function geoClass(
   if (GEO_EXCLUSIVITY_RE.test(blob)) return "hard_geo";
   if (isTzOverlapLocation(location)) {
     if (GEO_AMBIGUOUS_MARKERS.test(blob)) return "ambiguous_remote";
+    // Several offices and no remote marker: still a place, not "we could not tell".
+    if (specificPlace(location) && !FRIENDLY_PLACE.test(location) && !BRAZIL_PLACE.test(location)) return "hard_geo";
     return "unknown";
   }
   if (GEO_HARD_RE.test(blob)) return "hard_geo";
