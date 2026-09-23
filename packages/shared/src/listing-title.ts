@@ -92,6 +92,8 @@ export function titleFromSlug(slug?: string | null, companySlug?: string | null)
 /** Collapse whitespace. Boards sometimes send a trailing space or a cut-off line. */
 export function cleanJobTitle(title?: string | null): string {
   let text = (title || "").replace(/\s+/g, " ").trim();
+  text = text.replace(/([A-Za-z])-\s+(?=[A-Za-z])/g, "$1 - ");
+  text = text.replace(/\s+-\s*(?=[A-Za-z])/g, " - ");
   const open = text.lastIndexOf("(");
   const close = text.lastIndexOf(")");
   if (open > 0 && open > close && /[-–—]\s*$/.test(text.slice(open + 1))) {

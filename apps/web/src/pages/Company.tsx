@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { ListingBadge, ScoreMeter, StatusBadge } from "@/components/badges";
 import { Markdown } from "@/components/markdown";
 import { openDock, useChatScope } from "@/frame/store";
-import { post, useApi, type CompanyDetail } from "@/lib/api";
+import { post, useApi, type CompanyDetail, type SystemInfo } from "@/lib/api";
 import { ago, dateTime, host, money } from "@/lib/format";
 import { Btn, Card, Chip, Dot, Empty, ErrorNote, IconBtn, Loading, Monogram, Page, Panel, Table, Td, Th, Tr, cn } from "@/ui/kit";
 
@@ -14,6 +14,8 @@ export function CompanyPage() {
   const { id } = useParams({ from: "/companies/$id" });
   const [poll, setPoll] = useState(false);
   const q = useApi<CompanyDetail>(["company", id], `/api/v1/companies/${id}`, { refetchInterval: poll ? 4000 : false });
+  const sys = useApi<SystemInfo>(["system"], "/api/v1/settings/system", { staleTime: 30_000 });
+  const noKey = sys.data?.llmConfigured === false;
   const qc = useQueryClient();
   const navigate = useNavigate();
   const c = q.data;
@@ -78,7 +80,7 @@ export function CompanyPage() {
             <div className="font-display text-[22px] font-semibold tabular leading-none">{open.length}</div>
             <div className="eyebrow mt-0.5">open · {hot} hot</div>
           </div>
-          <Btn variant={c.research ? "default" : "primary"} onClick={research}>
+          <Btn variant={c.research ? "default" : "primary"} disabled={noKey} title={noKey ? "Add a model key in Settings" : undefined} onClick={research}>
             <Sparkles className="h-3.5 w-3.5" /> {c.research ? "Refresh research" : "Research"}
           </Btn>
           <IconBtn label="Chat about this company" onClick={() => openDock("chat")}>

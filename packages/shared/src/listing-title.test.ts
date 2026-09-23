@@ -12,6 +12,9 @@ describe("cleanJobTitle", () => {
   it("drops a parenthesis the board cut off mid-word", () => {
     expect(cleanJobTitle("Senior Software Engineer, Backend (Institutional -")).toBe("Senior Software Engineer, Backend");
     expect(cleanJobTitle("Backend Engineer (Platform)")).toBe("Backend Engineer (Platform)");
+    expect(cleanJobTitle("Software Engineer- Money Movement")).toBe("Software Engineer - Money Movement");
+    expect(cleanJobTitle("Senior Software Engineer -Observability")).toBe("Senior Software Engineer - Observability");
+    expect(cleanJobTitle("Core Software Engineer (C++) - Remote")).toBe("Core Software Engineer (C++) - Remote");
   });
 });
 
