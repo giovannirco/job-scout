@@ -10,7 +10,7 @@ import { StatusMenu, useStatusChange } from "@/components/status-menu";
 import { openDock, useChatScope } from "@/frame/store";
 import { INTERVIEW_OUTCOMES, INTERVIEW_STAGES, INTERVIEW_STATUSES, changeKindLabel, fitsHomeMarket, humanDiffSummary, isCompanyNameLocation } from "@job-scout/shared";
 import { api, del, patch, post, qs, useApi, type Evaluation, type Interview, type Material, type Person, type PipelineStatus, type PositionDetail, type Profile, type Revision, type SystemInfo, type TimelineEvent, type TriageJson } from "@/lib/api";
-import { ago, createdFromLabel, dateShort, dateTime, employmentLabel, host, jdChangedAt, money, questionStatusLabel, sourceLabel, titleCase } from "@/lib/format";
+import { ago, createdFromLabel, dateShort, dateTime, employmentLabel, host, jdChangedAt, money, questionStatusLabel, readableJd, sourceLabel, titleCase } from "@/lib/format";
 import { Btn, Card, Chip, Dot, Empty, ErrorNote, Field, IconBtn, Input, Loading, Monogram, Page, Panel, Select, SortHead, Tabs, Textarea, TONE_DOT, TONE_TEXT, cn } from "@/ui/kit";
 
 type Tab = "brief" | "evaluation" | "jd" | "materials" | "forms" | "company" | "history";
@@ -322,7 +322,7 @@ function BriefTab({ p, noKey, home, onTriage }: { p: PositionDetail; noKey: bool
 
         {p.jd?.descriptionText ? (
           <Panel title="Job description" meta={`rev ${p.jd.revision}`} bodyClass="max-h-[520px] overflow-y-auto">
-            <div className="prewrap text-[12.5px] text-fg/90 leading-relaxed">{p.jd.descriptionText}</div>
+            <div className="prewrap text-[12.5px] text-fg/90 leading-relaxed">{readableJd(p.jd.descriptionText)}</div>
           </Panel>
         ) : null}
       </div>
@@ -544,7 +544,7 @@ function JdTab({ p }: { p: PositionDetail }) {
                 ))}
               </div>
             ) : null}
-            <div className="prewrap text-[12.5px] text-fg/90 leading-relaxed">{r.data.descriptionText || <span className="text-faint">No text.</span>}</div>
+            <div className="prewrap text-[12.5px] text-fg/90 leading-relaxed">{r.data.descriptionText ? readableJd(r.data.descriptionText) : <span className="text-faint">No text.</span>}</div>
           </div>
         ) : (
           <Empty>No JD text.</Empty>

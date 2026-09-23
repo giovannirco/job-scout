@@ -73,7 +73,7 @@ export function PipelinePage() {
               }}
             >
               <Search className="h-3.5 w-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-faint" />
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Title, company…" className="w-[220px] h-8 rounded-md border border-border bg-bg pl-7 pr-7 text-[12.5px] outline-none focus:border-accent placeholder:text-faint" />
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Title, company, location…" className="w-[240px] h-8 rounded-md border border-border bg-bg pl-7 pr-7 text-[12.5px] outline-none focus:border-accent placeholder:text-faint" />
               {q ? (
                 <button type="button" onClick={() => (setQ(""), set({ q: undefined }))} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-faint hover:text-fg" aria-label="Clear search">
                   <X className="h-3.5 w-3.5" />
@@ -138,6 +138,7 @@ export function PipelinePage() {
             <option value="updated_desc">recently updated</option>
             <option value="score_desc">triage score</option>
             <option value="first_seen_desc">first seen</option>
+            <option value="posted_desc">posted</option>
             <option value="last_changed_desc">last changed</option>
             <option value="company_asc">company</option>
             <option value="status_asc">status</option>
@@ -243,6 +244,9 @@ function PositionsTable({ rows, home }: { rows: PositionRow[]; home?: string | n
             <SortHead label="Status" field="status" sort={search.sort} onSort={sortTo} />
           </Th>
           <Th right>
+            <SortHead label="Posted" field="posted" sort={search.sort} onSort={sortTo} />
+          </Th>
+          <Th right>
             <SortHead label="First seen" field="first_seen" sort={search.sort} onSort={sortTo} />
           </Th>
           <Th right>
@@ -295,6 +299,9 @@ function PositionsTable({ rows, home }: { rows: PositionRow[]; home?: string | n
                 <ListingBadge status={r.listingStatus} />
                 {r.watchEnabled ? <Eye className="h-3 w-3 text-faint" aria-label="watched" /> : null}
               </div>
+            </Td>
+            <Td right mono className="text-muted" title={r.postedAt || undefined}>
+              {r.postedAt ? ago(r.postedAt) : <span className="text-faint">—</span>}
             </Td>
             <Td right mono className="text-muted">
               {r.firstSeenAt ? ago(r.firstSeenAt) : <span className="text-faint">—</span>}
@@ -354,7 +361,13 @@ function Board({ rows }: { rows: PositionRow[] }) {
                       <div className="text-[12.5px] leading-snug line-clamp-2">{r.title}</div>
                       {r.locationRaw ? <div className="text-[11px] text-muted truncate mt-1">{r.locationRaw}</div> : null}
                       {money(r.salaryMin, r.salaryMax, r.salaryCurrency) ? <div className="text-[11px] font-mono text-fg truncate mt-1">{money(r.salaryMin, r.salaryMax, r.salaryCurrency)}</div> : null}
-                      {r.firstSeenAt ? <div className="text-[10.5px] font-mono text-faint tabular mt-1">seen {ago(r.firstSeenAt)}</div> : null}
+                      {r.postedAt || r.firstSeenAt ? (
+                        <div className="text-[10.5px] font-mono text-faint tabular mt-1">
+                          {r.postedAt ? `posted ${ago(r.postedAt)}` : ""}
+                          {r.postedAt && r.firstSeenAt ? " · " : ""}
+                          {r.firstSeenAt ? `seen ${ago(r.firstSeenAt)}` : ""}
+                        </div>
+                      ) : null}
                     </Link>
                     <div className="flex items-center justify-between mt-2">
                       <ScoreMeter score={r.triageScore} verdict={r.triageVerdict} />

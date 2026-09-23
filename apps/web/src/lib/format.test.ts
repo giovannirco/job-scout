@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countLabel, createdFromLabel, employmentLabel, jdChangedAt, money, questionStatusLabel, sourceLabel } from "./format.js";
+import { countLabel, createdFromLabel, employmentLabel, jdChangedAt, money, questionStatusLabel, readableJd, sourceLabel } from "./format.js";
 
 describe("jdChangedAt", () => {
   it("ignores a change stamp that is the first snapshot", () => {
@@ -47,6 +47,12 @@ describe("questionStatusLabel", () => {
     expect(questionStatusLabel("open")).toBe("unanswered");
     expect(questionStatusLabel("answered")).toBe("answered");
     expect(questionStatusLabel("skipped")).toBe("skipped");
+  });
+});
+
+describe("readableJd", () => {
+  it("collapses the blank runs boards leave between sections", () => {
+    expect(readableJd("Intro\n\n\n\nWhat you will do\n")).toBe("Intro\n\nWhat you will do");
   });
 });
 

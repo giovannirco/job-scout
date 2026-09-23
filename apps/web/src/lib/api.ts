@@ -56,6 +56,7 @@ export type PositionRow = {
   watchEnabled: boolean;
   appliedAt: string | null;
   firstSeenAt: string | null;
+  postedAt?: string | null;
   lastChangedAt: string | null;
   triagedAt: string | null;
   updatedAt: string;
