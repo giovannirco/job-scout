@@ -407,6 +407,49 @@ describe("core on pglite", () => {
     expect((await regateRecentDiscovery()).withdrawn).toBe(0);
   });
 
+  it("repairs discovery promotions that were stored as manual and now miss the title gate", async () => {
+    const { repairMisstampedDiscoveryFilings, regateRecentDiscovery } = await import("./scan.js");
+    const { updateSettings } = await import("./settings.js");
+    const { upsertFromJob, getPosition, patchPosition } = await import("./positions.js");
+    const { getDb, discoveryFeed, id } = await import("@job-scout/db");
+    const db = await getDb();
+    await updateSettings({
+      gate: {
+        titleInclude: ["software engineer"],
+        titleExclude: ["junior", "early career"],
+        geoAllow: ["remote"],
+        geoBlock: [],
+        maxPostingAgeDays: 0,
+        allowUnknownGeo: true,
+      },
+    });
+    const stuck = await upsertFromJob(job({
+      jobId: "early-stuck",
+      externalIdentity: "greenhouse:stripe:early-stuck",
+      url: "https://boards.greenhouse.io/stripe/jobs/early-stuck",
+      title: "Software Engineer, Early Career — Immediate Start",
+    }), { source: "manual" });
+    const noted = await upsertFromJob(job({
+      jobId: "early-noted",
+      externalIdentity: "greenhouse:stripe:early-noted",
+      url: "https://boards.greenhouse.io/stripe/jobs/early-noted",
+      title: "Software Engineer, Early Career — Immediate Start",
+    }), { source: "manual" });
+    await patchPosition(noted.position.id, { notes: "pasted on purpose" });
+    const observedAt = new Date();
+    await db.insert(discoveryFeed).values([
+      { id: id("df"), externalIdentity: "greenhouse:stripe:early-stuck", company: "Stripe", title: stuck.position.title, url: stuck.position.primaryUrl, locationRaw: "Remote", lane: "filtered", gateReason: "title_exclude:early career", positionId: stuck.position.id, observedAt },
+      { id: id("df"), externalIdentity: "greenhouse:stripe:early-noted", company: "Stripe", title: noted.position.title, url: noted.position.primaryUrl, locationRaw: "Remote", lane: "filtered", gateReason: "title_exclude:early career", positionId: noted.position.id, observedAt },
+    ]);
+    const repaired = await repairMisstampedDiscoveryFilings();
+    expect(repaired.withdrawn).toBeGreaterThanOrEqual(1);
+    expect((await getPosition(stuck.position.id))?.status).toBe("archived");
+    expect((await getPosition(stuck.position.id))?.archiveReason).toBe("left the title gate (title_exclude:early career)");
+    expect((await getPosition(noted.position.id))?.status).toBe("triaged");
+    expect((await regateRecentDiscovery()).withdrawn).toBe(0);
+    expect((await getPosition(noted.position.id))?.status).toBe("triaged");
+  });
+
   it("returns one company when the same name is created together", async () => {
     const { resolveCompanyForName } = await import("./companies.js");
     const name = `Parallel Labs ${Date.now()}`;
