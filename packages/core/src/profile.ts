@@ -2,6 +2,8 @@ import { eq } from "drizzle-orm";
 import { getDb, id, profiles } from "@job-scout/db";
 import { DEFAULT_SCOUT_BRIEF } from "@job-scout/llm";
 import { createHash } from "node:crypto";
+import { updateSettings } from "./settings.js";
+import { regateRecentDiscovery } from "./scan.js";
 
 export type Profile = typeof profiles.$inferSelect;
 
@@ -58,4 +60,30 @@ export async function updateProfile(patch: Record<string, unknown>): Promise<Pro
 
 export function briefOf(p: Profile): string {
   return (p.scoutBrief || DEFAULT_SCOUT_BRIEF).trim();
+}
+
+/** Lowercased title-gate terms from profile target roles. Drops blanks and duplicates. */
+export function titleIncludesFromRoles(roles: unknown): string[] {
+  if (!Array.isArray(roles)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const role of roles) {
+    const term = String(role).trim().toLowerCase();
+    if (term.length < 2 || seen.has(term)) continue;
+    seen.add(term);
+    out.push(term);
+  }
+  return out;
+}
+
+/** Point the title gate at these roles and recheck listings already in discovery. */
+export async function syncGateFromTargetRoles(roles: string[]): Promise<{
+  titleInclude: string[];
+  regate: Awaited<ReturnType<typeof regateRecentDiscovery>>;
+} | null> {
+  const titleInclude = titleIncludesFromRoles(roles);
+  if (!titleInclude.length) return null;
+  await updateSettings({ gate: { titleInclude } });
+  const regate = await regateRecentDiscovery();
+  return { titleInclude, regate };
 }
