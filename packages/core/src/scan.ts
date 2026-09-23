@@ -2,10 +2,10 @@ import { and, desc, eq, gte, isNull, lt, or, sql } from "drizzle-orm";
 import { boardDeltas, boardSnapshots, boardSources, discoveryFeed, getDb, id, positions } from "@job-scout/db";
 import { detectAts, externalIdentityFromDetect, listBoard, type AtsJob, type BoardJobSummary } from "@job-scout/ats";
 import { fetchJob as fetchJobFromUrl } from "./fetch-job.js";
-import { craftFamily, gateListing, geoClass, isNoiseJobTitle, parseClipListing, type GateVerdict } from "@job-scout/shared";
+import { craftFamily, gateListing, geoClass, isNoiseJobTitle, parseClipListing, type GateConfig, type GateVerdict } from "@job-scout/shared";
 import { enqueueJob } from "./jobs.js";
 import { llmConfigured } from "./llm.js";
-import { upsertFromJob } from "./positions.js";
+import { archivePosition, upsertFromJob } from "./positions.js";
 import { getSettings } from "./settings.js";
 import { boardErrorKind, type BoardErrorKind } from "./board-reconcile.js";
 import type { PositionStatus } from "@job-scout/db";
@@ -243,12 +243,51 @@ export async function enqueueDueBoardScans(opts: { limit?: number; all?: boolean
   return { due: due.length, enqueued };
 }
 
+function titleGateMiss(title: string, gate: GateConfig): string | null {
+  const verdict = gateListing(
+    { title, locationRaw: "Remote" },
+    { ...gate, maxPostingAgeDays: 0, geoAllow: ["remote"], geoBlock: [], allowUnknownGeo: true },
+  );
+  if (verdict.pass) return null;
+  if (verdict.reason === "title_no_include" || verdict.reason?.startsWith("title_exclude:")) return verdict.reason;
+  return null;
+}
+
+/** Archive a scan filing the operator has not touched when its title no longer matches. */
+async function withdrawUntouchedScanPosition(positionId: string, gate: GateConfig): Promise<boolean> {
+  const db = await getDb();
+  const pos = (
+    await db
+      .select({
+        id: positions.id,
+        title: positions.title,
+        status: positions.status,
+        triagedAt: positions.triagedAt,
+        triageVerdict: positions.triageVerdict,
+        source: positions.source,
+        notes: positions.notes,
+        priority: positions.priority,
+        watchEnabled: positions.watchEnabled,
+      })
+      .from(positions)
+      .where(eq(positions.id, positionId))
+      .limit(1)
+  )[0];
+  if (!pos || pos.status !== "triaged" || pos.triagedAt || pos.triageVerdict) return false;
+  if (!pos.source?.startsWith("scan:") || pos.notes?.trim() || pos.priority !== "P2" || pos.watchEnabled) return false;
+  const reason = titleGateMiss(pos.title, gate);
+  if (!reason) return false;
+  await archivePosition(pos.id, `left the title gate (${reason})`, "scan");
+  return true;
+}
+
 /** Re-apply the current gate to listings already stored in discovery. Newly passing rows are queued for intake. */
 export async function regateRecentDiscovery(hours = 24 * 7): Promise<{
   checked: number;
   nowPassed: number;
   nowFiltered: number;
   promoted: number;
+  withdrawn: number;
 }> {
   const db = await getDb();
   const settings = await getSettings({ fresh: true });
@@ -272,11 +311,18 @@ export async function regateRecentDiscovery(hours = 24 * 7): Promise<{
   let nowPassed = 0;
   let nowFiltered = 0;
   let promoted = 0;
+  let withdrawn = 0;
+  const considered = new Set<string>();
   for (const row of rows) {
     const verdict: GateVerdict = isNoiseJobTitle(row.title)
       ? { pass: false, reason: "junk_title", matchedInclude: null }
       : gateListing({ title: row.title, locationRaw: row.locationRaw, postedAt: row.postedAt }, settings.gate);
     const lane = verdict.pass ? "passed" : "filtered";
+    const titleMiss = !verdict.pass && (verdict.reason === "title_no_include" || verdict.reason?.startsWith("title_exclude:"));
+    if (titleMiss && row.positionId && !considered.has(row.positionId)) {
+      considered.add(row.positionId);
+      if (await withdrawUntouchedScanPosition(row.positionId, settings.gate)) withdrawn++;
+    }
     if (lane === row.lane && (verdict.reason ?? null) === (row.gateReason ?? null)) continue;
     await db
       .update(discoveryFeed)
@@ -296,10 +342,10 @@ export async function regateRecentDiscovery(hours = 24 * 7): Promise<{
       nowFiltered++;
     }
   }
-  if (nowPassed || nowFiltered) {
-    log.info("scan.regate", { checked: rows.length, nowPassed, nowFiltered, promoted, hours });
+  if (nowPassed || nowFiltered || withdrawn) {
+    log.info("scan.regate", { checked: rows.length, nowPassed, nowFiltered, promoted, withdrawn, hours });
   }
-  return { checked: rows.length, nowPassed, nowFiltered, promoted };
+  return { checked: rows.length, nowPassed, nowFiltered, promoted, withdrawn };
 }
 
 export async function followUpIntake(
