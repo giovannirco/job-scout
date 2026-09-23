@@ -52,6 +52,15 @@ export async function bootstrap(opts: { seedBoards?: boolean } = {}) {
         })
         .catch((e) => log.error("bootstrap.office-gate.failed", { err: e }));
     }
+    if (stored.gateLaneVersion !== "1") {
+      const { syncGateArchiveLanes } = await import("./scan.js");
+      await syncGateArchiveLanes()
+        .then(async (r) => {
+          await updateSettings({ gateLaneVersion: "1" });
+          if (r.updated) log.info("bootstrap.gate-lanes", r);
+        })
+        .catch((e) => log.error("bootstrap.gate-lanes.failed", { err: e }));
+    }
   }
   const db = await getDb();
   if (opts.seedBoards !== false) {

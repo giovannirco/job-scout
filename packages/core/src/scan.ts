@@ -333,6 +333,7 @@ async function withdrawUntouchedScanPosition(
   if (!reason) return false;
   const label = reason.startsWith("geo_") ? "left the location gate" : "left the title gate";
   await archivePosition(pos.id, `${label} (${reason})`, "scan");
+  await db.update(discoveryFeed).set({ lane: "filtered", gateReason: reason }).where(eq(discoveryFeed.positionId, pos.id));
   return true;
 }
 
@@ -411,6 +412,27 @@ export async function regateRecentDiscovery(hours = 24 * 7): Promise<{
     log.info("scan.regate", { checked: rows.length, nowPassed, nowFiltered, promoted, withdrawn, hours });
   }
   return { checked: rows.length, nowPassed, nowFiltered, promoted, withdrawn };
+}
+
+/** Passed rows whose filing was later archived for the gate should leave the passed lane. */
+export async function syncGateArchiveLanes(): Promise<{ updated: number }> {
+  const db = await getDb();
+  const rows = await db
+    .select({ id: positions.id, archiveReason: positions.archiveReason })
+    .from(positions)
+    .where(and(eq(positions.status, "archived"), sql`${positions.archiveReason} ~ '^left the (title|location) gate \\('`));
+  let updated = 0;
+  for (const row of rows) {
+    const reason = row.archiveReason?.match(/\(([^)]+)\)\s*$/)?.[1];
+    if (!reason) continue;
+    const changed = await db
+      .update(discoveryFeed)
+      .set({ lane: "filtered", gateReason: reason })
+      .where(and(eq(discoveryFeed.positionId, row.id), eq(discoveryFeed.lane, "passed")))
+      .returning({ id: discoveryFeed.id });
+    updated += changed.length;
+  }
+  return { updated };
 }
 
 /**

@@ -241,6 +241,8 @@ export const Settings = z.object({
   misstampWithdrawVersion: z.string().nullable().optional(),
   /** One-shot withdraw of office filings the gate used to treat as unknown geo. */
   officeGateVersion: z.string().nullable().optional(),
+  /** One-shot: discovery rows stay filtered after the filing is archived for the gate. */
+  gateLaneVersion: z.string().nullable().optional(),
 });
 export type Settings = z.infer<typeof Settings>;
 
@@ -319,6 +321,7 @@ export function resolveSettings(stored: unknown): Settings {
     listingFactsBackfillVersion: typeof s.listingFactsBackfillVersion === "string" ? s.listingFactsBackfillVersion : null,
     misstampWithdrawVersion: typeof s.misstampWithdrawVersion === "string" ? s.misstampWithdrawVersion : null,
     officeGateVersion: typeof s.officeGateVersion === "string" ? s.officeGateVersion : null,
+    gateLaneVersion: typeof s.gateLaneVersion === "string" ? s.gateLaneVersion : null,
   };
   return Settings.parse(merged);
 }
