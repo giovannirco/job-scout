@@ -7,6 +7,7 @@ describe("profile gate", () => {
   it("excludes infrastructure titles only when the north star rejects them", () => {
     expect(titleExcludesFromNorthStar("I write services, not infrastructure platforms.")).toEqual([
       "infrastructure", "infra", "kubernetes", "k8s", "devops", "sre", "site reliability",
+      "linux", "embedded", "kernel", "compiler", "openstack", "ceph",
     ]);
     expect(titleExcludesFromNorthStar("Remote Java backend.")).toEqual([
       "frontend", "front-end", "front end", "data engineer", "data engineering",
@@ -32,6 +33,9 @@ describe("profile gate", () => {
     expect(gateListing({ title: "Software Engineer - Solutions Engineering", locationRaw: "Remote" }, mina).reason).toBe("title_exclude:solutions engineer");
     expect(gateListing({ title: "Senior Software Engineer, Quality Engineering", locationRaw: "Remote" }, mina).reason).toBe("title_exclude:quality engineer");
     expect(gateListing({ title: "Security Software Engineer", locationRaw: "Remote" }, mina).pass).toBe(true);
+    expect(gateListing({ title: "Embedded Linux Senior Software Engineer", locationRaw: "Remote" }, mina).reason).toBe("title_exclude:linux");
+    expect(gateListing({ title: "System Software Engineer - GCC/LLVM compiler", locationRaw: "Remote" }, mina).reason).toBe("title_exclude:compiler");
+    expect(gateListing({ title: "Software Developer (Backend SaaS)", locationRaw: "Remote" }, mina).pass).toBe(true);
     const both = applyProfileToGate(DEFAULT_GATE, { northStar: "Frontend and backend product work." });
     expect(gateListing({ title: "Senior Software Engineer, Frontend", locationRaw: "Remote", workplaceType: "remote" }, { ...both, titleInclude: ["software engineer"] }).pass).toBe(true);
   });

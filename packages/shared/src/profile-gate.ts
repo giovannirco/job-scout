@@ -5,7 +5,10 @@ import { homeMarket } from "./home-geo.js";
 export function titleExcludesFromNorthStar(text = ""): string[] {
   const extra: string[] = [];
   if (/\bnot\s+infrastructure\b/i.test(text)) {
-    extra.push("infrastructure", "infra", "kubernetes", "k8s", "devops", "sre", "site reliability");
+    extra.push(
+      "infrastructure", "infra", "kubernetes", "k8s", "devops", "sre", "site reliability",
+      "linux", "embedded", "kernel", "compiler", "openstack", "ceph",
+    );
   }
   if (/\bbackend\b/i.test(text) && !/\bfront[-\s]?end\b/i.test(text)) {
     extra.push("frontend", "front-end", "front end");

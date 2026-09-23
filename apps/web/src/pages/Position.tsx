@@ -103,7 +103,7 @@ export function PositionPage() {
   const hasEval = p.evaluations.some((e) => e.kind === "evaluate");
   const hasJdReview = p.evaluations.some((e) => e.kind === "jd_review");
   const hasResearch = p.evaluations.some((e) => e.kind === "company_research");
-  const comp = p.salaryRaw || money(p.salaryMin, p.salaryMax, p.salaryCurrency);
+  const comp = money(p.salaryMin, p.salaryMax, p.salaryCurrency) || p.salaryRaw;
   const loc = sourceLocation(p);
 
   return (
@@ -132,7 +132,7 @@ export function PositionPage() {
             <div className="flex items-center gap-x-3 gap-y-1 flex-wrap mt-1.5 text-[12px] text-muted">
               <GeoChip geo={p.geoClass} remote={p.remoteClass} location={loc} home={profile.data?.location} />
               {loc ? <span className="max-w-[420px] truncate" title={loc}>{loc}</span> : null}
-              {comp ? <span className="font-mono text-[11.5px] text-fg">{comp}</span> : null}
+              {comp ? <span className="font-mono text-[11.5px] text-fg" title={p.salaryRaw || undefined}>{comp}</span> : null}
               {p.employmentType ? <span>{p.employmentType}</span> : null}
               {p.craftFamily ? <span>{titleCase(p.craftFamily)}</span> : null}
               <span className="font-mono text-[11px] text-faint tabular">
@@ -338,7 +338,7 @@ function BriefTab({ p, noKey, onTriage }: { p: PositionDetail; noKey: boolean; o
             </Field>
             {p.departments?.length ? <Field label="Team">{p.departments.join(" · ")}</Field> : null}
             {p.geoNotes ? <Field label="Geo notes">{p.geoNotes}</Field> : null}
-            <Field label="Comp">{p.salaryRaw || money(p.salaryMin, p.salaryMax, p.salaryCurrency) || "—"}</Field>
+            <Field label="Comp">{comp || "—"}</Field>
             {p.equityNotes ? <Field label="Equity">{p.equityNotes}</Field> : null}
             <Field label="Craft">{titleCase(p.craftFamily) || "—"}</Field>
             <Field label="Source">{p.source || "—"}</Field>
