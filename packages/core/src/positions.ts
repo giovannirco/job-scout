@@ -54,6 +54,7 @@ const LIST_ROW = {
   slug: positions.slug,
   title: positions.title,
   status: positions.status,
+  archiveReason: positions.archiveReason,
   priority: positions.priority,
   primaryUrl: positions.primaryUrl,
   atsProvider: positions.atsProvider,
