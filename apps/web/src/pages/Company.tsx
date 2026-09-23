@@ -7,7 +7,7 @@ import { ListingBadge, ScoreMeter, StatusBadge } from "@/components/badges";
 import { Markdown } from "@/components/markdown";
 import { openDock, useChatScope } from "@/frame/store";
 import { post, useApi, type CompanyDetail } from "@/lib/api";
-import { ago, dateTime, host } from "@/lib/format";
+import { ago, dateTime, host, money } from "@/lib/format";
 import { Btn, Card, Chip, Dot, Empty, ErrorNote, IconBtn, Loading, Monogram, Page, Panel, Table, Td, Th, Tr, cn } from "@/ui/kit";
 
 export function CompanyPage() {
@@ -111,6 +111,11 @@ export function CompanyPage() {
                     <Tr key={p.id} className={cn(p.status === "archived" && "opacity-50")} onClick={() => navigate({ to: "/positions/$id", params: { id: p.slug } })}>
                       <Td className="max-w-[360px]">
                         <span className="truncate block">{p.title || <span className="text-faint">Untitled</span>}</span>
+                        {p.locationRaw || p.salaryMin != null || p.salaryMax != null ? (
+                          <span className="truncate block text-[11px] text-faint">
+                            {[p.locationRaw, money(p.salaryMin, p.salaryMax, p.salaryCurrency)].filter(Boolean).join(" · ")}
+                          </span>
+                        ) : null}
                       </Td>
                       <Td>
                         <ScoreMeter score={p.triageScore} verdict={p.triageVerdict} />

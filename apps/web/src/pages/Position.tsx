@@ -10,7 +10,7 @@ import { StatusMenu, useStatusChange } from "@/components/status-menu";
 import { openDock, useChatScope } from "@/frame/store";
 import { INTERVIEW_OUTCOMES, INTERVIEW_STAGES, INTERVIEW_STATUSES, isCompanyNameLocation } from "@job-scout/shared";
 import { api, del, patch, post, qs, useApi, type Evaluation, type Interview, type Material, type Person, type PipelineStatus, type PositionDetail, type Profile, type Revision, type SystemInfo, type TimelineEvent, type TriageJson } from "@/lib/api";
-import { ago, dateShort, dateTime, host, money, titleCase } from "@/lib/format";
+import { ago, dateShort, dateTime, employmentLabel, host, money, titleCase } from "@/lib/format";
 import { Btn, Card, Chip, Dot, Empty, ErrorNote, Field, IconBtn, Input, Loading, Monogram, Page, Panel, Select, SortHead, Tabs, Textarea, TONE_DOT, TONE_TEXT, cn } from "@/ui/kit";
 
 type Tab = "brief" | "evaluation" | "jd" | "materials" | "forms" | "company" | "history";
@@ -133,7 +133,7 @@ export function PositionPage() {
               <GeoChip geo={p.geoClass} remote={p.remoteClass} location={loc} home={profile.data?.location} />
               {loc ? <span className="max-w-[420px] truncate" title={loc}>{loc}</span> : null}
               {comp ? <span className="font-mono text-[11.5px] text-fg" title={p.salaryRaw || undefined}>{comp}</span> : null}
-              {p.employmentType ? <span>{p.employmentType}</span> : null}
+              {p.employmentType ? <span>{employmentLabel(p.employmentType)}</span> : null}
               {p.craftFamily ? <span>{titleCase(p.craftFamily)}</span> : null}
               <span className="font-mono text-[11px] text-faint tabular">
                 seen {ago(p.firstSeenAt)} · updated {ago(p.updatedAt)}
@@ -329,7 +329,7 @@ function BriefTab({ p, noKey, onTriage }: { p: PositionDetail; noKey: boolean; o
       <div className="space-y-5 min-w-0">
         <Panel title="Facts">
           <div className="space-y-1.5">
-            <Field label="Employment">{p.employmentType || "—"}</Field>
+            <Field label="Employment">{employmentLabel(p.employmentType) || "—"}</Field>
             <Field label="Workplace">{p.workplace && p.workplace !== "unknown" ? p.workplace : "—"}</Field>
             {loc ? <Field label="Location">{loc}</Field> : null}
             <Field label="Geo">
