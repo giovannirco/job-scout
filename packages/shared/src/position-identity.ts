@@ -31,6 +31,19 @@ export function normalizePostingUrl(value?: string | null): string {
   } catch { return ""; }
 }
 
+/** A single opening, not a company's careers root. */
+export function isJobPostingUrl(value?: string | null): boolean {
+  try {
+    const u = new URL(value || "");
+    if (u.searchParams.has("gh_jid")) return true;
+    if (/\/jobs\/\d+(?:\/|$)/.test(u.pathname)) return true;
+    if (/^jobs\.ashbyhq\.com$/i.test(u.hostname) && /\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/?$/i.test(u.pathname)) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export function canonicalExternalIdentity(value?: string | null): string | null {
   if (!value) return null;
   const parts = value.split(":");

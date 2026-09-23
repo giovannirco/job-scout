@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { boardSources, companies, evaluations, getDb, id, positions, slugify } from "@job-scout/db";
-import { canonicalCompanySlug, parseListSort, preferredCompanyName } from "@job-scout/shared";
+import { canonicalCompanySlug, isJobPostingUrl, parseListSort, preferredCompanyName } from "@job-scout/shared";
 
 export type Company = typeof companies.$inferSelect;
 
@@ -21,13 +21,18 @@ export async function resolveCompanyForName(
   if (!company) {
     const cid = id("co");
     const slug = companySlug || slugify(name) || cid;
+    const given = extras?.careersUrl && !isJobPostingUrl(extras.careersUrl) ? extras.careersUrl : null;
+    const board = given ? null : (
+      await db.select({ careersUrl: boardSources.careersUrl }).from(boardSources).where(sql`lower(${boardSources.company}) = lower(${displayName})`).limit(1)
+    )[0];
+    const careersUrl = given || (board?.careersUrl && !isJobPostingUrl(board.careersUrl) ? board.careersUrl : null);
     try {
       await db.insert(companies).values({
         id: cid,
         slug,
         name: displayName,
         website: extras?.website || null,
-        careersUrl: extras?.careersUrl || null,
+        careersUrl,
         overview: extras?.overview || null,
         metadata: {},
       });
@@ -39,6 +44,24 @@ export async function resolveCompanyForName(
     }
   }
   return company;
+}
+
+/** Replace a careers link that is actually one opening with the board's careers root. */
+export async function alignCompanyCareersFromBoards(): Promise<{ updated: number }> {
+  const db = await getDb();
+  const boards = await db.select({ company: boardSources.company, careersUrl: boardSources.careersUrl }).from(boardSources);
+  let updated = 0;
+  for (const board of boards) {
+    if (!board.careersUrl || isJobPostingUrl(board.careersUrl)) continue;
+    const rows = await db.select({ id: companies.id, careersUrl: companies.careersUrl }).from(companies).where(sql`lower(${companies.name}) = lower(${board.company})`);
+    for (const row of rows) {
+      if (row.careersUrl === board.careersUrl) continue;
+      if (row.careersUrl && !isJobPostingUrl(row.careersUrl)) continue;
+      await db.update(companies).set({ careersUrl: board.careersUrl, updatedAt: new Date() }).where(eq(companies.id, row.id));
+      updated++;
+    }
+  }
+  return { updated };
 }
 
 function isUniqueViolation(err: unknown): boolean {

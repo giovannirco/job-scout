@@ -112,5 +112,9 @@ export async function bootstrap(opts: { seedBoards?: boolean } = {}) {
       .catch((e) => log.error("bootstrap.boards.reconcile.failed", { err: e }));
     const n = (await db.select({ c: sql<number>`count(*)::int` }).from(boardSources))[0]?.c ?? 0;
     log.info("bootstrap.boards.synced", { catalog: FULL_CATALOG.length, boards: n });
+    const { alignCompanyCareersFromBoards } = await import("./companies.js");
+    await alignCompanyCareersFromBoards()
+      .then((r) => { if (r.updated) log.info("bootstrap.company-careers", r); })
+      .catch((e) => log.error("bootstrap.company-careers.failed", { err: e }));
   }
 }
