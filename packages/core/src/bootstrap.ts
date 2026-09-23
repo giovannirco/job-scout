@@ -182,11 +182,11 @@ export async function bootstrap(opts: { seedBoards?: boolean } = {}) {
         })
         .catch((e) => log.error("bootstrap.labels.failed", { err: e }));
     }
-    if (stored.officeListVersion !== "3") {
+    if (stored.officeListVersion !== "4") {
       const { expandStoredOfficeLocations } = await import("./positions.js");
       await expandStoredOfficeLocations()
         .then(async (r) => {
-          await updateSettings({ officeListVersion: "3" });
+          await updateSettings({ officeListVersion: "4" });
           if (r.updated) log.info("bootstrap.offices", r);
         })
         .catch((e) => log.error("bootstrap.offices.failed", { err: e }));

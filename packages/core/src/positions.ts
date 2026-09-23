@@ -1160,7 +1160,7 @@ export async function expandStoredOfficeLocations(): Promise<{ checked: number; 
     let next = greenhouseListingLocation(rev.locationRaw, offices).locationRaw?.trim();
     const distributed = greenhouseListingLocation("Distributed", offices).locationRaw?.trim();
     const bareOffices = distributed?.replace(/^Distributed · /, "");
-    const withdrawnAsOnsite = row.workplace === "onsite" && (row.archiveReason || "").includes("geo_block:onsite");
+    const withdrawnAsOnsite = offices.length >= 3 && row.workplace === "onsite" && (row.archiveReason || "").includes("geo_block:onsite");
     if (withdrawnAsOnsite && distributed && bareOffices && rev.locationRaw.trim() === bareOffices && distributed !== rev.locationRaw.trim()) {
       next = distributed;
     }
