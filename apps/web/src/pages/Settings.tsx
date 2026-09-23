@@ -111,14 +111,8 @@ function NotificationsTab() {
             {f.channels.chat.chatId.trim() ? " · replies go to the chat group" : " · add a chat group id to receive replies"}
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <label className="text-[12px] text-muted">
-              Min triage score for new
-              <Input type="number" step="0.1" value={f.minTriageScore} onChange={(e) => setF({ ...f, minTriageScore: Number(e.target.value) })} />
-            </label>
-            <label className="text-[12px] text-muted">
-              Session
-              <Input value={f.session} onChange={(e) => setF({ ...f, session: e.target.value })} />
-            </label>
+            <Input label="Min triage score for new" type="number" step="0.1" value={f.minTriageScore} onChange={(e) => setF({ ...f, minTriageScore: Number(e.target.value) })} />
+            <Input label="Session" value={f.session} onChange={(e) => setF({ ...f, session: e.target.value })} />
           </div>
         </div>
       </Panel>
@@ -127,7 +121,7 @@ function NotificationsTab() {
           {CHANNELS.map((ch) => (
             <div key={ch} className="p-3 flex flex-wrap items-center gap-2">
               <Switch checked={f.channels[ch].enabled} onChange={(v) => setF({ ...f, channels: { ...f.channels, [ch]: { ...f.channels[ch], enabled: v } } })} label={ch} />
-              <Input className="flex-1 min-w-[12rem]" value={f.channels[ch].chatId} onChange={(e) => setF({ ...f, channels: { ...f.channels, [ch]: { ...f.channels[ch], chatId: e.target.value } } })} />
+              <Input className="flex-1 min-w-[12rem]" placeholder="WhatsApp chat id" value={f.channels[ch].chatId} onChange={(e) => setF({ ...f, channels: { ...f.channels, [ch]: { ...f.channels[ch], chatId: e.target.value } } })} />
               <Btn
                 disabled={!q.data.wahaConfigured || !f.channels[ch].chatId.trim()}
                 title={q.data.wahaConfigured ? (f.channels[ch].chatId.trim() ? "Send a test message" : "Add a chat id first") : "Set WAHA_API_KEY before sending a test"}
@@ -155,9 +149,9 @@ function NotificationsTab() {
         <div className="p-3 space-y-2">
           <Switch checked={f.quietHours.enabled} onChange={(v) => setF({ ...f, quietHours: { ...f.quietHours, enabled: v } })} label="Hold alerts overnight" />
           <div className="grid grid-cols-3 gap-2">
-            <Input value={f.quietHours.timezone} onChange={(e) => setF({ ...f, quietHours: { ...f.quietHours, timezone: e.target.value } })} />
-            <Input value={f.quietHours.start} onChange={(e) => setF({ ...f, quietHours: { ...f.quietHours, start: e.target.value } })} />
-            <Input value={f.quietHours.end} onChange={(e) => setF({ ...f, quietHours: { ...f.quietHours, end: e.target.value } })} />
+            <Input label="Timezone" value={f.quietHours.timezone} onChange={(e) => setF({ ...f, quietHours: { ...f.quietHours, timezone: e.target.value } })} />
+            <Input label="Start" hint="24-hour, local to the timezone" value={f.quietHours.start} onChange={(e) => setF({ ...f, quietHours: { ...f.quietHours, start: e.target.value } })} />
+            <Input label="End" value={f.quietHours.end} onChange={(e) => setF({ ...f, quietHours: { ...f.quietHours, end: e.target.value } })} />
           </div>
         </div>
       </Panel>
