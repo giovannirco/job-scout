@@ -59,6 +59,13 @@ describe("geo_class", () => {
     expect(geoClass("")).toBe("unknown");
   });
 
+  it("treats a US city list that also says remote as a US place", () => {
+    expect(geoClass("US-Remote, Chicago, Seattle, San Francisco", "remote")).toBe("hard_geo");
+    expect(geoClass("San Francisco · New York City · Seattle · US - Remote", "remote")).toBe("hard_geo");
+    expect(geoClass("Remote-Friendly (Travel-Required) · San Francisco, CA · Seattle, WA", "remote")).toBe("hard_geo");
+    expect(geoClass("United States (Remote) · Seattle, Washington · San Francisco, California", "remote")).toBe("hard_geo");
+  });
+
   it("treats a remote multi-country list without only/must-reside as TZ overlap, not hard_geo", () => {
     const location =
       "United Kingdom · Hungary · Poland · South Africa · Portugal · Ireland · Romania";

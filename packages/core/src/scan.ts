@@ -787,6 +787,43 @@ export async function refetchDisagreeingRegions(): Promise<{ checked: number; up
   return { checked: disagree.length, updated, withdrawn, failed };
 }
 
+/** A US city list that also says remote was stored as an unknown geo. Recompute those chips. */
+export async function reclassifyUsPlaceLists(): Promise<{ positions: number; discovery: number }> {
+  const db = await getDb();
+  const posRows = await db
+    .select({
+      id: positions.id,
+      geo: positions.geoClass,
+      workplace: positions.workplace,
+      location: sql<string | null>`(select location_raw from jd_revisions jr where jr.position_id = ${positions.id} order by jr.revision desc limit 1)`,
+    })
+    .from(positions)
+    .where(eq(positions.geoClass, "ambiguous_remote"));
+  let positionCount = 0;
+  for (const row of posRows) {
+    const location = (row.location || "").trim();
+    if (!location) continue;
+    const next = geoClass(location, row.workplace === "remote" ? "remote" : row.workplace || "");
+    if (!next || next === row.geo) continue;
+    await db.update(positions).set({ geoClass: next }).where(eq(positions.id, row.id));
+    positionCount++;
+  }
+  const feedRows = await db
+    .select({ id: discoveryFeed.id, geo: discoveryFeed.geoClass, location: discoveryFeed.locationRaw })
+    .from(discoveryFeed)
+    .where(eq(discoveryFeed.geoClass, "ambiguous_remote"));
+  let discovery = 0;
+  for (const row of feedRows) {
+    const location = (row.location || "").trim();
+    if (!location) continue;
+    const next = geoClass(location);
+    if (!next || next === row.geo) continue;
+    await db.update(discoveryFeed).set({ geoClass: next }).where(eq(discoveryFeed.id, row.id));
+    discovery++;
+  }
+  return { positions: positionCount, discovery };
+}
+
 /** N/A and HQ hide the office. Refetch those filings and tidy cut-off titles. */
 export async function refetchJunkPlaceFilings(): Promise<{ titled: number; checked: number; updated: number; withdrawn: number; failed: number }> {
   const titled = (await trimStoredTitles()).updated;

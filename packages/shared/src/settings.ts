@@ -263,6 +263,8 @@ export const Settings = z.object({
   regionOfficeVersion: z.string().nullable().optional(),
   /** One-shot: a stringified salary object is replaced with the posted range. */
   salaryObjectVersion: z.string().nullable().optional(),
+  /** One-shot: a US city list that also says remote is a home place, not an unknown geo. */
+  usPlaceGeoVersion: z.string().nullable().optional(),
 });
 export type Settings = z.infer<typeof Settings>;
 
