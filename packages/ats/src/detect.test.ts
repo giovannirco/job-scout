@@ -31,6 +31,13 @@ describe("detectAts", () => {
     expect(d.jobId).toBe("7799066003");
   });
 
+  it("does not use the jobs host label as a greenhouse board token", () => {
+    const d = detectAts("https://jobs.elastic.co/jobs?gh_jid=8225986&gh_jid=8225986");
+    expect(d.provider).toBe("greenhouse");
+    expect(d.jobId).toBe("8225986");
+    expect(d.boardToken).toBeUndefined();
+  });
+
   it("parses ashby UUID jobs", () => {
     const d = detectAts(
       "https://jobs.ashbyhq.com/supabase/ed6cedb1-b9bf-4609-ac5c-c75c33b31bf3",
