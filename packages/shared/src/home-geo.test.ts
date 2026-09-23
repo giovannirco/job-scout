@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { homeMarket, missesHomeMarket } from "./home-geo.js";
+import { fitsHomeMarket, homeMarket, missesHomeMarket } from "./home-geo.js";
 
 describe("home market", () => {
   it("reads a US city and ignores a blank or foreign profile", () => {
@@ -23,5 +23,13 @@ describe("home market", () => {
     expect(missesHomeMarket("Remote - Americas or EU", home)).toBe(false);
     expect(missesHomeMarket("Remote - EU - LATAM - NA", home)).toBe(false);
     expect(missesHomeMarket("Remote, Poland", "")).toBe(false);
+  });
+
+  it("treats a US restriction as a fit for Austin and a foreign one as not", () => {
+    expect(fitsHomeMarket("hard_geo", "Remote - USA", "Austin, TX")).toBe(true);
+    expect(fitsHomeMarket("hard_geo", "Remote, Canada · Remote, United States", "Austin, TX")).toBe(true);
+    expect(fitsHomeMarket("hard_geo", "Remote, Poland", "Austin, TX")).toBe(false);
+    expect(fitsHomeMarket("hard_geo", "Remote - USA", "")).toBe(false);
+    expect(fitsHomeMarket("worldwideish", "Remote - USA", "Austin, TX")).toBe(false);
   });
 });
