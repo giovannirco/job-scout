@@ -248,9 +248,6 @@ function PositionsTable({ rows, home }: { rows: PositionRow[]; home?: string | n
           <Th right>
             <SortHead label="Changed" field="last_changed" sort={search.sort} onSort={sortTo} />
           </Th>
-          <Th right>
-            <SortHead label="Updated" field="updated" sort={search.sort} onSort={sortTo} />
-          </Th>
           <Th w={36} />
         </tr>
       </thead>
@@ -304,9 +301,6 @@ function PositionsTable({ rows, home }: { rows: PositionRow[]; home?: string | n
             </Td>
             <Td right mono className="text-muted">
               {jdChangedAt(r.firstSeenAt, r.lastChangedAt) ? ago(r.lastChangedAt) : <span className="text-faint">—</span>}
-            </Td>
-            <Td right mono className="text-muted">
-              {ago(r.updatedAt)}
             </Td>
             <Td>
               {r.primaryUrl ? (

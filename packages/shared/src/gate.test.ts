@@ -62,6 +62,14 @@ describe("gateListing", () => {
     expect(strict.pass).toBe(false);
   });
 
+  it("matches a slash compound and a reversed role, not a different specialty in between", () => {
+    const gate = { ...DEFAULT_GATE, titleInclude: ["java engineer", "java", "software engineer", "backend engineer"], titleExclude: ["manager"] };
+    expect(gateListing({ title: "Backend/API Engineer, Money as a Service", locationRaw: "Remote" }, gate).pass).toBe(true);
+    expect(gateListing({ title: "Senior Engineer, Backend - Orchestration", locationRaw: "Remote" }, gate).matchedInclude).toBe("backend engineer");
+    expect(gateListing({ title: "Senior Software Security Engineer", locationRaw: "Remote" }, gate).reason).toBe("title_no_include");
+    expect(gateListing({ title: "Software Quality Assurance Engineer", locationRaw: "Remote" }, gate).reason).toBe("title_no_include");
+  });
+
   it("bare words are bounded, phrases are substrings", () => {
     // "dba" must not match "dbaas platform engineer"? it is bounded so it should not match "dbaas"
     const v = gateListing({ title: "Platform Engineer (DBaaS)", locationRaw: "Remote" }, DEFAULT_GATE);

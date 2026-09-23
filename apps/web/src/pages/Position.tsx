@@ -10,7 +10,7 @@ import { StatusMenu, useStatusChange } from "@/components/status-menu";
 import { openDock, useChatScope } from "@/frame/store";
 import { INTERVIEW_OUTCOMES, INTERVIEW_STAGES, INTERVIEW_STATUSES, changeKindLabel, humanDiffSummary, isCompanyNameLocation } from "@job-scout/shared";
 import { api, del, patch, post, qs, useApi, type Evaluation, type Interview, type Material, type Person, type PipelineStatus, type PositionDetail, type Profile, type Revision, type SystemInfo, type TimelineEvent, type TriageJson } from "@/lib/api";
-import { ago, dateShort, dateTime, employmentLabel, host, money, titleCase } from "@/lib/format";
+import { ago, dateShort, dateTime, employmentLabel, host, jdChangedAt, money, titleCase } from "@/lib/format";
 import { Btn, Card, Chip, Dot, Empty, ErrorNote, Field, IconBtn, Input, Loading, Monogram, Page, Panel, Select, SortHead, Tabs, Textarea, TONE_DOT, TONE_TEXT, cn } from "@/ui/kit";
 
 type Tab = "brief" | "evaluation" | "jd" | "materials" | "forms" | "company" | "history";
@@ -136,7 +136,8 @@ export function PositionPage() {
               {p.employmentType ? <span>{employmentLabel(p.employmentType)}</span> : null}
               {p.craftFamily ? <span>{titleCase(p.craftFamily)}</span> : null}
               <span className="font-mono text-[11px] text-faint tabular">
-                seen {ago(p.firstSeenAt)} · updated {ago(p.updatedAt)}
+                seen {ago(p.firstSeenAt)}
+                {jdChangedAt(p.firstSeenAt, p.lastChangedAt) ? ` · changed ${ago(p.lastChangedAt)}` : ""}
                 {p.appliedAt ? ` · applied ${ago(p.appliedAt)}` : ""}
               </span>
             </div>
