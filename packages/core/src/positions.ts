@@ -12,7 +12,7 @@ import {
   slugify,
   type PositionStatus,
 } from "@job-scout/db";
-import { decodeHtmlEntities, type AtsJob } from "@job-scout/ats";
+import { decodeHtmlEntities, fetchJobFromUrl as fetchListing, type AtsJob } from "@job-scout/ats";
 import { fetchJob as fetchJobFromUrl } from "./fetch-job.js";
 import {
   classifyMateriality,
@@ -30,6 +30,7 @@ import {
   HOT_STATUSES,
   PipelineStatus,
   isNoiseJobTitle, cleanJobTitle, cleanLocation, canonicalExternalIdentity, normalizePostingUrl,
+  searchWords, likeContains,
   employerFromPosting, unresolvedCompany, UNRESOLVED_COMPANY, requisitionId,
 } from "@job-scout/shared";
 import { resolveCompanyForName } from "./companies.js";
@@ -169,9 +170,23 @@ export async function listPositions(q: ListPositionsQuery) {
   if (q.minScore) conds.push(gte(positions.triageScore, Number(q.minScore)));
   if (q.watch === "true") conds.push(eq(positions.watchEnabled, true));
   if (q.company) conds.push(or(eq(companies.slug, q.company), eq(companies.id, q.company), ilike(companies.name, `%${q.company}%`))!);
-  if (q.q) {
-    const like = `%${q.q}%`;
-    conds.push(or(ilike(positions.title, like), ilike(companies.name, like), ilike(positions.slug, like))!);
+  if (q.q?.trim()) {
+    const tokens = searchWords(q.q);
+    const terms = tokens.length ? tokens : [q.q.trim()];
+    for (const token of terms) {
+      const like = likeContains(token);
+      conds.push(or(
+        ilike(positions.title, like),
+        ilike(companies.name, like),
+        ilike(positions.slug, like),
+        sql`exists (
+          select 1 from jd_revisions jr
+          where jr.position_id = ${positions.id}
+            and jr.revision = (select max(j2.revision) from jd_revisions j2 where j2.position_id = ${positions.id})
+            and jr.location_raw ilike ${like}
+        )`,
+      )!);
+    }
   }
   if (q.cursor) {
     if (q.sort && q.sort !== "updated_desc") throw new Error("cursor requires sort=updated_desc; use page for other sorts");
@@ -811,6 +826,74 @@ export async function clearRepairedChangedBadges(): Promise<{ cleared: number }>
     cleared++;
   }
   return { cleared };
+}
+
+/** Replace `USD [object Object]–150000` with the range the posting actually named. */
+export async function repairObjectSalaries(): Promise<{ checked: number; updated: number; failed: number }> {
+  const db = await getDb();
+  const rows = await db
+    .select({ id: positions.id, url: positions.primaryUrl, title: positions.title })
+    .from(positions)
+    .where(sql`${positions.salaryRaw} ilike '%[object Object]%' or exists (
+      select 1 from jd_revisions jr
+      where jr.position_id = ${positions.id}
+        and jr.salary_raw ilike '%[object Object]%'
+        and jr.revision = (select max(j2.revision) from jd_revisions j2 where j2.position_id = ${positions.id})
+    )`);
+  let updated = 0;
+  let failed = 0;
+  for (const row of rows) {
+    if (!row.url) {
+      failed++;
+      continue;
+    }
+    try {
+      const job = await fetchListing(row.url);
+      const salaryRaw = (job.salaryRaw || "").trim();
+      if (!salaryRaw || /\[object Object\]/.test(salaryRaw)) {
+        failed++;
+        continue;
+      }
+      const salary = parseSalary(salaryRaw);
+      if (salary.min == null) {
+        failed++;
+        continue;
+      }
+      const prev = (
+        await db.select().from(jdRevisions).where(eq(jdRevisions.positionId, row.id)).orderBy(desc(jdRevisions.revision)).limit(1)
+      )[0];
+      const hash = contentHash({
+        title: row.title,
+        descriptionText: prev?.descriptionText || "",
+        salaryRaw,
+        locationRaw: prev?.locationRaw || "",
+      });
+      await db.update(positions).set({
+        salaryMin: salary.min,
+        salaryMax: salary.max,
+        salaryCurrency: salary.currency,
+        salaryPeriod: salary.period,
+        salaryRaw,
+        contentHash: hash,
+      }).where(eq(positions.id, row.id));
+      if (prev) {
+        await db.update(jdRevisions).set({
+          salaryMin: salary.min,
+          salaryMax: salary.max,
+          salaryCurrency: salary.currency,
+          salaryPeriod: salary.period,
+          salaryRaw,
+          contentHash: hash,
+        }).where(eq(jdRevisions.id, prev.id));
+      }
+      updated++;
+    } catch (e) {
+      failed++;
+      log.warn("salary.object_repair_failed", { url: row.url, err: e instanceof Error ? e.message : String(e) });
+    }
+  }
+  if (rows.length && failed === rows.length) throw new Error("object salary refetch failed");
+  return { checked: rows.length, updated, failed };
 }
 
 /** Create-or-update a position from an ATS job. New positions start as `triaged` (untriaged until the LLM runs). */

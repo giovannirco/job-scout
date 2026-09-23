@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ashbyListingLocation, fetchAshbyJob, greenhouseListingLocation, greenhouseOfficeIsRemote, listBoard, regionsDisagree } from "./fetch.js";
+import { ashbyListingLocation, fetchAshbyJob, greenhouseListingLocation, greenhouseOfficeIsRemote, listBoard, regionsDisagree, salaryFromBaseSalary } from "./fetch.js";
 
 const REMOTEOK_API = "https://remoteok.com/api";
 const WWR_RSS = "https://weworkremotely.com/categories/remote-devops-sysadmin-jobs.rss";
@@ -307,6 +307,17 @@ describe("fetchAshbyJob", () => {
     expect(job.locationRaw).not.toMatch(/\[object Object\]/);
     expect(job.isRemote).toBe(true);
     expect(job.workplaceType).toBe("Remote");
+  });
+});
+
+describe("salaryFromBaseSalary", () => {
+  it("reads a QuantitativeValue instead of stringifying it", () => {
+    expect(salaryFromBaseSalary({
+      "@type": "MonetaryAmount",
+      currency: "USD",
+      value: { "@type": "QuantitativeValue", minValue: 80000, maxValue: 150000, unitText: "YEAR" },
+    })).toBe("USD 80000-150000");
+    expect(salaryFromBaseSalary({ currency: "USD", value: 140000 })).toBe("USD 140000");
   });
 });
 

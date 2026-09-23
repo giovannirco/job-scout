@@ -93,6 +93,28 @@ export function stripHtml(html: string): string {
     .trim();
 }
 
+function postedAmount(value: unknown): string | number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() && !/\[object Object\]/.test(value)) return value.trim();
+  return undefined;
+}
+
+/** Schema.org MonetaryAmount, including a QuantitativeValue object. Never stringifies the object. */
+export function salaryFromBaseSalary(base: unknown): string | undefined {
+  if (!base || typeof base !== "object") return undefined;
+  const row = base as { currency?: unknown; value?: unknown; minValue?: unknown; maxValue?: unknown };
+  const nested = row.value && typeof row.value === "object"
+    ? (row.value as { value?: unknown; minValue?: unknown; maxValue?: unknown; currency?: unknown })
+    : null;
+  const min = postedAmount(nested?.minValue ?? nested?.value ?? row.minValue ?? (nested ? undefined : row.value));
+  const max = postedAmount(nested?.maxValue ?? row.maxValue);
+  if (min == null && max == null) return undefined;
+  const nestedCurrency = nested && typeof nested.currency === "string" ? nested.currency.trim() : "";
+  const currency = typeof row.currency === "string" && row.currency.trim() ? row.currency.trim() : nestedCurrency || "USD";
+  if (min != null && max != null && String(min) !== String(max)) return `${currency} ${min}-${max}`;
+  return `${currency} ${min ?? max}`;
+}
+
 function extractJsonLdJob(html: string): Partial<AtsJob> | null {
   const re = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
   let m: RegExpExecArray | null;
@@ -102,19 +124,7 @@ function extractJsonLdJob(html: string): Partial<AtsJob> | null {
       const nodes = Array.isArray(data) ? data : data["@graph"] ? data["@graph"] : [data];
       for (const n of nodes) {
         if (n && (n["@type"] === "JobPosting" || n["@type"]?.includes?.("JobPosting"))) {
-          const salary =
-            n.baseSalary?.value?.value ||
-            n.baseSalary?.value ||
-            n.baseSalary?.minValue ||
-            null;
-          const salaryMax = n.baseSalary?.value?.maxValue || n.baseSalary?.maxValue;
-          let salaryRaw: string | undefined;
-          if (salary || salaryMax) {
-            const cur = n.baseSalary?.currency || "USD";
-            salaryRaw = salaryMax
-              ? `${cur} ${salary}–${salaryMax}`
-              : `${cur} ${salary}`;
-          }
+          const salaryRaw = salaryFromBaseSalary(n.baseSalary);
           return {
             title: n.title || n.name,
             descriptionText: n.description ? stripHtml(String(n.description)) : undefined,

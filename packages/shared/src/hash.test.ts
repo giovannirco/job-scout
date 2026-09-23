@@ -49,6 +49,14 @@ describe("materiality", () => {
     expect(m.change_kind).toBe("title");
   });
 
+  it("a stringified salary object is snapshot cleanup", () => {
+    const m = classifyMateriality([
+      { path: "salary_raw", before: "USD [object Object]–150000", after: "USD 80000-150000" },
+    ]);
+    expect(m.material).toBe(false);
+    expect(m.change_kind).toBe("noise_rebase");
+  });
+
   it("noise_rebase force", () => {
     const m = classifyMateriality(
       [{ path: "description_text", before: "a", after: "a <!-- x -->" }],

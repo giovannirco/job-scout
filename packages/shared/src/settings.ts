@@ -261,6 +261,8 @@ export const Settings = z.object({
   labelVersion: z.string().nullable().optional(),
   /** One-shot: a title region that disagrees with the stored place is refetched from the office. */
   regionOfficeVersion: z.string().nullable().optional(),
+  /** One-shot: a stringified salary object is replaced with the posted range. */
+  salaryObjectVersion: z.string().nullable().optional(),
 });
 export type Settings = z.infer<typeof Settings>;
 

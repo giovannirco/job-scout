@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, gte, ilike, or, sql, type SQL } from "drizzle-orm";
 import { boardDeltas, boardSources, discoveryFeed, getDb, positions } from "@job-scout/db";
-import { parseListSort } from "@job-scout/shared";
+import { likeContains, parseListSort, searchWords } from "@job-scout/shared";
 import { boardErrorKind } from "./board-reconcile.js";
 
 export async function listDiscovery(q: {
@@ -20,7 +20,14 @@ export async function listDiscovery(q: {
   if (q.lane && q.lane !== "all") conds.push(eq(discoveryFeed.lane, q.lane as never));
   if (q.hours) conds.push(gte(discoveryFeed.observedAt, new Date(Date.now() - Number(q.hours) * 3_600_000)));
   if (q.reason) conds.push(ilike(discoveryFeed.gateReason, `${q.reason}%`));
-  if (q.q) conds.push(or(ilike(discoveryFeed.title, `%${q.q}%`), ilike(discoveryFeed.company, `%${q.q}%`))!);
+  if (q.q?.trim()) {
+    const tokens = searchWords(q.q);
+    const terms = tokens.length ? tokens : [q.q.trim()];
+    for (const token of terms) {
+      const like = likeContains(token);
+      conds.push(or(ilike(discoveryFeed.title, like), ilike(discoveryFeed.company, like), ilike(discoveryFeed.locationRaw, like))!);
+    }
+  }
   if (q.cursor) {
     const d = new Date(q.cursor);
     if (!Number.isNaN(d.getTime())) conds.push(sql`${discoveryFeed.observedAt} < ${d}`);

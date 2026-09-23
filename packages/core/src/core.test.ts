@@ -667,6 +667,24 @@ describe("core on pglite", () => {
     await db.update((await import("@job-scout/db")).positions).set({ triageScore: 1 }).where((await import("drizzle-orm")).eq((await import("@job-scout/db")).positions.id, a.position.id));
     await db.update((await import("@job-scout/db")).positions).set({ triageScore: 5 }).where((await import("drizzle-orm")).eq((await import("@job-scout/db")).positions.id, z.position.id));
 
+    const dashed = await upsertFromJob(
+      job({
+        jobId: "search-eu",
+        externalIdentity: "greenhouse:alpaca:search-eu",
+        url: "https://boards.greenhouse.io/alpaca/jobs/search-eu",
+        title: "Senior Software Engineer New Markets - EU",
+        company: "Alpaca",
+        locationRaw: "Remote - EMEA",
+      }),
+      { source: "test", companyName: "Alpaca" },
+    );
+    const byPhrase = await listPositions({ q: "New Markets EU", includeArchived: "true", pageSize: "50" });
+    expect(byPhrase.items.some((r) => r.id === dashed.position.id)).toBe(true);
+    const byPlace = await listPositions({ q: "EMEA", includeArchived: "true", pageSize: "50" });
+    expect(byPlace.items.some((r) => r.id === dashed.position.id)).toBe(true);
+    const miss = await listPositions({ q: "New Markets APAC", includeArchived: "true", pageSize: "50" });
+    expect(miss.items.some((r) => r.id === dashed.position.id)).toBe(false);
+
     const byCompany = await listPositions({ q: "Platform", sort: "company_asc", pageSize: "50" });
     const acmeIdx = byCompany.items.findIndex((r) => r.id === a.position.id);
     const zetaIdx = byCompany.items.findIndex((r) => r.id === z.position.id);

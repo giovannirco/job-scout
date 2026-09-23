@@ -197,7 +197,11 @@ export function classifyMateriality(
     return { material: true, change_kind: "closed" };
   }
 
-  const meaningful = diffs.filter((d) => !isSnapshotCompletionDiff(d));
+  const brokenPay = diffs.some((d) => d.path === "salary_raw" && /\[object Object\]/.test(d.before || ""));
+  const meaningful = diffs.filter((d) => {
+    if (brokenPay && d.path.startsWith("salary_")) return false;
+    return !isSnapshotCompletionDiff(d);
+  });
   if (!meaningful.length) {
     return { material: false, change_kind: "noise_rebase" };
   }
