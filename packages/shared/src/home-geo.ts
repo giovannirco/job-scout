@@ -10,7 +10,7 @@ export function homeMarket(profileLocation = ""): "us" | "br" | null {
 
 const OPEN_TO_US = /\b(worldwide|anywhere|global|distributed|americas|north america)\b/i;
 const US_PLACE = /\b(united states|u\.s\.a?\.?|usa|\bus\b|austin|texas|north america|americas|\bna\b)\b/i;
-const FOREIGN_PLACE = /\b(united kingdom|\buk\b|england|ireland|germany|france|spain|portugal|poland|netherlands|sweden|norway|denmark|finland|switzerland|austria|belgium|italy|greece|romania|hungary|czech|canada|mexico|brazil|brasil|australia|singapore|india|japan|israel|apac|emea|europe|\beu\b|latam|latin america)\b/i;
+const FOREIGN_PLACE = /\b(united kingdom|\buk\b|england|ireland|germany|france|spain|portugal|poland|netherlands|sweden|norway|denmark|finland|switzerland|austria|belgium|italy|greece|romania|hungary|czech|canada|mexico|brazil|brasil|sao paulo|s[aã]o paulo|australia|singapore|india|japan|israel|apac|apj|emea|europe|\beu\b|latam|latin america|lugano)\b/i;
 
 /**
  * True when a US-based profile cannot take this location.

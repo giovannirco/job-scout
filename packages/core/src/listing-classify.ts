@@ -169,8 +169,8 @@ export async function runListingClassify(positionId: string) {
 }
 
 export async function backfillListingFacts(opts: { force?: boolean } = {}) {
-  // v8: "$143,800.00 to $231,900.00" and a band whose top was glued to the next number.
-  const BACKFILL_VERSION = "8";
+  // v9: bullet-separated offices, Bay Area + country, and "home based" are not unknown.
+  const BACKFILL_VERSION = "9";
   const s = await getSettings({ fresh: true });
   if (!opts.force && s.listingFactsBackfillVersion === BACKFILL_VERSION) {
     return { skipped: true as const, archivedSkipped: 0, updated: 0, enqueued: 0 };

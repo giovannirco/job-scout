@@ -14,12 +14,12 @@ const GEO_FRIENDLY_RE =
 
 const GEO_AMBIGUOUS_MARKERS = /\bremote\b|\bremoto\b|\bdistributed\b|\bremote[\s-]*first\b|^all$/i;
 
-const BRAZIL_PLACE = /\b(brazil|brasil|s[aã]o paulo|rio de janeiro|belo horizonte|curitiba|porto alegre|recife|florian[oó]polis|bras[ií]lia)\b/i;
-const FOREIGN_REGION = /\b(namer|north america|united states|us|usa|canada|uk|eu|emea|europe|apac|india|united kingdom|england|scotland|wales|netherlands|argentina|chile|colombia|peru|uruguay|paraguay|mexico|bolivia|ecuador|turkey|t[uü]rkiye|spain|ireland|greece|portugal|poland|romania|australia|norway|israel|switzerland|germany|france|italy|hungary|japan|sweden|denmark|finland|belgium|austria|czechia|czech republic|south africa|new zealand|south korea|korea|taiwan|hong kong|singapore)\b/i;
+const BRAZIL_PLACE = /\b(brazil|brasil|s[aã]o paulo|sao paulo|rio de janeiro|belo horizonte|curitiba|porto alegre|recife|florian[oó]polis|bras[ií]lia)\b/i;
+const FOREIGN_REGION = /\b(namer|north america|united states|us|usa|canada|uk|eu|emea|europe|apac|apj|india|united kingdom|england|scotland|wales|netherlands|argentina|chile|colombia|peru|uruguay|paraguay|mexico|bolivia|ecuador|turkey|t[uü]rkiye|spain|ireland|greece|portugal|poland|romania|australia|norway|israel|switzerland|germany|france|italy|hungary|japan|sweden|denmark|finland|belgium|austria|czechia|czech republic|south africa|new zealand|south korea|korea|taiwan|hong kong|singapore)\b/i;
 
 // Cities the board list names without "only" or "onsite". A single named place is a restriction.
 const HARD_CITY =
-  /\b(seattle|san francisco|new york|bay area|palo alto|bangalore|bengaluru|melbourne|boston|austin|los angeles|mountain view|redmond|bellevue|london|dublin|berlin|amsterdam|lisbon|tokyo|sydney|toronto|chicago|geneva|vilnius|kaunas)\b/i;
+  /\b(seattle|san francisco|\bsf\b|new york|\bnyc\b|bay area|palo alto|bangalore|bengaluru|melbourne|boston|austin|los angeles|mountain view|redmond|bellevue|london|dublin|berlin|amsterdam|lisbon|tokyo|sydney|toronto|chicago|geneva|vilnius|kaunas|lugano|sao paulo|s[aã]o paulo)\b/i;
 
 const US_STATE_ABBR = new Set(
   "AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC".split(
@@ -88,7 +88,7 @@ export function craftFamily(title: string): CraftFamily {
 
 export function locationSegments(location = ""): string[] {
   return location
-    .split(/\s*[·;|/]\s*|,\s*/)
+    .split(/\s*[·•;|/]\s*|,\s*/)
     .map((p) => p.replace(GEO_EXCLUSIVITY_RE, "").trim())
     .filter((p) => p && !/^(remote|hybrid|onsite|on-site|distributed)$/i.test(p));
 }
@@ -112,6 +112,7 @@ function isCountryList(location: string): boolean {
   if (!isTzOverlapLocation(location)) return false;
   const segs = locationSegments(location);
   if (!segs.length) return false;
+  if (segs.some((s) => HARD_CITY.test(s))) return false;
   const cityOrState = segs.filter((s) => HARD_CITY.test(s) || segmentIsUsState(s)).length;
   return cityOrState < segs.length;
 }
@@ -177,7 +178,8 @@ export function workplaceOf(
   if (/\bhybrid\b/.test(blob)) return "hybrid";
   if (/(on[\s-]*site|office based|in-office|in office)/.test(blob) && !/\bremote\b/.test(blob)) return "onsite";
   if (wt === "remote" || isRemote === true) return "remote";
-  if (/\b(remote|remoto)\b/.test(blob)) return "remote";
+  if (/\b(remote|remoto|home[-\s]?based)\b/.test(blob)) return "remote";
+  if (/\b(worldwide|anywhere|global|distributed)\b/.test(loc)) return "remote";
   return "unknown";
 }
 

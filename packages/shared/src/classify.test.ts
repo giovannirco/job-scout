@@ -260,6 +260,11 @@ describe("classifyListing", () => {
     expect(classifyListing({ locationRaw: "Remote, Poland", workplaceType: "Remote", company: "GitLab" }).workplace).toBe("remote");
     expect(classifyListing({ locationRaw: "San Francisco", workplaceType: "Hybrid", company: "OpenAI" }).workplace).toBe("hybrid");
     expect(classifyListing({ locationRaw: "", company: "Acme" }).workplace).toBe("unknown");
+    expect(classifyListing({ locationRaw: "Bay Area, CA, United States of America" }).workplace).toBe("onsite");
+    expect(classifyListing({ locationRaw: "San Francisco, CA • New York, NY • United States" }).workplace).toBe("onsite");
+    expect(classifyListing({ locationRaw: "Home based - Worldwide" }).workplace).toBe("remote");
+    expect(classifyListing({ locationRaw: "Lugano" }).workplace).toBe("onsite");
+    expect(classifyListing({ locationRaw: "Sao Paulo" }).workplace).toBe("onsite");
     expect(classifyListing({ locationRaw: "Poland · Brazil · Sweden · Colombia", company: "Kraken" }).workplace).toBe("unknown");
   });
 

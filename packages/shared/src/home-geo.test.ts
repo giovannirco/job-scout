@@ -29,6 +29,8 @@ describe("home market", () => {
     expect(missesHomeMarket("Brazil (Remote)", "São Paulo")).toBe(false);
     expect(missesHomeMarket("Remote", "São Paulo")).toBe(false);
     expect(missesHomeMarket("Remote, Poland", "London")).toBe(false);
+    expect(missesHomeMarket("Sao Paulo", "Austin, TX")).toBe(true);
+    expect(missesHomeMarket("APJ", "Austin, TX")).toBe(true);
   });
 
   it("treats a US restriction as a fit for Austin and a foreign one as not", () => {
