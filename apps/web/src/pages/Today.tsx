@@ -10,6 +10,7 @@ import { patch, post, useAction, useApi, type AutopilotState, type PipelineStatu
 import { ago, compact, dateTime } from "@/lib/format";
 import { Btn, Empty, ErrorNote, Loading, Monogram, Page, PageHeader, Panel, TONE_DOT, TONE_TEXT, cn } from "@/ui/kit";
 import { todayTitle, unscoredStage } from "./today-title";
+import { discoveryQueuedMessage } from "@/lib/discovery-toast";
 
 export function TodayPage() {
   useChatScope({ scope: "global" });
@@ -66,7 +67,9 @@ export function TodayPage() {
             <Btn
               onClick={async () => {
                 const r = await post<{ enqueued: number }>("/api/v1/radar/boards/scan-all");
-                toast.success(`Discovery queued for ${r.enqueued} boards`);
+                const text = discoveryQueuedMessage(r);
+                if (r.enqueued > 0) toast.success(text);
+                else toast.message(text);
               }}
             >
               <RadarIcon className="h-3.5 w-3.5" /> Run discovery
