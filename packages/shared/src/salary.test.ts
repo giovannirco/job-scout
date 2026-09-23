@@ -48,6 +48,20 @@ describe("parseSalary", () => {
     expect(cad.max).toBe(243600);
   });
 
+  it("reads a range written with the word to, including cents", () => {
+    const s = parseSalary(extractSalaryRaw("United States: $143,800.00 to $231,900.00"));
+    expect(s.min).toBe(143800);
+    expect(s.max).toBe(231900);
+    expect(s.currency).toBe("USD");
+  });
+
+  it("does not glue the next number onto the top of the band", () => {
+    const s = parseSalary(extractSalaryRaw("Annual base salary range: $152,405 &mdash; $179,300,152 USD"));
+    expect(s.min).toBe(152405);
+    expect(s.max).toBe(179300);
+    expect(s.currency).toBe("USD");
+  });
+
   it("returns nulls when unknown", () => {
     const s = parseSalary("");
     expect(s.min).toBeNull();
