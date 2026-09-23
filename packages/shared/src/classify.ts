@@ -107,8 +107,9 @@ function specificPlace(location: string): boolean {
   return FOREIGN_REGION.test(location) || HARD_CITY.test(location) || locationSegments(location).some(segmentIsUsState);
 }
 
-/** Three or more places, and not only cities, is a country list rather than one office. */
+/** Three or more bullet-separated places, and not only cities, is a country list rather than one office. A comma address is one place. */
 function isCountryList(location: string): boolean {
+  if (!/[·•;|]/.test(location)) return false;
   if (!isTzOverlapLocation(location)) return false;
   const segs = locationSegments(location);
   if (!segs.length) return false;

@@ -83,11 +83,11 @@ export async function bootstrap(opts: { seedBoards?: boolean } = {}) {
         .then((r) => { if (r.updated) log.info("bootstrap.titles", r); })
         .catch((e) => log.error("bootstrap.titles.failed", { err: e }));
     }
-    if (stored.placeSplitVersion !== "4") {
+    if (stored.placeSplitVersion !== "5") {
       const { repairProfileGateFilings } = await import("./scan.js");
       await repairProfileGateFilings()
         .then(async (r) => {
-          await updateSettings({ placeSplitVersion: "4" });
+          await updateSettings({ placeSplitVersion: "5" });
           if (r.withdrawn || r.regated) log.info("bootstrap.place-split", r);
         })
         .catch((e) => log.error("bootstrap.place-split.failed", { err: e }));
