@@ -7,7 +7,7 @@ import { StatusMenu, useStatusChange } from "@/components/status-menu";
 import { useChatScope } from "@/frame/store";
 import { qs, STATUSES, useApi, useApiMeta, type PipelineStatus, type PositionRow, type Profile, type SystemInfo } from "@/lib/api";
 import { homeMarket } from "@job-scout/shared";
-import { defaultPipelinePreset } from "./pipeline-defaults";
+import { defaultPipelinePreset, pipelineSortFallback } from "./pipeline-defaults";
 import { familyLocationLabel } from "./pipeline-location";
 import { ago, jdChangedAt, money } from "@/lib/format";
 import { archiveReasonLabel } from "@/lib/gate-reason";
@@ -21,7 +21,7 @@ const PRESETS: { value: Preset; label: string; params: Partial<PipelineSearch> }
   { value: "decide", label: "Decide", params: { verdict: "pass", status: "triaged,review", sort: "score_desc" } },
   { value: "marginal", label: "Marginal", params: { verdict: "marginal", status: "triaged", sort: "score_desc" } },
   { value: "active", label: "Active", params: { status: "hot", sort: "updated_desc" } },
-  { value: "all", label: "All open", params: { status: "active", sort: "updated_desc" } },
+  { value: "all", label: "All open", params: { status: "active", sort: "first_seen_desc" } },
   { value: "archived", label: "Archived", params: { status: "archived", sort: "updated_desc" } },
 ];
 
@@ -40,7 +40,9 @@ export function PipelinePage() {
   const llmKnown = sys.isError || sys.data !== undefined;
   const presetReady = !untouched || llmKnown;
   const opening = defaultPipelinePreset(sys.data?.llmConfigured === true);
-  const s: PipelineSearch = untouched ? { ...PRESETS.find((p) => p.value === opening)!.params, ...stripUndefined(search) } : { sort: "updated_desc", ...stripUndefined(search) };
+  const s: PipelineSearch = untouched
+    ? { ...PRESETS.find((p) => p.value === opening)!.params, ...stripUndefined(search) }
+    : { sort: pipelineSortFallback(search), ...stripUndefined(search) };
   const page = s.page || 1;
   const [q, setQ] = useState(s.q || "");
   useEffect(() => setQ(s.q || ""), [s.q]);
@@ -160,7 +162,7 @@ export function PipelinePage() {
             sys.data && !sys.data.llmConfigured ? (
               <>
                 No model key is set, so nothing has a PASS verdict.{" "}
-                <button type="button" className="text-accent hover:underline" onClick={() => set({ verdict: undefined, status: "active", sort: "updated_desc" })}>
+                <button type="button" className="text-accent hover:underline" onClick={() => set({ verdict: undefined, status: "active", sort: "first_seen_desc" })}>
                   Show all open filings
                 </button>
                 .

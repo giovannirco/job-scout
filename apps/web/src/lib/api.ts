@@ -480,7 +480,7 @@ export type CompanyDetail = {
   industryTags: string[] | null;
   overview: string | null;
   metadata: Record<string, unknown>;
-  positions: { id: string; slug: string; title: string; status: PipelineStatus; triageScore: number | null; triageVerdict: Verdict | null; listingStatus: string | null; primaryUrl: string | null; salaryMin: number | null; salaryMax: number | null; salaryCurrency: string | null; locationRaw: string | null; updatedAt: string }[];
+  positions: { id: string; slug: string; title: string; status: PipelineStatus; triageScore: number | null; triageVerdict: Verdict | null; listingStatus: string | null; primaryUrl: string | null; salaryMin: number | null; salaryMax: number | null; salaryCurrency: string | null; locationRaw: string | null; firstSeenAt: string | null; updatedAt: string }[];
   research: Evaluation | null;
   boards: Board[];
 };
