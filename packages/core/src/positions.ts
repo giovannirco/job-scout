@@ -189,6 +189,10 @@ export async function listPositions(q: ListPositionsQuery) {
             and jr.revision = (select max(j2.revision) from jd_revisions j2 where j2.position_id = ${positions.id})
             and jr.location_raw ilike ${like}
         )`,
+        sql`exists (
+          select 1 from jsonb_array_elements_text(coalesce(${positions.metadata}->'ats'->'departments', '[]'::jsonb)) dep
+          where dep ilike ${like}
+        )`,
       )!);
     }
   }

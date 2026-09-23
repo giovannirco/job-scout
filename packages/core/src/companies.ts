@@ -104,6 +104,7 @@ export async function getCompany(idOrSlug: string) {
       locationRaw: sql<string | null>`(select jr.location_raw from jd_revisions jr where jr.position_id = "positions"."id" order by jr.revision desc limit 1)`,
       firstSeenAt: positions.firstSeenAt,
       postedAt: sql<string | null>`nullif(${positions.metadata}->'ats'->>'postedAt', '')`,
+      departments: sql<string[]>`coalesce((select array_agg(value) from jsonb_array_elements_text(coalesce(${positions.metadata}->'ats'->'departments', '[]'::jsonb)) as value), '{}')`,
       updatedAt: positions.updatedAt,
     })
     .from(positions)
