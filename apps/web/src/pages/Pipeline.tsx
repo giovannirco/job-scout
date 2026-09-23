@@ -6,6 +6,7 @@ import { GeoChip, ListingBadge, ScoreMeter, STATUS_LABEL, STATUS_PATH, STATUS_TO
 import { StatusMenu, useStatusChange } from "@/components/status-menu";
 import { useChatScope } from "@/frame/store";
 import { qs, STATUSES, useApi, useApiMeta, type PipelineStatus, type PositionRow, type Profile, type SystemInfo } from "@/lib/api";
+import { homeMarket } from "@job-scout/shared";
 import { defaultPipelinePreset } from "./pipeline-defaults";
 import { familyLocationLabel } from "./pipeline-location";
 import { ago, jdChangedAt, money } from "@/lib/format";
@@ -127,6 +128,7 @@ export function PipelinePage() {
             <option value="worldwideish">worldwide</option>
             <option value="brazil_friendly">brazil / latam</option>
             <option value="ambiguous_remote">ambiguous remote</option>
+            {homeMarket(profile.data?.location || "") ? <option value="home">home</option> : null}
             <option value="hard_geo">hard geo</option>
             <option value="unknown">unknown</option>
           </FilterSelect>

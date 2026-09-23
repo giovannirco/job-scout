@@ -109,33 +109,24 @@ export function CompanyPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {[...open, ...c.positions.filter((p) => p.status === "archived")].map((p) => (
-                    <Tr key={p.id} className={cn(p.status === "archived" && "opacity-50")} onClick={() => navigate({ to: "/positions/$id", params: { id: p.slug } })}>
-                      <Td className="max-w-[360px]">
-                        <span className="truncate block">{p.title || <span className="text-faint">Untitled</span>}</span>
-                        {p.locationRaw || p.salaryMin != null || p.salaryMax != null ? (
-                          <span className="truncate block text-[11px] text-faint">
-                            {[p.locationRaw, money(p.salaryMin, p.salaryMax, p.salaryCurrency)].filter(Boolean).join(" · ")}
-                          </span>
-                        ) : null}
-                      </Td>
-                      <Td>
-                        <ScoreMeter score={p.triageScore} verdict={p.triageVerdict} />
-                      </Td>
-                      <Td>
-                        <span className="inline-flex gap-1.5">
-                          <StatusBadge status={p.status} />
-                          <ListingBadge status={p.listingStatus} />
-                        </span>
-                      </Td>
-                      <Td right mono className="text-muted">
-                        {ago(p.updatedAt)}
-                      </Td>
-                    </Tr>
+                  {open.map((p) => (
+                    <PositionRow key={p.id} p={p} onOpen={() => navigate({ to: "/positions/$id", params: { id: p.slug } })} />
                   ))}
                 </tbody>
               </Table>
             )}
+            {archived ? (
+              <details className="border-t border-border/70">
+                <summary className="cursor-pointer px-3 py-2 text-[12px] text-muted">{archived} archived</summary>
+                <Table className="border-0 rounded-none">
+                  <tbody>
+                    {c.positions.filter((p) => p.status === "archived").map((p) => (
+                      <PositionRow key={p.id} p={p} muted onOpen={() => navigate({ to: "/positions/$id", params: { id: p.slug } })} />
+                    ))}
+                  </tbody>
+                </Table>
+              </details>
+            ) : null}
           </Panel>
 
           {c.boards.length ? (
@@ -167,5 +158,32 @@ export function CompanyPage() {
         </Panel>
       </div>
     </Page>
+  );
+}
+
+function PositionRow({ p, muted, onOpen }: { p: CompanyDetail["positions"][number]; muted?: boolean; onOpen: () => void }) {
+  return (
+    <Tr className={cn(muted && "opacity-50")} onClick={onOpen}>
+      <Td className="max-w-[360px]">
+        <span className="truncate block">{p.title || <span className="text-faint">Untitled</span>}</span>
+        {p.locationRaw || p.salaryMin != null || p.salaryMax != null ? (
+          <span className="truncate block text-[11px] text-faint">
+            {[p.locationRaw, money(p.salaryMin, p.salaryMax, p.salaryCurrency)].filter(Boolean).join(" · ")}
+          </span>
+        ) : null}
+      </Td>
+      <Td>
+        <ScoreMeter score={p.triageScore} verdict={p.triageVerdict} />
+      </Td>
+      <Td>
+        <span className="inline-flex gap-1.5">
+          <StatusBadge status={p.status} />
+          <ListingBadge status={p.listingStatus} />
+        </span>
+      </Td>
+      <Td right mono className="text-muted">
+        {ago(p.updatedAt)}
+      </Td>
+    </Tr>
   );
 }
