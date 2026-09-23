@@ -73,7 +73,7 @@ export function PipelinePage() {
               }}
             >
               <Search className="h-3.5 w-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-faint" />
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Title, company, location…" className="w-[240px] h-8 rounded-md border border-border bg-bg pl-7 pr-7 text-[12.5px] outline-none focus:border-accent placeholder:text-faint" />
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Title, company, team, location…" className="w-[260px] h-8 rounded-md border border-border bg-bg pl-7 pr-7 text-[12.5px] outline-none focus:border-accent placeholder:text-faint" />
               {q ? (
                 <button type="button" onClick={() => (setQ(""), set({ q: undefined }))} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-faint hover:text-fg" aria-label="Clear search">
                   <X className="h-3.5 w-3.5" />
