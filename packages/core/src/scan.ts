@@ -380,10 +380,10 @@ export async function followUpIntake(
 }
 
 /** Manual intake: URL -> position (status triaged) -> triage job. */
-export async function intakeUrl(url: string, opts: { companyName?: string; status?: "triaged" | "review" } = {}) {
+export async function intakeUrl(url: string, opts: { companyName?: string; status?: "triaged" | "review"; source?: string } = {}) {
   const job = await fetchJobFromUrl(url);
   const { position, created, revived } = await upsertFromJob(job, {
-    source: "manual",
+    source: opts.source || "manual",
     companyName: opts.companyName,
     status: opts.status || "triaged",
     reviveArchived: true,
