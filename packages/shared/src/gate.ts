@@ -43,6 +43,15 @@ function excludeHits(title: string, term: string): string | null {
   return null;
 }
 
+/** Engineer and developer are the same job shape. "software engineer" also matches "software developer". */
+function includeTerms(term: string): string[] {
+  const t = norm(term);
+  if (!t) return [];
+  if (t.endsWith(" engineer")) return [t, `${t.slice(0, -" engineer".length)} developer`];
+  if (t.endsWith(" developer")) return [t, `${t.slice(0, -" developer".length)} engineer`];
+  return [t];
+}
+
 /**
  * Deterministic pre-LLM gate. Cheap, explainable, tunable from Settings > Gate.
  * Order: exclude title -> require include title -> stale -> geo block -> geo allow/unknown.
@@ -58,8 +67,9 @@ export function gateListing(input: GateInput, cfg: GateConfig): GateVerdict {
 
   let matchedInclude: string | null = null;
   for (const term of cfg.titleInclude) {
-    if (has(title, term)) {
-      matchedInclude = term.trim();
+    const hit = includeTerms(term).find((candidate) => has(title, candidate));
+    if (hit) {
+      matchedInclude = hit;
       break;
     }
   }
