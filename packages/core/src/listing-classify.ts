@@ -169,8 +169,8 @@ export async function runListingClassify(positionId: string) {
 }
 
 export async function backfillListingFacts(opts: { force?: boolean } = {}) {
-  // v9: bullet-separated offices, Bay Area + country, and "home based" are not unknown.
-  const BACKFILL_VERSION = "9";
+  // v10: AMER/EMEA region codes are remote. N/A and HQ are not places.
+  const BACKFILL_VERSION = "10";
   const s = await getSettings({ fresh: true });
   if (!opts.force && s.listingFactsBackfillVersion === BACKFILL_VERSION) {
     return { skipped: true as const, archivedSkipped: 0, updated: 0, enqueued: 0 };
