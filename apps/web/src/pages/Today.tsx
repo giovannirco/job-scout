@@ -302,7 +302,7 @@ function Funnel({
           const tone = STATUS_TONE[s as PipelineStatus];
           const pct = Math.max(n ? 6 : 0, (n / total) * 100);
           if (!n) return null;
-          const label = s === "triaged" && unscored ? "Unscored" : STATUS_LABEL[s as PipelineStatus];
+          const label = s === "triaged" && unscored ? "Not scored" : STATUS_LABEL[s as PipelineStatus];
           return (
             <button
               key={s}
@@ -333,7 +333,7 @@ function Funnel({
         <span className="text-faint">30d</span>
         {FUNNEL_30D.map((s) => (
           <button key={s} type="button" className="hover:text-fg" onClick={() => navigate({ to: "/pipeline", search: { status: s } })}>
-            {last30d?.[s] || 0} {s === "triaged" && unscored ? "unscored" : STATUS_LABEL[s].toLowerCase()}
+            {last30d?.[s] || 0} {s === "triaged" && unscored ? "not scored" : STATUS_LABEL[s].toLowerCase()}
           </button>
         ))}
         {extra30.map(([s, n]) => (

@@ -119,6 +119,31 @@ function isCountryList(location: string): boolean {
   return cityOrState < segs.length;
 }
 
+const US_LOCAL_CITY =
+  /\b(seattle|san francisco|\bsf\b|new york|\bnyc\b|bay area|palo alto|boston|austin|los angeles|mountain view|redmond|bellevue|chicago)\b/i;
+
+const US_STATE_NAME =
+  /\b(alabama|alaska|arizona|arkansas|california|colorado|connecticut|delaware|florida|georgia|hawaii|idaho|illinois|indiana|iowa|kansas|kentucky|louisiana|maine|maryland|massachusetts|michigan|minnesota|mississippi|missouri|montana|nebraska|nevada|new hampshire|new jersey|new mexico|new york|north carolina|north dakota|ohio|oklahoma|oregon|pennsylvania|rhode island|south carolina|south dakota|tennessee|texas|utah|vermont|virginia|washington|west virginia|wisconsin|wyoming|district of columbia)\b/i;
+
+/** A segment that names a US city, state, or the country, and no other country. */
+function isUsLocalSegment(segment: string): boolean {
+  const s = segment.trim();
+  if (!s) return false;
+  if (s.length === 2 && US_STATE_ABBR.has(s.toUpperCase())) return true;
+  if (/\b(united states|u\.s\.a?\.?|usa)\b/i.test(s) || /^us$/i.test(s)) return true;
+  if (US_LOCAL_CITY.test(s) || US_STATE_NAME.test(s)) {
+    const rest = s.replace(US_LOCAL_CITY, " ").replace(US_STATE_NAME, " ");
+    return !FOREIGN_REGION.test(rest);
+  }
+  return false;
+}
+
+/** Every concrete place is in the US. Remote wording does not make it a foreign list. */
+export function usOnlyPlaces(location: string): boolean {
+  const places = locationSegments(location).filter((segment) => !/\bremote\b/i.test(segment));
+  return places.length > 0 && places.every(isUsLocalSegment);
+}
+
 /** A city or US state in the location, not a country name on its own. */
 export function isCityOffice(location: string): boolean {
   if (!isNamedOffice(location)) return false;
@@ -155,6 +180,7 @@ export function geoClass(
   }
   if (GEO_EXCLUSIVITY_RE.test(blob)) return "hard_geo";
   if (isTzOverlapLocation(location)) {
+    if (usOnlyPlaces(location)) return "hard_geo";
     if (GEO_AMBIGUOUS_MARKERS.test(blob)) return "ambiguous_remote";
     // Several offices and no remote marker: still a place, not "we could not tell".
     if (specificPlace(location) && !FRIENDLY_PLACE.test(location) && !BRAZIL_PLACE.test(location)) return "hard_geo";
