@@ -617,7 +617,7 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
       contentHash: hash,
       listingStatus,
       lastCheckedAt: now,
-      lastChangedAt: now,
+      lastChangedAt: material && change_kind !== "first_seen" ? now : (pos.lastChangedAt || now),
       closedAt: listingStatus === "closed" ? pos.closedAt || now : null,
       firstSeenAt: pos.firstSeenAt || now,
       metadata: {
@@ -715,6 +715,46 @@ export async function decodeStoredJdEntities(): Promise<{ updated: number }> {
         }),
       })
       .where(eq(positions.id, positionId));
+    updated++;
+  }
+  return { updated };
+}
+
+/** A snapshot we completed ourselves is not an employer edit, so it should not move Changed. */
+export async function repairSnapshotChangeTimes(): Promise<{ updated: number }> {
+  const db = await getDb();
+  const rows = await db
+    .select({ id: positions.id, firstSeenAt: positions.firstSeenAt, lastChangedAt: positions.lastChangedAt })
+    .from(positions);
+  let updated = 0;
+  for (const row of rows) {
+    if (!row.firstSeenAt || !row.lastChangedAt) continue;
+    if (row.lastChangedAt.getTime() - row.firstSeenAt.getTime() < 60_000) continue;
+    const revs = await db
+      .select({
+        id: jdRevisions.id,
+        revision: jdRevisions.revision,
+        observedAt: jdRevisions.observedAt,
+        fieldDiffs: jdRevisions.fieldDiffs,
+        material: jdRevisions.material,
+        changeKind: jdRevisions.changeKind,
+      })
+      .from(jdRevisions)
+      .where(eq(jdRevisions.positionId, row.id))
+      .orderBy(asc(jdRevisions.revision));
+    let latest: Date | null = null;
+    for (const rev of revs) {
+      if (rev.revision <= 1) continue;
+      const diffs = Array.isArray(rev.fieldDiffs) ? rev.fieldDiffs : [];
+      const judged = diffs.length ? classifyMateriality(diffs) : { material: rev.material, change_kind: rev.changeKind };
+      if (diffs.length && (judged.material !== rev.material || judged.change_kind !== rev.changeKind)) {
+        await db.update(jdRevisions).set({ material: judged.material, changeKind: judged.change_kind }).where(eq(jdRevisions.id, rev.id));
+      }
+      if (judged.material && judged.change_kind !== "first_seen" && judged.change_kind !== "noise_rebase") latest = rev.observedAt;
+    }
+    const next = latest || row.firstSeenAt;
+    if (Math.abs(next.getTime() - row.lastChangedAt.getTime()) < 1000) continue;
+    await db.update(positions).set({ lastChangedAt: next }).where(eq(positions.id, row.id));
     updated++;
   }
   return { updated };

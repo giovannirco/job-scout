@@ -112,7 +112,7 @@ export function PipelinePage() {
             <option value="marginal">marginal</option>
             <option value="pass,marginal">pass + marginal</option>
             <option value="fail">fail</option>
-            <option value="none">untriaged</option>
+            <option value="none">not scored</option>
           </FilterSelect>
           <FilterSelect value={s.workplace || ""} onChange={(v) => set({ workplace: v || undefined })} label="workplace">
             <option value="">any workplace</option>

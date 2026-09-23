@@ -770,7 +770,7 @@ function AutopilotTab() {
                 <div className="eyebrow mt-1">in inbox</div>
               </Link>
             </div>
-            {summary.untriaged ? <div className="text-[11.5px] text-warn mt-2">{summary.untriaged} positions still untriaged.</div> : null}
+            {summary.untriaged ? <div className="text-[11.5px] text-warn mt-2">{summary.untriaged} positions are not scored yet.</div> : null}
           </Panel>
         </div>
       </div>

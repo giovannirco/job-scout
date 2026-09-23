@@ -171,7 +171,7 @@ export function PositionPage() {
             </div>
             <div className="flex items-center gap-3">
               <ScoreMeter score={p.triageScore} verdict={p.triageVerdict} size="md" />
-              {p.triageVerdict ? <span className={cn("font-mono text-[11px] uppercase", TONE_TEXT[verdictTone(p.triageVerdict)])}>{p.triageVerdict}</span> : <span className="font-mono text-[11px] text-faint">untriaged</span>}
+              {p.triageVerdict ? <span className={cn("font-mono text-[11px] uppercase", TONE_TEXT[verdictTone(p.triageVerdict)])}>{p.triageVerdict}</span> : <span className="font-mono text-[11px] text-faint">not scored</span>}
             </div>
           </div>
         </div>
