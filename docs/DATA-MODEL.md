@@ -39,7 +39,7 @@ Schema: `packages/db/src/schema.ts` (drizzle). Migrations: `packages/db/migratio
 | `board_sources` | one row per board: provider (greenhouse / ashby / lever / remoteok / market / html), token/URL, enabled, capability (`list_api` is scanned: ATS + RemoteOK JSON + WWR DevOps RSS), last scan |
 | `board_snapshots` | listings seen per scan (retention keeps the last 3 per board) |
 | `board_deltas` | new / changed / closed listings between snapshots |
-| `discovery_feed` | every listing the gate or triage did not turn into a position, with `lane` and `reason` |
+| `discovery_feed` | every listing observed in the window, with `lane` (`passed` / `filtered`) and `gate_reason`. Archiving a filing for the gate moves its row to `filtered` |
 | `watches` | standalone URL watches not tied to a board |
 
 ### Machine

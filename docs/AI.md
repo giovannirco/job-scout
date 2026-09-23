@@ -20,7 +20,20 @@ Prompt inputs are bounded (`triage.jdMaxChars`, default 6000) and every prompt i
 
 ## The gate (free)
 
-Before any model call, `packages/shared/src/gate.ts` rejects listings deterministically: title include/exclude lists, geo allow/block, max posting age, unknown-geo policy. Rejections land in `discovery_feed` with a reason (`title_exclude:<term>`, `title_no_include`, `geo_block:<term>`, `geo_unknown`, `stale:<days>d`) and are visible under Radar › Filtered so you can tune the lists. Only passes are triaged.
+Before any model call, `packages/shared/src/gate.ts` rejects listings with no model. Rejections land in `discovery_feed` with a reason and stay under Discovery › Filtered.
+
+| check | what it does |
+|--|--|
+| Title include | Profile **target roles** replace this list. `java` does not match JavaScript. `engineer` and `developer` match each other. |
+| Title exclude | `junior` also excludes new grad and early career. |
+| Named office | A city or single country with no remote wording does not pass, even when unknown geo is allowed. A country list is not one office. |
+| Home location | A US city on the profile drops a remote role that requires another country. A blank location does not. |
+| Geo allow / block | Word lists. A block wins when both match (`Remote - US only` hits `us only`). |
+| Posting age | Default 14 days, when the board exposes a date. |
+
+Reasons include `title_exclude:<term>`, `title_no_include`, `geo_block:<term>`, `geo_unlisted`, `geo_home`, `geo_unknown`, and `stale:<days>d`.
+
+A pass becomes a position with status `triaged` and no score. Triage runs only when a model key is set and the triage operation is enabled. An untouched scan filing that later misses the gate is archived, and its discovery row leaves the passed lane. A URL pasted by hand, with no discovery row, stays.
 
 ## Autopilot
 
