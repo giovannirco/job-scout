@@ -62,16 +62,33 @@ export function briefOf(p: Profile): string {
   return (p.scoutBrief || DEFAULT_SCOUT_BRIEF).trim();
 }
 
+/** Words that only describe seniority or a generic job shape. A specialty token such as "java" is kept on its own. */
+const ROLE_FILLER = new Set([
+  "engineer", "engineering", "senior", "staff", "principal", "lead", "junior",
+  "software", "developer", "development", "backend", "frontend", "full", "stack",
+  "fullstack", "site", "reliability", "platform", "devops", "sre", "manager",
+  "intern", "associate",
+]);
+
+function pushTerm(seen: Set<string>, out: string[], term: string) {
+  if (term.length < 2 || seen.has(term)) return;
+  seen.add(term);
+  out.push(term);
+}
+
 /** Lowercased title-gate terms from profile target roles. Drops blanks and duplicates. */
 export function titleIncludesFromRoles(roles: unknown): string[] {
   if (!Array.isArray(roles)) return [];
   const seen = new Set<string>();
   const out: string[] = [];
   for (const role of roles) {
-    const term = String(role).trim().toLowerCase();
-    if (term.length < 2 || seen.has(term)) continue;
-    seen.add(term);
-    out.push(term);
+    const phrase = String(role).trim().toLowerCase().replace(/\s+/g, " ");
+    if (phrase.length < 2) continue;
+    pushTerm(seen, out, phrase);
+    for (const token of phrase.split(/[^a-z0-9+#]+/)) {
+      if (ROLE_FILLER.has(token)) continue;
+      pushTerm(seen, out, token);
+    }
   }
   return out;
 }
