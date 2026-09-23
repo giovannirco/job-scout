@@ -29,6 +29,8 @@ import {
   browserStatus,
   totalsToday,
   regateRecentDiscovery,
+  syncGateFromTargetRoles,
+  titleIncludesFromRoles,
 } from "@job-scout/core";
 import { applyAutopilotPreset, AUTOPILOT_PRESET_VALUES, LLM_OPERATION_IDS } from "@job-scout/shared";
 import { body, fail, ok } from "../envelope.js";
@@ -61,7 +63,16 @@ settingsRoutes.patch("/", async (c) => {
 });
 
 settingsRoutes.get("/profile", async (c) => ok(c, await getProfile()));
-settingsRoutes.patch("/profile", async (c) => ok(c, await updateProfile(await body(c))));
+settingsRoutes.patch("/profile", async (c) => {
+  const patch = await body(c);
+  const before = await getProfile();
+  const next = await updateProfile(patch);
+  const rolesChanged =
+    Array.isArray(patch.targetRoles) &&
+    JSON.stringify(titleIncludesFromRoles(before.targetRoles)) !== JSON.stringify(titleIncludesFromRoles(next.targetRoles));
+  const synced = rolesChanged ? await syncGateFromTargetRoles(next.targetRoles) : null;
+  return ok(c, next, synced ? { regate: synced.regate, titleInclude: synced.titleInclude } : {});
+});
 
 /** Settings > AI */
 settingsRoutes.get("/llm/models", async (c) => {
