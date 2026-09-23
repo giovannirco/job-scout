@@ -9,6 +9,7 @@ import { openDock, useChatScope } from "@/frame/store";
 import { patch, post, useAction, useApi, type AutopilotState, type PipelineStatus, type SystemInfo, type TodayData, type TodaySlim } from "@/lib/api";
 import { ago, compact, dateTime } from "@/lib/format";
 import { Btn, Empty, ErrorNote, Loading, Monogram, Page, PageHeader, Panel, TONE_DOT, TONE_TEXT, cn } from "@/ui/kit";
+import { todayTitle } from "./today-title";
 
 export function TodayPage() {
   useChatScope({ scope: "global" });
@@ -30,6 +31,7 @@ export function TodayPage() {
   const llmFails = d.llm.byOperation.reduce((n, r) => n + r.failures, 0);
 
   const needs = d.decisions.length + d.approvals.length + d.upcoming.length;
+  const noKey = sys.data?.llmConfigured === false;
   const bits: string[] = [];
   if (d.decisions.length) bits.push(`${d.decisions.length} PASS ${d.decisions.length === 1 ? "verdict" : "verdicts"} to decide`);
   if (d.approvals.length) bits.push(`${d.approvals.length} autopilot ${d.approvals.length === 1 ? "suggestion" : "suggestions"}`);
@@ -41,8 +43,18 @@ export function TodayPage() {
     <Page wide>
       <PageHeader
         eyebrow={dateLabel}
-        title={needs === 0 ? "Nothing needs you right now" : `${needs} ${needs === 1 ? "thing needs" : "things need"} you`}
-        subtitle={bits.length ? bits.join(" · ") : "The machine keeps scanning. Add a URL or run discovery to feed it."}
+        title={todayTitle({ needs, untriaged: d.counts.untriaged, llmConfigured: !noKey })}
+        subtitle={
+          bits.length ? (
+            bits.join(" · ")
+          ) : noKey && d.counts.untriaged > 0 ? (
+            <>
+              Discovery filed them without a model. Read them in the <Link to="/pipeline" className="text-accent hover:underline">pipeline</Link>, or add a key when you want them scored.
+            </>
+          ) : (
+            "The machine keeps scanning. Add a URL or run discovery to feed it."
+          )
+        }
         actions={
           <>
             {auto.data ? (
@@ -78,7 +90,7 @@ export function TodayPage() {
             title="Decide"
             meta={`${d.decisions.length} PASS`}
             actions={
-              <Link to="/pipeline" search={{ verdict: "pass", status: "triaged" }} className="text-[11.5px] text-muted hover:text-fg inline-flex items-center gap-1">
+              <Link to="/pipeline" search={noKey ? {} : { verdict: "pass", status: "triaged" }} className="text-[11.5px] text-muted hover:text-fg inline-flex items-center gap-1">
                 All <ArrowRight className="h-3 w-3" />
               </Link>
             }
@@ -86,7 +98,15 @@ export function TodayPage() {
           >
             {d.decisions.length === 0 ? (
               <div className="p-3">
-                <Empty>No PASS verdicts waiting. Discovery keeps running; new matches land here.</Empty>
+                <Empty>
+                  {noKey ? (
+                    <>
+                      Nothing is scored yet. <Link to="/pipeline" className="text-accent hover:underline">Open the filings</Link>.
+                    </>
+                  ) : (
+                    "No PASS verdicts waiting. Discovery keeps running; new matches land here."
+                  )}
+                </Empty>
               </div>
             ) : (
               <DecisionList rows={d.decisions} />
