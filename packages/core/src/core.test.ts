@@ -296,8 +296,10 @@ describe("core on pglite", () => {
     expect(result.nowPassed).toBeGreaterThanOrEqual(1);
     const row = (await db.select().from(discoveryFeed).where(eq(discoveryFeed.id, rowId)))[0];
     expect(row?.lane).toBe("passed");
-    const queued = await db.select({ payload: jobs.payload }).from(jobs).where(eq(jobs.type, "scan_url"));
-    expect(queued.some((r) => (r.payload as { url?: string }).url?.includes("java-regate"))).toBe(true);
+    const queued = await db.select({ payload: jobs.payload, priority: jobs.priority }).from(jobs).where(eq(jobs.type, "scan_url"));
+    const mine = queued.find((r) => (r.payload as { url?: string }).url?.includes("java-regate"));
+    expect(mine).toBeTruthy();
+    expect(mine?.priority).toBeGreaterThan(120);
   });
 
   it("uses target roles as the title gate and rechecks a stored java listing", async () => {
@@ -368,7 +370,11 @@ describe("core on pglite", () => {
       { question: "Why Lightning Labs?", required: true, inputType: "textarea" },
     ];
     await harvestQuestions(position.id, prompts);
-    await harvestQuestions(position.id, prompts);
+    await harvestQuestions(position.id, [
+      ...prompts,
+      { question: "Name", required: false, inputType: "text" },
+      { question: "name", required: false, inputType: "text" },
+    ]);
     const db = await getDb();
     const rows = await db.select().from(applicationQuestions).where(eq(applicationQuestions.positionId, position.id));
     expect(rows).toHaveLength(2);
