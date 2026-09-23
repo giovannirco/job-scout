@@ -150,6 +150,24 @@ export function greenhouseOfficeIsRemote(offices: string[]): boolean {
 
 const JUNK_PLACE = /^(n\/a|hq|tbd|none|null|-+|—+)$/i;
 
+const HIRING_REGIONS = [
+  /\b(emea|europe|\beu\b)\b/i,
+  /\b(apac|asia pacific|\basia\b)\b/i,
+  /\b(americas|north america|latin america|latam)\b/i,
+];
+
+/** One hiring region, or null when the text names none or more than one. */
+export function hiringRegion(text: string): number | null {
+  const hits = HIRING_REGIONS.map((re, index) => (re.test(text) ? index : -1)).filter((index) => index >= 0);
+  return hits.length === 1 ? hits[0]! : null;
+}
+
+export function regionsDisagree(left: string, right: string): boolean {
+  const a = hiringRegion(left);
+  const b = hiringRegion(right);
+  return a != null && b != null && a !== b;
+}
+
 /** When the board location is N/A or HQ, the office list is the place. A region office is not a desk. */
 export function greenhouseListingLocation(
   locationName: string | undefined,
@@ -157,7 +175,11 @@ export function greenhouseListingLocation(
 ): { locationRaw?: string; regionOffice: boolean } {
   const name = (locationName || "").trim();
   const usable = offices.map((office) => office.trim()).filter((office) => office && !JUNK_PLACE.test(office));
-  if (name && !JUNK_PLACE.test(name)) return { locationRaw: name, regionOffice: false };
+  if (name && !JUNK_PLACE.test(name)) {
+    const officeText = usable.join(" · ");
+    if (officeText && regionsDisagree(name, officeText)) return { locationRaw: officeText, regionOffice: false };
+    return { locationRaw: name, regionOffice: false };
+  }
   if (!usable.length) return { locationRaw: undefined, regionOffice: false };
   const regionOffice = usable.every((office) => !isCityOffice(office) && !/,/.test(office));
   return { locationRaw: usable.join(" · "), regionOffice };

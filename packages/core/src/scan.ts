@@ -1,6 +1,6 @@
 import { and, desc, eq, gte, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { boardDeltas, boardSnapshots, boardSources, companies, discoveryFeed, getDb, id, jdRevisions, positions } from "@job-scout/db";
-import { detectAts, externalIdentityFromDetect, fetchGreenhouseJob, greenhouseBoardToken, greenhouseListingNeedsBoardFetch, listBoard, type AtsJob, type BoardJobSummary } from "@job-scout/ats";
+import { detectAts, externalIdentityFromDetect, fetchGreenhouseJob, greenhouseBoardToken, greenhouseListingNeedsBoardFetch, listBoard, regionsDisagree, type AtsJob, type BoardJobSummary } from "@job-scout/ats";
 import { fetchJob as fetchJobFromUrl } from "./fetch-job.js";
 import { applyProfileToGate, classifyListing, cleanJobTitle, craftFamily, gateListing, geoClass, homeMarket, isNoiseJobTitle, listingCompany, missesHomeMarket, parseClipListing, unresolvedCompany, type GateConfig, type GateVerdict } from "@job-scout/shared";
 import { enqueueJob } from "./jobs.js";
@@ -753,6 +753,38 @@ export async function refetchBlankGreenhouseFilings(): Promise<{ checked: number
   }
   if (blank.length && failed === blank.length) throw new Error("greenhouse location refetch failed");
   return { checked: blank.length, updated, withdrawn, failed };
+}
+
+/** A title that names EU while the stored place says Americas needs the office, not the stale location. */
+export async function refetchDisagreeingRegions(): Promise<{ checked: number; updated: number; withdrawn: number; failed: number }> {
+  const db = await getDb();
+  const rows = await db
+    .select({
+      url: positions.primaryUrl,
+      company: companies.name,
+      title: positions.title,
+      provider: positions.atsProvider,
+      location: sql<string | null>`(select location_raw from jd_revisions jr where jr.position_id = ${positions.id} order by jr.revision desc limit 1)`,
+    })
+    .from(positions)
+    .innerJoin(companies, eq(positions.companyId, companies.id))
+    .where(eq(positions.status, "triaged"));
+  const disagree = rows.filter((row) => row.url && row.provider === "greenhouse" && regionsDisagree(row.title, row.location || ""));
+  let updated = 0;
+  let withdrawn = 0;
+  let failed = 0;
+  for (const row of disagree) {
+    try {
+      const result = await intakeUrl(row.url!, { companyName: row.company, source: "scan:discovery" });
+      if ("skipped" in result && result.skipped) withdrawn++;
+      else if (result.position) updated++;
+    } catch (e) {
+      failed++;
+      log.warn("intake.region_disagree_failed", { url: row.url, err: e instanceof Error ? e.message : String(e) });
+    }
+  }
+  if (disagree.length && failed === disagree.length) throw new Error("region refetch failed");
+  return { checked: disagree.length, updated, withdrawn, failed };
 }
 
 /** N/A and HQ hide the office. Refetch those filings and tidy cut-off titles. */
