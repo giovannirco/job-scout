@@ -210,7 +210,10 @@ export async function bootstrap(opts: { seedBoards?: boolean } = {}) {
     await settleExpectedQueueFailures()
       .then((r) => { if (r.cleared) log.info("bootstrap.queue", r); })
       .catch((e) => log.error("bootstrap.queue.failed", { err: e }));
-    const { repairSnapshotChangeTimes, clearRepairedChangedBadges } = await import("./positions.js");
+    const { collapseIdenticalFilings, repairSnapshotChangeTimes, clearRepairedChangedBadges } = await import("./positions.js");
+    await collapseIdenticalFilings()
+      .then((r) => { if (r.archived) log.info("bootstrap.duplicates", r); })
+      .catch((e) => log.error("bootstrap.duplicates.failed", { err: e }));
     await repairSnapshotChangeTimes()
       .then((r) => { if (r.updated) log.info("bootstrap.change-times", r); })
       .catch((e) => log.error("bootstrap.change-times.failed", { err: e }));

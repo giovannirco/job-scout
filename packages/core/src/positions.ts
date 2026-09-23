@@ -761,6 +761,40 @@ export async function repairSnapshotChangeTimes(): Promise<{ updated: number }> 
   return { updated };
 }
 
+/** Same company and the same JD text is one posting, even when the board minted several ids. */
+export async function collapseIdenticalFilings(): Promise<{ archived: number }> {
+  const db = await getDb();
+  const rows = await db
+    .select({
+      id: positions.id,
+      companyId: positions.companyId,
+      contentHash: positions.contentHash,
+      firstSeenAt: positions.firstSeenAt,
+    })
+    .from(positions)
+    .where(eq(positions.status, "triaged"));
+  const groups = new Map<string, typeof rows>();
+  for (const row of rows) {
+    if (!row.contentHash) continue;
+    const key = `${row.companyId}|${row.contentHash}`;
+    const list = groups.get(key) || [];
+    list.push(row);
+    groups.set(key, list);
+  }
+  let archived = 0;
+  for (const list of groups.values()) {
+    if (list.length < 2) continue;
+    list.sort((a, b) => (a.firstSeenAt?.getTime() || 0) - (b.firstSeenAt?.getTime() || 0) || a.id.localeCompare(b.id));
+    const keep = list[0];
+    for (const extra of list.slice(1)) {
+      await archivePosition(extra.id, "duplicate of the same posting", "scan");
+      await db.update(discoveryFeed).set({ positionId: keep.id }).where(eq(discoveryFeed.positionId, extra.id));
+      archived++;
+    }
+  }
+  return { archived };
+}
+
 /** Drop "changed" when every later revision only completed a bad first snapshot. */
 export async function clearRepairedChangedBadges(): Promise<{ cleared: number }> {
   const db = await getDb();
@@ -853,10 +887,22 @@ export async function upsertFromJob(
     throw new Error("unparseable job title");
   }
 
+  const hash = contentHash({ title: job.title, descriptionText: job.descriptionText, salaryRaw: job.salaryRaw, locationRaw: job.locationRaw });
+  const sameJd = (
+    await db
+      .select({ id: positions.id })
+      .from(positions)
+      .where(and(eq(positions.companyId, company.id), eq(positions.contentHash, hash), sql`${positions.status} <> 'archived'`))
+      .limit(1)
+  )[0];
+  if (sameJd) {
+    const position = (await getPosition(sameJd.id))!;
+    return { position, created: false, revived: false };
+  }
+
   const posId = id("pos");
   const posSlug = `${slugify(`${company.slug}-${job.title}`).slice(0, 70)}-${posId.slice(-4)}`;
   const salary = parseSalary(job.salaryRaw);
-  const hash = contentHash({ title: job.title, descriptionText: job.descriptionText, salaryRaw: job.salaryRaw, locationRaw: job.locationRaw });
   const now = new Date();
   const repost = await repostFor({ id: posId, company: company.name, title: job.title, locationRaw: job.locationRaw || null, primaryUrl: job.url, externalIdentity });
   const loc = job.locationRaw || "";
