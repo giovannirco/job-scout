@@ -35,7 +35,7 @@ export type CatalogEntry = {
 export const ATS_CATALOG: CatalogEntry[] = [
   // ── Crypto / fintech (Greenhouse) ───────────────────────────────────────
   { id: "gh-strike", company: "Strike", provider: "greenhouse", token: "strike", careersUrl: "https://strike.me/careers", sourceKind: "ats", tags: ["crypto", "payments", "platform"], capability: "list_api", notes: "Bitcoin payments; strong remote platform/SRE signal." },
-  { id: "gh-bitso", company: "Bitso", provider: "greenhouse", token: "bitso", careersUrl: "https://bitso.com/careers", sourceKind: "ats", tags: ["crypto", "latam", "brazil"], capability: "list_api", notes: "LATAM exchange; watch geo notes carefully." },
+  { id: "gh-bitso", company: "Bitso", provider: "greenhouse", token: "bitso", careersUrl: "https://bitso.com/jobs", sourceKind: "ats", tags: ["crypto", "latam", "brazil"], capability: "list_api", notes: "Greenhouse token 404s. Openings are on BambooHR; boot demotes this row to a manual watch." },
   { id: "gh-coinbase", company: "Coinbase", provider: "greenhouse", token: "coinbase", careersUrl: "https://www.coinbase.com/careers", sourceKind: "ats", tags: ["crypto"], capability: "list_api" },
   { id: "gh-block", company: "Block", provider: "greenhouse", token: "block", careersUrl: "https://block.xyz/careers", sourceKind: "ats", tags: ["fintech", "crypto"], capability: "list_api", notes: "Square/Cash App/TBD; multi-board Greenhouse." },
   { id: "gh-bitgo", company: "BitGo", provider: "greenhouse", token: "bitgo", careersUrl: "https://www.bitgo.com/careers", sourceKind: "ats", tags: ["crypto", "infra", "custody"], capability: "list_api" },
@@ -66,7 +66,7 @@ export const ATS_CATALOG: CatalogEntry[] = [
   { id: "gh-consensys", company: "Consensys", provider: "greenhouse", token: "consensys", careersUrl: "https://consensys.io/careers", sourceKind: "ats", tags: ["crypto", "web3"], capability: "list_api" },
   // ── Ashby boards ────────────────────────────────────────────────────────
   { id: "ash-supabase", company: "Supabase", provider: "ashby", token: "supabase", careersUrl: "https://supabase.com/careers", sourceKind: "ats", tags: ["devtools", "postgres", "remote"], capability: "list_api" },
-  { id: "ash-kraken", company: "Kraken", provider: "ashby", token: "kraken", careersUrl: "https://jobs.kraken.com", sourceKind: "ats", tags: ["crypto"], capability: "list_api", notes: "Seed demo for noise rebaseline revisions." },
+  { id: "ash-kraken", company: "Kraken", provider: "ashby", token: "kraken.com", careersUrl: "https://jobs.ashbyhq.com/kraken.com", sourceKind: "ats", tags: ["crypto"], capability: "list_api", notes: "Ashby board slug is kraken.com. The bare kraken token 404s." },
   { id: "ash-chainlink", company: "Chainlink Labs", provider: "ashby", token: "chainlink-labs", careersUrl: "https://chain.link/careers", sourceKind: "ats", tags: ["crypto", "infra"], capability: "list_api" },
   { id: "ash-phantom", company: "Phantom", provider: "ashby", token: "phantom", careersUrl: "https://phantom.app/careers", sourceKind: "ats", tags: ["crypto", "wallet"], capability: "list_api" },
   { id: "ash-railway", company: "Railway", provider: "ashby", token: "railway", careersUrl: "https://railway.app/careers", sourceKind: "ats", tags: ["devtools", "platform", "remote"], capability: "list_api" },
