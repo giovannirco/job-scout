@@ -9,7 +9,7 @@ import { openDock, useChatScope } from "@/frame/store";
 import { patch, post, useAction, useApi, type AutopilotState, type PipelineStatus, type SystemInfo, type TodayData, type TodaySlim } from "@/lib/api";
 import { ago, compact, dateTime } from "@/lib/format";
 import { Btn, Empty, ErrorNote, Loading, Monogram, Page, PageHeader, Panel, TONE_DOT, TONE_TEXT, cn } from "@/ui/kit";
-import { todayTitle } from "./today-title";
+import { todayTitle, unscoredStage } from "./today-title";
 
 export function TodayPage() {
   useChatScope({ scope: "global" });
@@ -287,6 +287,7 @@ function Funnel({
   appliedThisWeek: number;
 }) {
   const navigate = useNavigate();
+  const unscored = unscoredStage(byStatus.triaged || 0, untriaged);
   const stages = STATUS_PATH.map((s) => ({ s, n: byStatus[s] || 0 }));
   const total = stages.reduce((n, x) => n + x.n, 0) || 1;
   const terminal = (byStatus.rejected || 0) + (byStatus.skip || 0);
@@ -298,25 +299,26 @@ function Funnel({
           const tone = STATUS_TONE[s as PipelineStatus];
           const pct = Math.max(n ? 6 : 0, (n / total) * 100);
           if (!n) return null;
+          const label = s === "triaged" && unscored ? "Unscored" : STATUS_LABEL[s as PipelineStatus];
           return (
             <button
               key={s}
               type="button"
-              title={`${STATUS_LABEL[s as PipelineStatus]} · ${n}`}
+              title={`${label} · ${n}`}
               onClick={() => navigate({ to: "/pipeline", search: { status: s } })}
               style={{ width: `${pct}%` }}
               className={cn("relative flex items-center gap-1.5 px-2 border-r border-bg last:border-r-0 hover:brightness-110 transition-[filter] min-w-0 text-left", s === "triaged" ? "bg-surface-3" : "bg-surface-2")}
             >
               <span className={cn("h-full w-[3px] absolute left-0 top-0", TONE_DOT[tone])} />
               <span className="font-mono text-[12px] tabular pl-1">{n}</span>
-              <span className="text-[11px] text-muted truncate hidden sm:inline">{STATUS_LABEL[s as PipelineStatus]}</span>
+              <span className="text-[11px] text-muted truncate hidden sm:inline">{label}</span>
             </button>
           );
         })}
       </div>
       <div className="flex items-center gap-3 font-mono text-[10.5px] text-faint tabular flex-wrap">
         <span>{total} live</span>
-        {untriaged ? (
+        {untriaged && !unscored ? (
           <Link to="/pipeline" search={{ verdict: "none", status: "triaged" }} className="text-warn hover:underline">
             {untriaged} untriaged
           </Link>
@@ -328,7 +330,7 @@ function Funnel({
         <span className="text-faint">30d</span>
         {FUNNEL_30D.map((s) => (
           <button key={s} type="button" className="hover:text-fg" onClick={() => navigate({ to: "/pipeline", search: { status: s } })}>
-            {last30d?.[s] || 0} {STATUS_LABEL[s].toLowerCase()}
+            {last30d?.[s] || 0} {s === "triaged" && unscored ? "unscored" : STATUS_LABEL[s].toLowerCase()}
           </button>
         ))}
         {extra30.map(([s, n]) => (
