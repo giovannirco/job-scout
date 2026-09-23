@@ -1,3 +1,18 @@
+/** A first snapshot stamps Changed at the same moment as First seen. That is not an edit. */
+export function jdChangedAt(firstSeenAt?: string | null, lastChangedAt?: string | null): string | null {
+  if (!lastChangedAt) return null;
+  if (!firstSeenAt) return lastChangedAt;
+  const first = new Date(firstSeenAt).getTime();
+  const changed = new Date(lastChangedAt).getTime();
+  if (Number.isNaN(first) || Number.isNaN(changed)) return lastChangedAt;
+  if (Math.abs(changed - first) < 1000) return null;
+  return lastChangedAt;
+}
+
+export function countLabel(n: number, singular: string, plural = `${singular}s`): string {
+  return `${n} ${n === 1 ? singular : plural}`;
+}
+
 export function ago(iso: string | null | undefined): string {
   if (!iso) return "—";
   const ms = Date.now() - new Date(iso).getTime();

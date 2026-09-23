@@ -8,7 +8,7 @@ import { useChatScope } from "@/frame/store";
 import { qs, STATUSES, useApi, useApiMeta, type PipelineStatus, type PositionRow, type Profile, type SystemInfo } from "@/lib/api";
 import { defaultPipelinePreset } from "./pipeline-defaults";
 import { familyLocationLabel } from "./pipeline-location";
-import { ago, money } from "@/lib/format";
+import { ago, jdChangedAt, money } from "@/lib/format";
 import { archiveReasonLabel } from "@/lib/gate-reason";
 import type { PipelineSearch } from "@/router";
 import { Btn, Card, Dot, Empty, Loading, Monogram, Page, PageHeader, Pager, Seg, SortHead, Table, Td, Th, Tr, cn, ErrorNote } from "@/ui/kit";
@@ -299,7 +299,7 @@ function PositionsTable({ rows, home }: { rows: PositionRow[]; home?: string | n
               {r.firstSeenAt ? ago(r.firstSeenAt) : <span className="text-faint">—</span>}
             </Td>
             <Td right mono className="text-muted">
-              {r.lastChangedAt ? ago(r.lastChangedAt) : <span className="text-faint">—</span>}
+              {jdChangedAt(r.firstSeenAt, r.lastChangedAt) ? ago(r.lastChangedAt) : <span className="text-faint">—</span>}
             </Td>
             <Td right mono className="text-muted">
               {ago(r.updatedAt)}
@@ -359,7 +359,7 @@ function Board({ rows }: { rows: PositionRow[] }) {
                     </Link>
                     <div className="flex items-center justify-between mt-2">
                       <ScoreMeter score={r.triageScore} verdict={r.triageVerdict} />
-                      <span className="text-[10.5px] font-mono text-faint tabular">{r.lastChangedAt ? ago(r.lastChangedAt) : ago(r.updatedAt)}</span>
+                      {jdChangedAt(r.firstSeenAt, r.lastChangedAt) ? <span className="text-[10.5px] font-mono text-faint tabular">changed {ago(r.lastChangedAt)}</span> : null}
                     </div>
                   </div>
                 </Card>
