@@ -83,11 +83,11 @@ export async function bootstrap(opts: { seedBoards?: boolean } = {}) {
         .then((r) => { if (r.updated) log.info("bootstrap.titles", r); })
         .catch((e) => log.error("bootstrap.titles.failed", { err: e }));
     }
-    if (stored.placeSplitVersion !== "4") {
+    if (stored.placeSplitVersion !== "6") {
       const { repairProfileGateFilings } = await import("./scan.js");
       await repairProfileGateFilings()
         .then(async (r) => {
-          await updateSettings({ placeSplitVersion: "4" });
+          await updateSettings({ placeSplitVersion: "6" });
           if (r.withdrawn || r.regated) log.info("bootstrap.place-split", r);
         })
         .catch((e) => log.error("bootstrap.place-split.failed", { err: e }));
@@ -100,6 +100,15 @@ export async function bootstrap(opts: { seedBoards?: boolean } = {}) {
           if (r.checked) log.info("bootstrap.blank-greenhouse", r);
         })
         .catch((e) => log.error("bootstrap.blank-greenhouse.failed", { err: e }));
+    }
+    if (stored.junkPlaceVersion !== "1") {
+      const { refetchJunkPlaceFilings } = await import("./scan.js");
+      await refetchJunkPlaceFilings()
+        .then(async (r) => {
+          await updateSettings({ junkPlaceVersion: "1" });
+          if (r.checked || r.titled) log.info("bootstrap.junk-place", r);
+        })
+        .catch((e) => log.error("bootstrap.junk-place.failed", { err: e }));
     }
   }
   const db = await getDb();

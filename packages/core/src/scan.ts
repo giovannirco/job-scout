@@ -1,17 +1,18 @@
 import { and, desc, eq, gte, inArray, isNull, lt, or, sql } from "drizzle-orm";
-import { boardDeltas, boardSnapshots, boardSources, companies, discoveryFeed, getDb, id, positions } from "@job-scout/db";
+import { boardDeltas, boardSnapshots, boardSources, companies, discoveryFeed, getDb, id, jdRevisions, positions } from "@job-scout/db";
 import { detectAts, externalIdentityFromDetect, fetchGreenhouseJob, greenhouseBoardToken, greenhouseListingNeedsBoardFetch, listBoard, type AtsJob, type BoardJobSummary } from "@job-scout/ats";
 import { fetchJob as fetchJobFromUrl } from "./fetch-job.js";
 import { applyProfileToGate, classifyListing, cleanJobTitle, craftFamily, gateListing, geoClass, homeMarket, isNoiseJobTitle, missesHomeMarket, parseClipListing, type GateConfig, type GateVerdict } from "@job-scout/shared";
 import { enqueueJob } from "./jobs.js";
 import { llmConfigured } from "./llm.js";
-import { archivePosition, upsertFromJob } from "./positions.js";
+import { archivePosition, trimStoredTitles, upsertFromJob } from "./positions.js";
 import { getSettings } from "./settings.js";
 import { boardErrorKind, type BoardErrorKind } from "./board-reconcile.js";
 import type { PositionStatus } from "@job-scout/db";
 import { log as rootLog } from "@job-scout/shared";
 import { boardScans, scanListings } from "./metrics.js";
 const log = rootLog.child({ scope: "scan" });
+const JUNK_PLACE = /^(n\/a|hq|tbd|none|null|-+|—+)$/i;
 
 type Ident = { externalIdentity: string; title: string; url?: string; location?: string | null };
 
@@ -586,9 +587,20 @@ export async function repairProfileGateFilings(): Promise<{ withdrawn: number; r
         .limit(1)
     )[0];
     if (row.source === "manual" && !feed) continue;
+    const rev = (
+      await db
+        .select({ locationRaw: jdRevisions.locationRaw })
+        .from(jdRevisions)
+        .where(eq(jdRevisions.positionId, row.id))
+        .orderBy(desc(jdRevisions.revision))
+        .limit(1)
+    )[0];
+    const discovered = (feed?.locationRaw || "").trim();
+    const fetched = (rev?.locationRaw || "").trim();
+    const locationRaw = !discovered || JUNK_PLACE.test(discovered) ? fetched || discovered : discovered;
     const verdict = listingGate({
       title: row.title,
-      locationRaw: feed?.locationRaw,
+      locationRaw,
       postedAt: feed?.postedAt,
       workplaceType: row.workplace && row.workplace !== "unknown" ? row.workplace : undefined,
     }, settings.gate, profile, { listedNow: true });
@@ -701,6 +713,38 @@ export async function refetchBlankGreenhouseFilings(): Promise<{ checked: number
   }
   if (blank.length && failed === blank.length) throw new Error("greenhouse location refetch failed");
   return { checked: blank.length, updated, withdrawn, failed };
+}
+
+/** N/A and HQ hide the office. Refetch those filings and tidy cut-off titles. */
+export async function refetchJunkPlaceFilings(): Promise<{ titled: number; checked: number; updated: number; withdrawn: number; failed: number }> {
+  const titled = (await trimStoredTitles()).updated;
+  const db = await getDb();
+  const rows = await db
+    .select({
+      url: positions.primaryUrl,
+      company: companies.name,
+      provider: positions.atsProvider,
+      location: sql<string | null>`(select location_raw from jd_revisions jr where jr.position_id = ${positions.id} order by jr.revision desc limit 1)`,
+    })
+    .from(positions)
+    .innerJoin(companies, eq(positions.companyId, companies.id))
+    .where(eq(positions.status, "triaged"));
+  const junk = rows.filter((row) => row.url && (row.provider === "greenhouse" || row.provider === "ashby") && JUNK_PLACE.test((row.location || "").trim()));
+  let updated = 0;
+  let withdrawn = 0;
+  let failed = 0;
+  for (const row of junk) {
+    try {
+      const result = await intakeUrl(row.url!, { companyName: row.company, source: "scan:discovery" });
+      if ("skipped" in result && result.skipped) withdrawn++;
+      else if (result.position) updated++;
+    } catch (e) {
+      failed++;
+      log.warn("intake.junk_place_failed", { url: row.url, err: e instanceof Error ? e.message : String(e) });
+    }
+  }
+  if (junk.length && failed === junk.length) throw new Error("junk place refetch failed");
+  return { titled, checked: junk.length, updated, withdrawn, failed };
 }
 
 /** Manual intake: URL -> position (status triaged) -> triage job. */
