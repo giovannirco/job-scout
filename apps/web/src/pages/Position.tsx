@@ -248,7 +248,7 @@ function Stepper({ id, status, archiveReason }: { id: string; status: PipelineSt
         ) : (
           <>
             <Btn size="xs" variant="ghost" onClick={() => move("skip")}>
-              Skip
+              {STATUS_LABEL.skip}
             </Btn>
             <Btn size="xs" variant="ghost" onClick={() => move("rejected")}>
               Rejected
