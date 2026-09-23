@@ -99,6 +99,32 @@ describe("formatting-only description (F-23)", () => {
     expect(filtered[0].path).toBe("listing_status");
   });
 
+  it("a changed badge flipping back to open is not an employer edit", () => {
+    const chrome = "•\n •\n •\n •\n\n Principal Software Engineer\n\n • • • • • • • •\n\n Elastic, the Search AI Company, enables everyone to find the answers they need.";
+    const clean = "Elastic, the Search AI Company, enables everyone to find the answers they need.";
+    const m = classifyMateriality([
+      { path: "listing_status", before: "changed", after: "open" },
+      { path: "description_text", before: chrome, after: clean },
+      { path: "location_raw", before: "", after: "Spain" },
+      { path: "title", before: "Principal Software Engineer ", after: "Principal Software Engineer" },
+    ]);
+    expect(m.material).toBe(false);
+    expect(m.change_kind).toBe("noise_rebase");
+  });
+
+  it("a real JD edit stays material beside a badge flip", () => {
+    const m = classifyMateriality([
+      { path: "listing_status", before: "changed", after: "open" },
+      {
+        path: "description_text",
+        before: "Need Kubernetes experience and on-call ownership for the platform.",
+        after: "Need Kubernetes and Terraform experience plus on-call ownership for the platform.",
+      },
+    ]);
+    expect(m.material).toBe(true);
+    expect(m.change_kind).toBe("content");
+  });
+
   it("real content change stays material", () => {
     const m = classifyMateriality([
       {
