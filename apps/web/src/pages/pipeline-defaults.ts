@@ -5,7 +5,7 @@ export function defaultPipelinePreset(llmConfigured: boolean): "decide" | "all" 
 
 /**
  * Sort when the URL does not name one. Score when a verdict is selected.
- * Open filings use first seen, because updated_at also moves on our own repairs.
+ * Open filings use the employer posted date. First seen is when this app stored the row.
  * Working and archived lists stay on recently updated.
  */
 export const PIPELINE_SORT_OPTIONS: { value: string; label: string }[] = [
@@ -34,5 +34,5 @@ export function pipelineSortFallback(search: { verdict?: string; status?: string
   if (search.sort) return search.sort;
   if (search.verdict && search.verdict !== "none") return "score_desc";
   if (search.status === "hot" || search.status === "archived") return "updated_desc";
-  return "first_seen_desc";
+  return "posted_desc";
 }

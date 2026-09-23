@@ -21,7 +21,7 @@ const PRESETS: { value: Preset; label: string; params: Partial<PipelineSearch> }
   { value: "decide", label: "Decide", params: { verdict: "pass", status: "triaged,review", sort: "score_desc" } },
   { value: "marginal", label: "Marginal", params: { verdict: "marginal", status: "triaged", sort: "score_desc" } },
   { value: "active", label: "Active", params: { status: "hot", sort: "updated_desc" } },
-  { value: "all", label: "All open", params: { status: "active", sort: "first_seen_desc" } },
+  { value: "all", label: "All open", params: { status: "active", sort: "posted_desc" } },
   { value: "archived", label: "Archived", params: { status: "archived", sort: "updated_desc" } },
 ];
 
@@ -159,7 +159,7 @@ export function PipelinePage() {
             sys.data && !sys.data.llmConfigured ? (
               <>
                 No model key is set, so nothing has a PASS verdict.{" "}
-                <button type="button" className="text-accent hover:underline" onClick={() => set({ verdict: undefined, status: "active", sort: "first_seen_desc" })}>
+                <button type="button" className="text-accent hover:underline" onClick={() => set({ verdict: undefined, status: "active", sort: "posted_desc" })}>
                   Show all open filings
                 </button>
                 .
@@ -221,32 +221,32 @@ function PositionsTable({ rows, home }: { rows: PositionRow[]; home?: string | n
         <tr>
           <Th w={44} />
           <Th>
-            <SortHead label="Position" field="title" sort={search.sort} onSort={sortTo} />
+            <SortHead label="Position" field="title" sort={s.sort} onSort={sortTo} />
           </Th>
           <Th w={120}>
-            <SortHead label="Signal" field="score" sort={search.sort} onSort={sortTo} />
+            <SortHead label="Signal" field="score" sort={s.sort} onSort={sortTo} />
           </Th>
           <Th>
-            <SortHead label="Workplace" field="workplace" sort={search.sort} onSort={sortTo} />
+            <SortHead label="Workplace" field="workplace" sort={s.sort} onSort={sortTo} />
           </Th>
           <Th>
-            <SortHead label="Location" field="location" sort={search.sort} onSort={sortTo} />
+            <SortHead label="Location" field="location" sort={s.sort} onSort={sortTo} />
           </Th>
           <Th>
-            <SortHead label="Geo" field="geo" sort={search.sort} onSort={sortTo} />
+            <SortHead label="Geo" field="geo" sort={s.sort} onSort={sortTo} />
           </Th>
           <Th>Comp</Th>
           <Th>
-            <SortHead label="Status" field="status" sort={search.sort} onSort={sortTo} />
+            <SortHead label="Status" field="status" sort={s.sort} onSort={sortTo} />
           </Th>
           <Th right>
-            <SortHead label="Posted" field="posted" sort={search.sort} onSort={sortTo} />
+            <SortHead label="Posted" field="posted" sort={s.sort} onSort={sortTo} />
           </Th>
           <Th right>
-            <SortHead label="First seen" field="first_seen" sort={search.sort} onSort={sortTo} />
+            <SortHead label="First seen" field="first_seen" sort={s.sort} onSort={sortTo} />
           </Th>
           <Th right>
-            <SortHead label="Changed" field="last_changed" sort={search.sort} onSort={sortTo} />
+            <SortHead label="Changed" field="last_changed" sort={s.sort} onSort={sortTo} />
           </Th>
           <Th w={36} />
         </tr>
