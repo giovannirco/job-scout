@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ashbyListingLocation, fetchAshbyJob, greenhouseListingLocation, greenhouseOfficeIsRemote, listBoard } from "./fetch.js";
+import { ashbyListingLocation, fetchAshbyJob, greenhouseListingLocation, greenhouseOfficeIsRemote, listBoard, regionsDisagree } from "./fetch.js";
 
 const REMOTEOK_API = "https://remoteok.com/api";
 const WWR_RSS = "https://weworkremotely.com/categories/remote-devops-sysadmin-jobs.rss";
@@ -501,6 +501,9 @@ describe("greenhouse office remote signal", () => {
     expect(greenhouseListingLocation("N/A", ["US"])).toEqual({ locationRaw: "US", regionOffice: true });
     expect(greenhouseListingLocation("N/A", ["India Locations"])).toEqual({ locationRaw: "India Locations", regionOffice: true });
     expect(greenhouseListingLocation("Remote - USA", ["US - Remote Zone 1"])).toEqual({ locationRaw: "Remote - USA", regionOffice: false });
+    expect(greenhouseListingLocation("Remote - Americas", ["Remote - EMEA"])).toEqual({ locationRaw: "Remote - EMEA", regionOffice: false });
+    expect(greenhouseListingLocation("Remote - Americas", ["Remote - North America"])).toEqual({ locationRaw: "Remote - Americas", regionOffice: false });
+    expect(regionsDisagree("Senior Software Engineer New Markets - EU", "Remote - Americas")).toBe(true);
     expect(greenhouseListingLocation("HQ", ["Menlo Park, California"])).toEqual({
       locationRaw: "Menlo Park, California",
       regionOffice: false,

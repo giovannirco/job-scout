@@ -119,6 +119,15 @@ export async function bootstrap(opts: { seedBoards?: boolean } = {}) {
         })
         .catch((e) => log.error("bootstrap.craft-gate.failed", { err: e }));
     }
+    if (stored.regionOfficeVersion !== "1") {
+      const { refetchDisagreeingRegions } = await import("./scan.js");
+      await refetchDisagreeingRegions()
+        .then(async (r) => {
+          await updateSettings({ regionOfficeVersion: "1" });
+          if (r.checked) log.info("bootstrap.region-office", r);
+        })
+        .catch((e) => log.error("bootstrap.region-office.failed", { err: e }));
+    }
     if (stored.labelVersion !== "1") {
       const { refreshListingLabels } = await import("./scan.js");
       await refreshListingLabels()

@@ -259,6 +259,8 @@ export const Settings = z.object({
   craftGateVersion: z.string().nullable().optional(),
   /** One-shot: software titles get a craft, and aggregator rows show the employer. */
   labelVersion: z.string().nullable().optional(),
+  /** One-shot: a title region that disagrees with the stored place is refetched from the office. */
+  regionOfficeVersion: z.string().nullable().optional(),
 });
 export type Settings = z.infer<typeof Settings>;
 
