@@ -8,7 +8,7 @@ import { InterviewRoundBody } from "@/components/interview-round";
 import { Markdown } from "@/components/markdown";
 import { StatusMenu, useStatusChange } from "@/components/status-menu";
 import { openDock, useChatScope } from "@/frame/store";
-import { INTERVIEW_OUTCOMES, INTERVIEW_STAGES, INTERVIEW_STATUSES, isCompanyNameLocation } from "@job-scout/shared";
+import { INTERVIEW_OUTCOMES, INTERVIEW_STAGES, INTERVIEW_STATUSES, changeKindLabel, humanDiffSummary, isCompanyNameLocation } from "@job-scout/shared";
 import { api, del, patch, post, qs, useApi, type Evaluation, type Interview, type Material, type Person, type PipelineStatus, type PositionDetail, type Profile, type Revision, type SystemInfo, type TimelineEvent, type TriageJson } from "@/lib/api";
 import { ago, dateShort, dateTime, employmentLabel, host, money, titleCase } from "@/lib/format";
 import { Btn, Card, Chip, Dot, Empty, ErrorNote, Field, IconBtn, Input, Loading, Monogram, Page, Panel, Select, SortHead, Tabs, Textarea, TONE_DOT, TONE_TEXT, cn } from "@/ui/kit";
@@ -185,7 +185,7 @@ export function PositionPage() {
         options={[
           { value: "brief", label: "Brief" },
           { value: "evaluation", label: "Evaluation", count: p.evaluations.filter((e) => e.kind !== "company_research").length || null },
-          { value: "jd", label: "JD", count: p.revisions.length > 1 ? p.revisions.length : null, tone: p.revisions.some((r) => r.material && r.revision > 1) ? "warn" : undefined },
+          { value: "jd", label: "JD", count: p.revisions.filter((r) => r.revision > 1 && r.material).length || null, tone: p.revisions.some((r) => r.material && r.revision > 1) ? "warn" : undefined },
           { value: "materials", label: "Materials", count: p.materials.filter((m) => m.isCurrent).length || null },
           { value: "forms", label: "Forms" },
           { value: "company", label: "Company" },
@@ -510,11 +510,11 @@ function JdTab({ p }: { p: PositionDetail }) {
             <button key={x.id} type="button" onClick={() => setRev(x.revision)} className={cn("w-full text-left px-3 py-2 text-[12px] hover:bg-surface-2/60", currentRev === x.revision && "bg-surface-2")}>
               <div className="flex items-center justify-between gap-2">
                 <span className="font-mono inline-flex items-center gap-1.5">
-                  <Dot tone={x.changeKind === "closed" ? "bad" : x.material ? "warn" : "faint"} />r{x.revision} · {x.changeKind}
+                  <Dot tone={x.changeKind === "closed" ? "bad" : x.material ? "warn" : "faint"} />r{x.revision} · {changeKindLabel(x.changeKind)}
                 </span>
                 <span className="text-faint font-mono text-[10.5px] tabular">{dateTime(x.observedAt)}</span>
               </div>
-              {x.diffSummary ? <div className="text-[11px] text-muted line-clamp-2 mt-0.5">{x.diffSummary}</div> : null}
+              {x.diffSummary ? <div className="text-[11px] text-muted line-clamp-2 mt-0.5">{humanDiffSummary(x.diffSummary)}</div> : null}
             </button>
           ))}
           {p.revisions.length === 0 ? <div className="p-3 text-faint text-xs">No JD captured yet.</div> : null}
@@ -534,7 +534,7 @@ function JdTab({ p }: { p: PositionDetail }) {
               <div className="rounded-md border border-border bg-bg divide-y divide-border/60 text-[11.5px]">
                 {r.data.fieldDiffs.slice(0, 30).map((d, i) => (
                   <div key={i} className="grid grid-cols-[110px_1fr_1fr] gap-2 px-2 py-1">
-                    <span className="font-mono text-faint">{d.path}</span>
+                    <span className="font-mono text-faint">{humanDiffSummary(d.path)}</span>
                     <span className="text-bad/80 line-through break-words">{d.before || "∅"}</span>
                     <span className="text-good break-words">{d.after || "∅"}</span>
                   </div>

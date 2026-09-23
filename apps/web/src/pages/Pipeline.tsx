@@ -357,6 +357,7 @@ function Board({ rows }: { rows: PositionRow[] }) {
                       </div>
                       <div className="text-[12.5px] leading-snug line-clamp-2">{r.title}</div>
                       {r.locationRaw ? <div className="text-[11px] text-muted truncate mt-1">{r.locationRaw}</div> : null}
+                      {money(r.salaryMin, r.salaryMax, r.salaryCurrency) ? <div className="text-[11px] font-mono text-fg truncate mt-1">{money(r.salaryMin, r.salaryMax, r.salaryCurrency)}</div> : null}
                       {r.firstSeenAt ? <div className="text-[10.5px] font-mono text-faint tabular mt-1">seen {ago(r.firstSeenAt)}</div> : null}
                     </Link>
                     <div className="flex items-center justify-between mt-2">
