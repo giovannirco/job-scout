@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyProfileToGate, titleExcludesFromNorthStar } from "./profile-gate.js";
+import { applyProfileToGate, pausedGeoBlocks, titleExcludesFromNorthStar } from "./profile-gate.js";
 import { gateListing } from "./gate.js";
 import { DEFAULT_GATE } from "./settings.js";
 
@@ -49,6 +49,8 @@ describe("profile gate", () => {
     const gate = applyProfileToGate(DEFAULT_GATE, { home: "Austin, TX" });
     const v = gateListing({ title: "Site Reliability Engineer", locationRaw: "Remote - US only" }, gate);
     expect(v.pass).toBe(true);
+    expect(pausedGeoBlocks("Austin, TX", DEFAULT_GATE.geoBlock)).toEqual(["us only", "usa only"]);
+    expect(pausedGeoBlocks("London", DEFAULT_GATE.geoBlock)).toEqual([]);
   });
 
   it("does not age-filter a job the board is still listing", () => {

@@ -100,16 +100,25 @@ const SCAN_SOURCE: Record<string, string> = {
 };
 
 /** Stored creation lines name the scanner. The history tab should name the place. */
+export function sourceLabel(source: string | null | undefined): string {
+  const text = (source || "").trim();
+  if (!text) return "";
+  if (text === "manual") return "added by hand";
+  const scan = text.match(/^scan:([a-z0-9]+)$/i);
+  if (!scan) return text;
+  const key = scan[1].toLowerCase();
+  if (key === "discovery") return "discovery";
+  return SCAN_SOURCE[key] || scan[1];
+}
+
 export function createdFromLabel(title: string | null | undefined): string {
   const text = title || "";
-  const scan = text.match(/^Created from scan:([a-z0-9]+)$/i);
-  if (scan) {
-    const key = scan[1].toLowerCase();
-    const name = SCAN_SOURCE[key] || scan[1];
-    return key === "discovery" ? "Created from discovery" : `Created from ${name}`;
-  }
-  if (text === "Created from manual") return "Added by hand";
-  return text;
+  const scan = text.match(/^Created from (scan:[a-z0-9]+|manual)$/i);
+  if (!scan) return text;
+  const label = sourceLabel(scan[1]);
+  if (label === "discovery") return "Created from discovery";
+  if (label === "added by hand") return "Added by hand";
+  return `Created from ${label}`;
 }
 
 /** A question with status open has not been answered yet. */

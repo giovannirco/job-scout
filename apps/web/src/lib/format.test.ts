@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countLabel, createdFromLabel, employmentLabel, jdChangedAt, money, questionStatusLabel } from "./format.js";
+import { countLabel, createdFromLabel, employmentLabel, jdChangedAt, money, questionStatusLabel, sourceLabel } from "./format.js";
 
 describe("jdChangedAt", () => {
   it("ignores a change stamp that is the first snapshot", () => {
@@ -33,6 +33,12 @@ describe("createdFromLabel", () => {
     expect(createdFromLabel("Created from scan:remoteok")).toBe("Created from Remote OK");
     expect(createdFromLabel("Created from manual")).toBe("Added by hand");
     expect(createdFromLabel("First JD snapshot")).toBe("First JD snapshot");
+  });
+
+  it("names a stored source the same way", () => {
+    expect(sourceLabel("scan:discovery")).toBe("discovery");
+    expect(sourceLabel("scan:ashby")).toBe("Ashby");
+    expect(sourceLabel("manual")).toBe("added by hand");
   });
 });
 
