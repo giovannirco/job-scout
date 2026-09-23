@@ -1,10 +1,19 @@
 import type { GateConfig } from "./settings.js";
 import { homeMarket } from "./home-geo.js";
 
-/** A north star that rejects infrastructure also excludes those titles before any model runs. */
+/** A north star that names a craft also excludes the crafts it does not ask for. */
 export function titleExcludesFromNorthStar(text = ""): string[] {
-  if (!/\bnot\s+infrastructure\b/i.test(text)) return [];
-  return ["infrastructure", "infra", "kubernetes", "k8s", "devops"];
+  const extra: string[] = [];
+  if (/\bnot\s+infrastructure\b/i.test(text)) {
+    extra.push("infrastructure", "infra", "kubernetes", "k8s", "devops", "sre", "site reliability");
+  }
+  if (/\bbackend\b/i.test(text) && !/\bfront[-\s]?end\b/i.test(text)) {
+    extra.push("frontend", "front-end", "front end");
+  }
+  if (/\bbackend\b/i.test(text) && !/\bdata\s+engineer/i.test(text)) {
+    extra.push("data engineer", "data engineering");
+  }
+  return extra;
 }
 
 /** Fold profile rules into the saved gate. Listed jobs are on the board now, so age does not apply. */

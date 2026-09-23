@@ -255,6 +255,8 @@ export const Settings = z.object({
   junkPlaceVersion: z.string().nullable().optional(),
   /** One-shot: named HTML entities left in stored job descriptions. */
   entityDecodeVersion: z.string().nullable().optional(),
+  /** One-shot: a backend north star drops frontend, SRE, and data-engineering titles. */
+  craftGateVersion: z.string().nullable().optional(),
 });
 export type Settings = z.infer<typeof Settings>;
 

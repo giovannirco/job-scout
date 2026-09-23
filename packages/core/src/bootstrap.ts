@@ -110,6 +110,15 @@ export async function bootstrap(opts: { seedBoards?: boolean } = {}) {
         })
         .catch((e) => log.error("bootstrap.junk-place.failed", { err: e }));
     }
+    if (stored.craftGateVersion !== "1") {
+      const { repairProfileGateFilings } = await import("./scan.js");
+      await repairProfileGateFilings()
+        .then(async (r) => {
+          await updateSettings({ craftGateVersion: "1" });
+          if (r.withdrawn || r.regated) log.info("bootstrap.craft-gate", r);
+        })
+        .catch((e) => log.error("bootstrap.craft-gate.failed", { err: e }));
+    }
     if (stored.entityDecodeVersion !== "1") {
       const { decodeStoredJdEntities } = await import("./positions.js");
       await decodeStoredJdEntities()
