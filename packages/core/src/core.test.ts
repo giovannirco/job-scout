@@ -43,9 +43,15 @@ describe("core on pglite", () => {
     const { getProfile } = await import("./profile.js");
     const { listBoards } = await import("./radar.js");
     const s = await getSettings({ fresh: true });
-    expect(s.gate.titleInclude.length).toBeGreaterThan(5);
+    expect(s.gate.titleInclude).toEqual(["platform engineer", "sre", "devops engineer"]);
     expect((await getProfile()).scoutBrief).toContain("Hard DQ");
     expect((await listBoards({})).length).toBeGreaterThan(10);
+    const { updateSettings } = await import("./settings.js");
+    const { bootstrap } = await import("./bootstrap.js");
+    await updateSettings({ gate: { titleInclude: ["java"] } });
+    await bootstrap({ seedBoards: false });
+    expect((await getSettings({ fresh: true })).gate.titleInclude).toEqual(["java"]);
+    await updateSettings({ gate: { titleInclude: ["platform engineer", "sre", "devops engineer"] } });
   });
 
   it("creates a position, ignores unchanged snapshots, writes one closed revision", async () => {
@@ -105,7 +111,7 @@ describe("core on pglite", () => {
     expect(s.llm.operations.triage?.model).toBe("gpt-x");
     expect(s.llm.operations.evaluate?.enabled).toBe(true);
     expect(s.gate.maxPostingAgeDays).toBe(7);
-    expect(s.gate.titleInclude.length).toBeGreaterThan(5);
+    expect(s.gate.titleInclude).toEqual(["platform engineer", "sre", "devops engineer"]);
     expect((await getSettings({ fresh: true })).gate.maxPostingAgeDays).toBe(7);
     await expect(updateSettings({ triage: { passThreshold: 9 } })).rejects.toThrow();
   });

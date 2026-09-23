@@ -1,8 +1,9 @@
 import { eq } from "drizzle-orm";
 import { getDb, id, profiles } from "@job-scout/db";
 import { DEFAULT_SCOUT_BRIEF } from "@job-scout/llm";
+import { DEFAULT_GATE } from "@job-scout/shared";
 import { createHash } from "node:crypto";
-import { updateSettings } from "./settings.js";
+import { updateSettings, getSettings } from "./settings.js";
 import { regateRecentDiscovery } from "./scan.js";
 
 export type Profile = typeof profiles.$inferSelect;
@@ -103,4 +104,19 @@ export async function syncGateFromTargetRoles(roles: string[]): Promise<{
   await updateSettings({ gate: { titleInclude } });
   const regate = await regateRecentDiscovery();
   return { titleInclude, regate };
+}
+
+function sameTerms(a: string[], b: string[]): boolean {
+  return [...a].sort().join("\0") === [...b].sort().join("\0");
+}
+
+/** A fresh install stores the starter title list, which is wider than the roles on the profile. Point it at those roles once. A custom list is left alone. */
+export async function alignStarterGateWithRoles(): Promise<string[] | null> {
+  const settings = await getSettings({ fresh: true });
+  if (!sameTerms(settings.gate.titleInclude, DEFAULT_GATE.titleInclude)) return null;
+  const titleInclude = titleIncludesFromRoles((await getProfile()).targetRoles);
+  if (!titleInclude.length || sameTerms(titleInclude, settings.gate.titleInclude)) return null;
+  await updateSettings({ gate: { titleInclude } });
+  await regateRecentDiscovery();
+  return titleInclude;
 }

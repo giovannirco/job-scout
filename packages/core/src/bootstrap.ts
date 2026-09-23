@@ -9,7 +9,7 @@ export async function closeDbSafe() {
   }
 }
 import { FULL_CATALOG } from "@job-scout/shared";
-import { getProfile } from "./profile.js";
+import { getProfile, alignStarterGateWithRoles } from "./profile.js";
 import { getSettings } from "./settings.js";
 import { log as rootLog } from "@job-scout/shared";
 const log = rootLog.child({ scope: "bootstrap" });
@@ -19,6 +19,8 @@ export async function bootstrap(opts: { seedBoards?: boolean } = {}) {
   await runMigrations();
   await getProfile();
   await getSettings({ fresh: true });
+  const aligned = await alignStarterGateWithRoles();
+  if (aligned) log.info("bootstrap.gate.from-roles", { titleInclude: aligned });
   if (process.env.PGLITE_DATA_DIR && process.env.NODE_ENV !== "production") {
     /* tests skip deploy backfill */
   } else {
