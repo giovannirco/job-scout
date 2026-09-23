@@ -27,6 +27,22 @@ function has(blob: string, term: string): boolean {
   return new RegExp(`(^|[^a-z0-9])${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`).test(blob);
 }
 
+/** Phrases that mean the same thing as a configured exclude, so a saved gate keeps working. */
+const EXCLUDE_ALIASES: Record<string, string[]> = {
+  junior: ["new graduate", "new grad", "early career"],
+  intern: ["internship"],
+};
+
+function excludeHits(title: string, term: string): string | null {
+  const configured = norm(term);
+  if (!configured) return null;
+  if (has(title, configured)) return configured;
+  for (const alias of EXCLUDE_ALIASES[configured] || []) {
+    if (has(title, alias)) return alias;
+  }
+  return null;
+}
+
 /**
  * Deterministic pre-LLM gate. Cheap, explainable, tunable from Settings > Gate.
  * Order: exclude title -> require include title -> stale -> geo block -> geo allow/unknown.
@@ -36,7 +52,8 @@ export function gateListing(input: GateInput, cfg: GateConfig): GateVerdict {
   const geo = norm([input.locationRaw, input.workplaceType].filter(Boolean).join(" | "));
 
   for (const term of cfg.titleExclude) {
-    if (has(title, term)) return { pass: false, reason: `title_exclude:${term.trim()}`, matchedInclude: null };
+    const hit = excludeHits(title, term);
+    if (hit) return { pass: false, reason: `title_exclude:${hit}`, matchedInclude: null };
   }
 
   let matchedInclude: string | null = null;

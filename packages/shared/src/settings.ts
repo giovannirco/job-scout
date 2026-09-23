@@ -254,6 +254,8 @@ export const DEFAULT_GATE: GateConfig = {
     "director",
     "intern",
     "junior",
+    "new grad",
+    "early career",
     "sales",
     "recruiter",
     "dba",
