@@ -273,7 +273,11 @@ function titleGateMiss(title: string, gate: GateConfig): string | null {
 }
 
 /** Archive a scan filing the operator has not touched when its title no longer matches. */
-async function withdrawUntouchedScanPosition(positionId: string, gate: GateConfig): Promise<boolean> {
+async function withdrawUntouchedScanPosition(
+  positionId: string,
+  gate: GateConfig,
+  opts?: { allowManual?: boolean },
+): Promise<boolean> {
   const db = await getDb();
   const pos = (
     await db
@@ -293,7 +297,9 @@ async function withdrawUntouchedScanPosition(positionId: string, gate: GateConfi
       .limit(1)
   )[0];
   if (!pos || pos.status !== "triaged" || pos.triagedAt || pos.triageVerdict) return false;
-  if (!pos.source?.startsWith("scan:") || pos.notes?.trim() || pos.priority !== "P2" || pos.watchEnabled) return false;
+  const fromScan = Boolean(pos.source?.startsWith("scan:"));
+  const misstampedManual = Boolean(opts?.allowManual && pos.source === "manual");
+  if ((!fromScan && !misstampedManual) || pos.notes?.trim() || pos.priority !== "P2" || pos.watchEnabled) return false;
   const reason = titleGateMiss(pos.title, gate);
   if (!reason) return false;
   await archivePosition(pos.id, `left the title gate (${reason})`, "scan");
@@ -365,6 +371,38 @@ export async function regateRecentDiscovery(hours = 24 * 7): Promise<{
     log.info("scan.regate", { checked: rows.length, nowPassed, nowFiltered, promoted, withdrawn, hours });
   }
   return { checked: rows.length, nowPassed, nowFiltered, promoted, withdrawn };
+}
+
+/**
+ * Discovery promotions made before scan_url stamped source "scan:discovery" were
+ * stored as manual. A later title-gate miss could not withdraw them. Run once.
+ * A URL the operator adds by hand stays, because ordinary regate does not pass allowManual.
+ */
+export async function repairMisstampedDiscoveryFilings(): Promise<{ withdrawn: number }> {
+  const db = await getDb();
+  const settings = await getSettings({ fresh: true });
+  const rows = await db
+    .select({
+      positionId: discoveryFeed.positionId,
+      title: discoveryFeed.title,
+      locationRaw: discoveryFeed.locationRaw,
+      postedAt: discoveryFeed.postedAt,
+    })
+    .from(discoveryFeed)
+    .where(sql`${discoveryFeed.positionId} is not null`);
+  const seen = new Set<string>();
+  let withdrawn = 0;
+  for (const row of rows) {
+    if (!row.positionId || seen.has(row.positionId)) continue;
+    const verdict = isNoiseJobTitle(row.title)
+      ? { pass: false, reason: "junk_title" }
+      : gateListing({ title: row.title, locationRaw: row.locationRaw, postedAt: row.postedAt }, settings.gate);
+    const titleMiss = !verdict.pass && (verdict.reason === "title_no_include" || verdict.reason?.startsWith("title_exclude:"));
+    if (!titleMiss) continue;
+    seen.add(row.positionId);
+    if (await withdrawUntouchedScanPosition(row.positionId, settings.gate, { allowManual: true })) withdrawn++;
+  }
+  return { withdrawn };
 }
 
 export async function followUpIntake(

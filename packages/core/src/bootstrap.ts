@@ -32,6 +32,17 @@ export async function bootstrap(opts: { seedBoards?: boolean } = {}) {
     await backfillListingFacts()
       .then((r) => log.info("bootstrap.listing-facts", r))
       .catch((e) => log.error("bootstrap.listing-facts.failed", { err: e }));
+    const { getSettings, updateSettings } = await import("./settings.js");
+    const { repairMisstampedDiscoveryFilings } = await import("./scan.js");
+    const stored = await getSettings({ fresh: true });
+    if (stored.misstampWithdrawVersion !== "1") {
+      await repairMisstampedDiscoveryFilings()
+        .then(async (r) => {
+          await updateSettings({ misstampWithdrawVersion: "1" });
+          log.info("bootstrap.misstamp-withdraw", r);
+        })
+        .catch((e) => log.error("bootstrap.misstamp-withdraw.failed", { err: e }));
+    }
   }
   const db = await getDb();
   if (opts.seedBoards !== false) {

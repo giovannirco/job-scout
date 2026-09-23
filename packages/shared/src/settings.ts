@@ -237,6 +237,8 @@ export const Settings = z.object({
   notifications: NotificationsConfigSchema,
   listingFactsBackfillAt: z.string().nullable().optional(),
   listingFactsBackfillVersion: z.string().nullable().optional(),
+  /** One-shot repair for discovery promotions stored as source "manual" before scan:discovery. */
+  misstampWithdrawVersion: z.string().nullable().optional(),
 });
 export type Settings = z.infer<typeof Settings>;
 
@@ -311,6 +313,9 @@ export function resolveSettings(stored: unknown): Settings {
     autopilot: mergeAutopilot(s.autopilot),
     chat: { ...DEFAULT_SETTINGS.chat, ...(s.chat as object | undefined) },
     notifications: mergeNotifications(s.notifications),
+    listingFactsBackfillAt: typeof s.listingFactsBackfillAt === "string" ? s.listingFactsBackfillAt : null,
+    listingFactsBackfillVersion: typeof s.listingFactsBackfillVersion === "string" ? s.listingFactsBackfillVersion : null,
+    misstampWithdrawVersion: typeof s.misstampWithdrawVersion === "string" ? s.misstampWithdrawVersion : null,
   };
   return Settings.parse(merged);
 }
