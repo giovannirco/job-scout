@@ -110,6 +110,15 @@ export async function bootstrap(opts: { seedBoards?: boolean } = {}) {
         })
         .catch((e) => log.error("bootstrap.junk-place.failed", { err: e }));
     }
+    if (stored.entityDecodeVersion !== "1") {
+      const { decodeStoredJdEntities } = await import("./positions.js");
+      await decodeStoredJdEntities()
+        .then(async (r) => {
+          await updateSettings({ entityDecodeVersion: "1" });
+          if (r.updated) log.info("bootstrap.entities", r);
+        })
+        .catch((e) => log.error("bootstrap.entities.failed", { err: e }));
+    }
   }
   const db = await getDb();
   if (opts.seedBoards !== false) {

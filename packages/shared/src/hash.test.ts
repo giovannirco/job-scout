@@ -122,6 +122,24 @@ describe("formatting-only description (F-23)", () => {
     expect(m.material).toBe(false);
   });
 
+  it("filling a junk location and the first salary is not an employer edit", () => {
+    const m = classifyMateriality([
+      { path: "location_raw", before: "N/A", after: "US" },
+      { path: "salary_raw", before: null, after: "USD 133100-210600" },
+      { path: "description_text", before: `${"• ".repeat(12)}careers page`, after: "The board job description." },
+    ]);
+    expect(m.material).toBe(false);
+    expect(m.change_kind).toBe("noise_rebase");
+  });
+
+  it("a later salary edit stays material", () => {
+    const m = classifyMateriality([
+      { path: "salary_raw", before: "USD 100000-120000", after: "USD 140000-160000" },
+    ]);
+    expect(m.material).toBe(true);
+    expect(m.change_kind).toBe("comp");
+  });
+
   it("a real JD edit stays material beside a badge flip", () => {
     const m = classifyMateriality([
       { path: "listing_status", before: "changed", after: "open" },

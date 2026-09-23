@@ -16,6 +16,11 @@ describe("stripHtml", () => {
     expect(out).not.toContain("content-intro");
   });
 
+  it("decodes the dashes and quotes Greenhouse leaves in the JD", () => {
+    expect(stripHtml("<p>$133,100 &mdash; $210,600</p>")).toBe("$133,100 — $210,600");
+    expect(decodeHtmlEntities("it&rsquo;s")).toBe("it’s");
+  });
+
   it("decodeHtmlEntities handles amp last", () => {
     expect(decodeHtmlEntities("&amp;lt;")).toBe("&lt;");
     expect(decodeHtmlEntities(decodeHtmlEntities("&amp;lt;"))).toBe("<");

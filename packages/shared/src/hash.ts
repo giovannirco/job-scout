@@ -21,9 +21,16 @@ export function normalizeDescription(text: string): string {
 export function decodeBasicEntities(text: string): string {
   let s = text || "";
   for (let i = 0; i < 2; i++) {
-    if (!/&(?:lt|gt|amp|quot|nbsp|#\d+|#x[0-9a-f]+);/i.test(s)) break;
+    if (!/&(?:lt|gt|amp|quot|nbsp|mdash|ndash|hellip|rsquo|lsquo|rdquo|ldquo|#\d+|#x[0-9a-f]+);/i.test(s)) break;
     s = s
       .replace(/&nbsp;/gi, " ")
+      .replace(/&mdash;/gi, "—")
+      .replace(/&ndash;/gi, "–")
+      .replace(/&hellip;/gi, "…")
+      .replace(/&rsquo;/gi, "’")
+      .replace(/&lsquo;/gi, "‘")
+      .replace(/&rdquo;/gi, "”")
+      .replace(/&ldquo;/gi, "“")
       .replace(/&quot;/g, '"')
       .replace(/&#0*39;/g, "'")
       .replace(/&#x27;/gi, "'")
@@ -140,7 +147,17 @@ function hasBulletRun(text: string): boolean {
 export function isSnapshotCompletionDiff(d: FieldDiff): boolean {
   if (d.path === "listing_status" && d.before === "changed" && d.after === "open") return true;
   if (d.path === "title" && (d.before || "").trim() === (d.after || "").trim()) return true;
-  if (d.path === "location_raw" && !(d.before || "").trim()) return true;
+  if (d.path === "location_raw") {
+    const before = (d.before || "").trim();
+    if (!before || /^(n\/a|hq|tbd|none|null|-+|—+)$/i.test(before)) return true;
+  }
+  if (
+    (d.path === "salary_raw" || d.path === "salary_min" || d.path === "salary_max" || d.path === "salary_currency") &&
+    !(d.before || "").trim() &&
+    (d.after || "").trim()
+  ) {
+    return true;
+  }
   if (d.path === "description_text") {
     const before = descriptionProse(d.before || "");
     const after = descriptionProse(d.after || "");

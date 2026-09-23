@@ -12,7 +12,7 @@ import {
   slugify,
   type PositionStatus,
 } from "@job-scout/db";
-import type { AtsJob } from "@job-scout/ats";
+import { decodeHtmlEntities, type AtsJob } from "@job-scout/ats";
 import { fetchJob as fetchJobFromUrl } from "./fetch-job.js";
 import {
   classifyMateriality,
@@ -674,6 +674,50 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
     }
   }
   return { changed: true as const, revision: nextRev, material, changeKind: change_kind };
+}
+
+/** Greenhouse leaves `&mdash;` in the stored JD. Rewrite the latest snapshot in place. */
+export async function decodeStoredJdEntities(): Promise<{ updated: number }> {
+  const db = await getDb();
+  const candidates = await db
+    .select({ positionId: jdRevisions.positionId })
+    .from(jdRevisions)
+    .where(sql`${jdRevisions.descriptionText} ~ '&(mdash|ndash|hellip|rsquo|lsquo|rdquo|ldquo);'`);
+  const ids = [...new Set(candidates.map((row) => row.positionId))];
+  let updated = 0;
+  for (const positionId of ids) {
+    const rev = (
+      await db
+        .select({
+          id: jdRevisions.id,
+          descriptionText: jdRevisions.descriptionText,
+          title: jdRevisions.title,
+          salaryRaw: jdRevisions.salaryRaw,
+          locationRaw: jdRevisions.locationRaw,
+        })
+        .from(jdRevisions)
+        .where(eq(jdRevisions.positionId, positionId))
+        .orderBy(desc(jdRevisions.revision))
+        .limit(1)
+    )[0];
+    if (!rev?.descriptionText) continue;
+    const next = decodeHtmlEntities(rev.descriptionText);
+    if (next === rev.descriptionText) continue;
+    await db.update(jdRevisions).set({ descriptionText: next }).where(eq(jdRevisions.id, rev.id));
+    await db
+      .update(positions)
+      .set({
+        contentHash: contentHash({
+          title: rev.title,
+          descriptionText: next,
+          salaryRaw: rev.salaryRaw,
+          locationRaw: rev.locationRaw,
+        }),
+      })
+      .where(eq(positions.id, positionId));
+    updated++;
+  }
+  return { updated };
 }
 
 /** Drop "changed" when every later revision only completed a bad first snapshot. */

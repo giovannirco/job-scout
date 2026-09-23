@@ -49,6 +49,13 @@ async function fetchText(
 export function decodeHtmlEntities(s: string): string {
   return s
     .replace(/&nbsp;/gi, " ")
+    .replace(/&mdash;/gi, "—")
+    .replace(/&ndash;/gi, "–")
+    .replace(/&hellip;/gi, "…")
+    .replace(/&rsquo;/gi, "’")
+    .replace(/&lsquo;/gi, "‘")
+    .replace(/&rdquo;/gi, "”")
+    .replace(/&ldquo;/gi, "“")
     .replace(/&quot;/g, '"')
     .replace(/&#0*39;/g, "'")
     .replace(/&#x27;/gi, "'")

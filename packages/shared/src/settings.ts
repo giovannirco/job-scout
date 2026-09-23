@@ -253,6 +253,8 @@ export const Settings = z.object({
   blankGreenhouseVersion: z.string().nullable().optional(),
   /** One-shot: N/A and HQ locations are replaced from the office or street address. */
   junkPlaceVersion: z.string().nullable().optional(),
+  /** One-shot: named HTML entities left in stored job descriptions. */
+  entityDecodeVersion: z.string().nullable().optional(),
 });
 export type Settings = z.infer<typeof Settings>;
 
