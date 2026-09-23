@@ -334,6 +334,73 @@ describe("core on pglite", () => {
     expect(row?.lane).toBe("passed");
   });
 
+  it("archives untouched scan filings whose titles miss the new gate", async () => {
+    const { regateRecentDiscovery } = await import("./scan.js");
+    const { updateSettings } = await import("./settings.js");
+    const { upsertFromJob, getPosition, patchPosition } = await import("./positions.js");
+    const { getDb, discoveryFeed, id } = await import("@job-scout/db");
+    const db = await getDb();
+    const drop = await upsertFromJob(job({
+      jobId: "drop-sre",
+      externalIdentity: "greenhouse:acme:drop-sre",
+      url: "https://boards.greenhouse.io/acme/jobs/drop-sre",
+      title: "Site Reliability Engineer",
+    }), { source: "scan:greenhouse" });
+    const keep = await upsertFromJob(job({
+      jobId: "keep-java",
+      externalIdentity: "greenhouse:acme:keep-java",
+      url: "https://boards.greenhouse.io/acme/jobs/keep-java",
+      title: "Senior Java Developer",
+    }), { source: "scan:greenhouse" });
+    const manual = await upsertFromJob(job({
+      jobId: "manual-sre",
+      externalIdentity: "greenhouse:acme:manual-sre",
+      url: "https://boards.greenhouse.io/acme/jobs/manual-sre",
+      title: "Site Reliability Engineer",
+    }), { source: "manual" });
+    const noted = await upsertFromJob(job({
+      jobId: "noted-sre",
+      externalIdentity: "greenhouse:acme:noted-sre",
+      url: "https://boards.greenhouse.io/acme/jobs/noted-sre",
+      title: "Site Reliability Engineer",
+    }), { source: "scan:greenhouse" });
+    await patchPosition(noted.position.id, { notes: "look later" });
+    const review = await upsertFromJob(job({
+      jobId: "review-sre",
+      externalIdentity: "greenhouse:acme:review-sre",
+      url: "https://boards.greenhouse.io/acme/jobs/review-sre",
+      title: "Staff Site Reliability Engineer",
+    }), { source: "scan:greenhouse", status: "review" });
+    const observedAt = new Date();
+    await db.insert(discoveryFeed).values([
+      { id: id("df"), externalIdentity: "greenhouse:acme:drop-sre", company: "Acme", title: "Site Reliability Engineer", url: drop.position.primaryUrl, locationRaw: "Remote", lane: "passed", positionId: drop.position.id, observedAt },
+      { id: id("df"), externalIdentity: "greenhouse:acme:keep-java", company: "Acme", title: "Senior Java Developer", url: keep.position.primaryUrl, locationRaw: "Remote", lane: "passed", positionId: keep.position.id, observedAt },
+      { id: id("df"), externalIdentity: "greenhouse:acme:manual-sre", company: "Acme", title: "Site Reliability Engineer", url: manual.position.primaryUrl, locationRaw: "Remote", lane: "passed", positionId: manual.position.id, observedAt },
+      { id: id("df"), externalIdentity: "greenhouse:acme:noted-sre", company: "Acme", title: "Site Reliability Engineer", url: noted.position.primaryUrl, locationRaw: "Remote", lane: "filtered", gateReason: "title_no_include", positionId: noted.position.id, observedAt },
+      { id: id("df"), externalIdentity: "greenhouse:acme:review-sre", company: "Acme", title: "Staff Site Reliability Engineer", url: review.position.primaryUrl, locationRaw: "Remote", lane: "passed", positionId: review.position.id, observedAt },
+    ]);
+    await updateSettings({
+      gate: {
+        titleInclude: ["java"],
+        titleExclude: ["manager"],
+        geoAllow: ["remote"],
+        geoBlock: [],
+        maxPostingAgeDays: 0,
+        allowUnknownGeo: true,
+      },
+    });
+    const result = await regateRecentDiscovery();
+    expect(result.withdrawn).toBe(1);
+    const dropped = await getPosition(drop.position.id);
+    expect(dropped?.status).toBe("archived");
+    expect(dropped?.archiveReason).toBe("left the title gate (title_no_include)");
+    expect((await getPosition(keep.position.id))?.status).toBe("triaged");
+    expect((await getPosition(manual.position.id))?.status).toBe("triaged");
+    expect((await getPosition(noted.position.id))?.status).toBe("triaged");
+    expect((await getPosition(review.position.id))?.status).toBe("review");
+    expect((await regateRecentDiscovery()).withdrawn).toBe(0);
+  });
+
   it("listDiscovery attaches an existing position by ATS identity when positionId is missing", async () => {
     const { upsertFromJob } = await import("./positions.js");
     const { listDiscovery } = await import("./radar.js");
