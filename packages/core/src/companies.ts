@@ -103,6 +103,7 @@ export async function getCompany(idOrSlug: string) {
       salaryCurrency: positions.salaryCurrency,
       locationRaw: sql<string | null>`(select jr.location_raw from jd_revisions jr where jr.position_id = "positions"."id" order by jr.revision desc limit 1)`,
       firstSeenAt: positions.firstSeenAt,
+      postedAt: sql<string | null>`nullif(${positions.metadata}->'ats'->>'postedAt', '')`,
       updatedAt: positions.updatedAt,
     })
     .from(positions)

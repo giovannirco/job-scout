@@ -414,6 +414,7 @@ export type DiscoveryRow = {
   gateReason: string | null;
   provider: string | null;
   observedAt: string;
+  postedAt?: string | null;
   positionId: string | null;
   positionSlug: string | null;
   positionStatus: PipelineStatus | null;
@@ -481,7 +482,7 @@ export type CompanyDetail = {
   industryTags: string[] | null;
   overview: string | null;
   metadata: Record<string, unknown>;
-  positions: { id: string; slug: string; title: string; status: PipelineStatus; triageScore: number | null; triageVerdict: Verdict | null; listingStatus: string | null; primaryUrl: string | null; salaryMin: number | null; salaryMax: number | null; salaryCurrency: string | null; locationRaw: string | null; firstSeenAt: string | null; updatedAt: string }[];
+  positions: { id: string; slug: string; title: string; status: PipelineStatus; triageScore: number | null; triageVerdict: Verdict | null; listingStatus: string | null; primaryUrl: string | null; salaryMin: number | null; salaryMax: number | null; salaryCurrency: string | null; locationRaw: string | null; firstSeenAt: string | null; postedAt: string | null; updatedAt: string }[];
   research: Evaluation | null;
   boards: Board[];
 };
