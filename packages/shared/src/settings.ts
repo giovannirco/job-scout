@@ -265,6 +265,8 @@ export const Settings = z.object({
   salaryObjectVersion: z.string().nullable().optional(),
   /** One-shot: a US city list that also says remote is a home place, not an unknown geo. */
   usPlaceGeoVersion: z.string().nullable().optional(),
+  /** One-shot: discovery rows for an archived filing leave the passed lane. */
+  archivedDiscoveryVersion: z.string().nullable().optional(),
 });
 export type Settings = z.infer<typeof Settings>;
 

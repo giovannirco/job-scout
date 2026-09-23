@@ -685,6 +685,26 @@ describe("core on pglite", () => {
     const miss = await listPositions({ q: "New Markets APAC", includeArchived: "true", pageSize: "50" });
     expect(miss.items.some((r) => r.id === dashed.position.id)).toBe(false);
 
+    const copied = await upsertFromJob(
+      job({
+        jobId: "copies",
+        externalIdentity: "ashby:clickhouse:copies",
+        url: "https://jobs.ashbyhq.com/clickhouse/copies-1",
+        title: "Senior Backend Engineer - ClickStack",
+        company: "ClickHouse",
+      }),
+      { source: "test", companyName: "ClickHouse" },
+    );
+    const now = new Date();
+    await db.insert(discoveryFeed).values([
+      { id: id("df"), externalIdentity: "ashby:clickhouse:copies-1", company: "ClickHouse", title: "Senior Backend Engineer - ClickStack", url: "https://jobs.ashbyhq.com/clickhouse/copies-1", lane: "passed", positionId: copied.position.id, observedAt: new Date(now.getTime() - 1000) },
+      { id: id("df"), externalIdentity: "ashby:clickhouse:copies-2", company: "ClickHouse", title: "Senior Backend Engineer - ClickStack", url: "https://jobs.ashbyhq.com/clickhouse/copies-2", lane: "passed", positionId: copied.position.id, observedAt: now },
+    ]);
+    const copies = await listDiscovery({ q: "ClickStack", hours: "24" });
+    const copyHits = copies.items.filter((item) => item.positionId === copied.position.id);
+    expect(copyHits).toHaveLength(1);
+    expect(copyHits[0]?.copies).toBe(2);
+
     const byCompany = await listPositions({ q: "Platform", sort: "company_asc", pageSize: "50" });
     const acmeIdx = byCompany.items.findIndex((r) => r.id === a.position.id);
     const zetaIdx = byCompany.items.findIndex((r) => r.id === z.position.id);

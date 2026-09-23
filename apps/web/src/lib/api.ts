@@ -418,6 +418,7 @@ export type DiscoveryRow = {
   positionStatus: PipelineStatus | null;
   triageVerdict: Verdict | null;
   triageScore: number | null;
+  copies?: number;
 };
 
 export type DeltaRow = {
