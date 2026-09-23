@@ -3,6 +3,8 @@ import { createHash } from "node:crypto";
 import { companies, discoveryFeed, getDb, jdRevisions, positions } from "@job-scout/db";
 import {
   classifyListing,
+  extractSalaryRaw,
+  parseSalary,
   listingClassifyNeeded,
   mergeListingClassify,
   remoteClass,
@@ -167,8 +169,8 @@ export async function runListingClassify(positionId: string) {
 }
 
 export async function backfillListingFacts(opts: { force?: boolean } = {}) {
-  // v5: London and England count as a place. v4 left "London, England" as workplace unknown.
-  const BACKFILL_VERSION = "5";
+  // v7: keep CAD on a dollar range labeled CAD. v6 stored that Elastic band as USD.
+  const BACKFILL_VERSION = "7";
   const s = await getSettings({ fresh: true });
   if (!opts.force && s.listingFactsBackfillVersion === BACKFILL_VERSION) {
     return { skipped: true as const, archivedSkipped: 0, updated: 0, enqueued: 0 };
@@ -177,6 +179,8 @@ export async function backfillListingFacts(opts: { force?: boolean } = {}) {
   const rows = await db
     .select({
       id: positions.id,
+      salaryMin: positions.salaryMin,
+      salaryCurrency: positions.salaryCurrency,
       status: positions.status,
       listingStatus: positions.listingStatus,
       metadata: positions.metadata,
@@ -196,7 +200,7 @@ export async function backfillListingFacts(opts: { force?: boolean } = {}) {
     }
     const rev = (
       await db
-        .select({ locationRaw: jdRevisions.locationRaw })
+        .select({ locationRaw: jdRevisions.locationRaw, descriptionText: jdRevisions.descriptionText })
         .from(jdRevisions)
         .where(eq(jdRevisions.positionId, row.id))
         .orderBy(desc(jdRevisions.revision))
@@ -210,12 +214,15 @@ export async function backfillListingFacts(opts: { force?: boolean } = {}) {
       company: row.companyName,
       title: row.title,
     });
+    const salary = parseSalary(extractSalaryRaw(rev?.descriptionText || ""));
+    const fillSalary = Boolean(salary.min && (row.salaryMin == null || (row.salaryMin === salary.min && row.salaryCurrency !== salary.currency)));
     await db
       .update(positions)
       .set({
         workplace: facts.workplace,
         geoClass: facts.geoClass,
         remoteClass: facts.remoteClass,
+        ...(fillSalary ? { salaryMin: salary.min, salaryMax: salary.max, salaryCurrency: salary.currency, salaryRaw: salary.raw } : {}),
         updatedAt: new Date(),
       })
       .where(and(eq(positions.id, row.id), sql`${positions.status} <> 'archived'`));

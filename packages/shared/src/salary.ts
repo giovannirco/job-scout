@@ -4,6 +4,48 @@ import type { SalaryParse } from "./types.js";
  * Parse common posted salary strings. Returns nulls when unknown — never invents.
  * Examples: $129–304k, BRL 422.5–485k, $4–5k/mo, USD 200000-250000, $200,000 – $250,000
  */
+function decodeSalaryEntities(text: string): string {
+  return text
+    .replace(/&mdash;|&#8212;/gi, "—")
+    .replace(/&ndash;|&#8211;/gi, "–")
+    .replace(/&euro;/gi, "€")
+    .replace(/&pound;/gi, "£");
+}
+
+function moneyNumber(raw: string): number | null {
+  const s = raw.trim();
+  if (/^\d{1,3}(\.\d{3})+$/.test(s)) return Number(s.replace(/\./g, ""));
+  if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(s)) return Number(s.replace(/,/g, ""));
+  if (/^\d+(\.\d+)?$/.test(s)) return Number(s);
+  return null;
+}
+
+/** A posted range, or nothing. Ignores a lone stipend such as "USD$500 home office". */
+export function extractSalaryRaw(text: string | null | undefined): string | undefined {
+  if (!text) return undefined;
+  const src = decodeSalaryEntities(text);
+  const re = /(?:(USD|EUR|GBP|CAD|£|€|\$)\s*)?(\d{1,3}(?:[.,]\d{3})+|\d{2,})(?:\s*[kK])?\s*[—–\-]\s*(?:(USD|EUR|GBP|CAD|£|€|\$)\s*)?(\d{1,3}(?:[.,]\d{3})+|\d{2,})(?:\s*[kK])?/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(src))) {
+    let min = moneyNumber(m[2]);
+    let max = moneyNumber(m[4]);
+    if (min == null || max == null) continue;
+    if (/k/i.test(m[0]) && max < 10000) {
+      min *= 1000;
+      max *= 1000;
+    }
+    if (min < 20000 || max < min || max > 2_000_000) continue;
+    const window = src.slice(m.index, m.index + m[0].length + 12);
+    const mark = `${m[1] || ""} ${m[3] || ""} ${window}`;
+    const currency = /\bCAD\b|C\$/i.test(mark) ? "CAD"
+      : /€|EUR/i.test(mark) ? "EUR"
+      : /£|GBP/i.test(mark) ? "GBP"
+      : "USD";
+    return `${currency} ${Math.round(min)}-${Math.round(max)}`;
+  }
+  return undefined;
+}
+
 export function parseSalary(raw: string | null | undefined): SalaryParse {
   if (!raw || !String(raw).trim()) {
     return { min: null, max: null, currency: null, period: null, raw: null };
@@ -13,6 +55,7 @@ export function parseSalary(raw: string | null | undefined): SalaryParse {
 
   let currency: string | null = null;
   if (/\bbrl\b|r\$/i.test(text)) currency = "BRL";
+  else if (/\bcad\b|c\$/i.test(text)) currency = "CAD";
   else if (/\$|usd|us\$/i.test(text)) currency = "USD";
   else if (/\beur\b|€/i.test(text)) currency = "EUR";
   else if (/\bgbp\b|£/i.test(text)) currency = "GBP";
