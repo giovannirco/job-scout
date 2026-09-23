@@ -117,6 +117,12 @@ function isCountryList(location: string): boolean {
   return cityOrState < segs.length;
 }
 
+/** A city or US state in the location, not a country name on its own. */
+function isCityOffice(location: string): boolean {
+  if (!isNamedOffice(location)) return false;
+  return locationSegments(location).some((segment) => HARD_CITY.test(segment) || segmentIsUsState(segment));
+}
+
 /** A single city, country, or office list. Remote wording and country lists are not offices. */
 export function isNamedOffice(location = ""): boolean {
   const loc = location.trim();
@@ -189,6 +195,7 @@ export function classifyListing(input: {
   isRemote?: boolean | null;
   company?: string | null;
   title?: string | null;
+  descriptionText?: string | null;
 }): {
   workplace: Workplace;
   geoClass: GeoClass;
@@ -202,9 +209,12 @@ export function classifyListing(input: {
   const locationDiscarded = junkPlace || isCompanyNameLocation(raw, company);
   const locationClean = locationDiscarded ? "" : raw;
   let workplace = workplaceOf(input.workplaceType, input.isRemote, [locationClean, input.title || ""].filter(Boolean).join(" "));
-  // A named city or country, with no remote or hybrid marker, is an office. A list of countries is not one office.
-  if (workplace === "unknown" && isNamedOffice(locationClean)) workplace = "onsite";
-  if (workplace === "unknown" && /^(amer|emea|apac|apj|latam|na)$/i.test(locationClean)) workplace = "remote";
+  // A city office stays an office even when an earlier pass stored "remote" from the title.
+  // A country on its own ("United States") can still be a remote hiring region.
+  if (workplace !== "hybrid" && isCityOffice(locationClean)) workplace = "onsite";
+  else if (workplace === "unknown" && isNamedOffice(locationClean)) workplace = "onsite";
+  if (workplace === "unknown" && /^(amer|emea|apac|apj|latam|na|distributed)$/i.test(locationClean)) workplace = "remote";
+  if (workplace === "unknown" && !locationClean && /#LI-Remote\b/i.test(input.descriptionText || "")) workplace = "remote";
   const workplaceBlob = workplace === "remote" ? "remote" : input.workplaceType || "";
   let g = geoClass(locationClean, workplaceBlob);
   const noPlace = !locationClean || /^\s*remote\s*$/i.test(locationClean);

@@ -288,7 +288,7 @@ function listingGate(
     isRemote: input.isRemote,
     title,
   });
-  const workplaceType = input.workplaceType || (facts.workplace !== "unknown" ? facts.workplace : undefined);
+  const workplaceType = facts.workplace !== "unknown" ? facts.workplace : input.workplaceType;
   const verdict = gateListing({
     title,
     locationRaw: input.locationRaw,

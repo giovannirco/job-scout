@@ -568,6 +568,7 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
     isRemote: opts.job.isRemote,
     company: pos.company.name,
     title,
+    descriptionText: bodyText,
   });
 
   await db.insert(jdRevisions).values({
@@ -780,6 +781,7 @@ export async function upsertFromJob(
     isRemote: job.isRemote,
     company: company.name,
     title: job.title,
+    descriptionText: job.descriptionText,
   });
   await db.insert(positions).values({
     id: posId,
@@ -867,6 +869,7 @@ async function afterAtsFetch(positionId: string, job: AtsJob, facts?: ReturnType
       isRemote: job.isRemote,
       company: pos.company.name,
       title: job.title || pos.title,
+      descriptionText: job.descriptionText,
     });
   const db = await getDb();
   const prev = (pos.metadata || {}) as Record<string, unknown>;
