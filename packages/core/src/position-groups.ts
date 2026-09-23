@@ -87,12 +87,13 @@ export function familySalaryBand(group: Array<Pick<GroupRow, "salaryMin" | "sala
 
 export function groupSummary(group: GroupRow[]) {
   const representative = group[0];
-  const band = familySalaryBand(group);
+  const visible = group.some((r) => r.status !== "archived") ? group.filter((r) => r.status !== "archived") : group;
+  const band = familySalaryBand(visible);
   return {
     roleFamilyId: representative.id,
-    siblingCount: group.length,
-    locations: [...new Set(group.map(r => r.locationRaw).filter(Boolean))],
-    siblings: group.map(r => ({ id: r.id, title: r.title, status: r.status, location: r.locationRaw, url: r.primaryUrl })),
+    siblingCount: visible.length,
+    locations: [...new Set(visible.map(r => r.locationRaw).filter(Boolean))],
+    siblings: visible.map(r => ({ id: r.id, title: r.title, status: r.status, location: r.locationRaw, url: r.primaryUrl })),
     ...(band || {}),
   };
 }

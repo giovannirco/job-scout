@@ -48,6 +48,17 @@ describe("queue integrity on isolated PGlite", () => {
     expect((await listPositions({ company: "countries", includeDuplicates: "true" })).total).toBe(6);
   });
 
+  it("does not advertise archived country copies as open locations", async () => {
+    const us = await upsertFromJob(job("home-family", "us", { locationRaw: "United States" }), { status: "triaged" });
+    const ca = await upsertFromJob(job("home-family", "ca", { locationRaw: "Canada" }), { status: "triaged" });
+    await patchPosition(ca.position.id, { status: "archived" });
+    const list = await listPositions({ company: "home-family", status: "active", collapseFamilies: "true" });
+    expect(list.total).toBe(1);
+    expect(list.items[0].id).toBe(us.position.id);
+    expect(list.items[0].siblingCount).toBe(1);
+    expect(list.items[0].locations).toEqual(["United States"]);
+  });
+
   it("does not group different seniority or explicit requisition IDs", async () => {
     await upsertFromJob(job("reqs", "1", { requisitionId: "1524" }));
     await upsertFromJob(job("reqs", "2", { requisitionId: "1525" }));
