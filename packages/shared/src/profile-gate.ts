@@ -13,6 +13,9 @@ export function titleExcludesFromNorthStar(text = ""): string[] {
   if (/\bbackend\b/i.test(text) && !/\bdata\s+engineer/i.test(text)) {
     extra.push("data engineer", "data engineering");
   }
+  if (/\bbackend\b/i.test(text) && !/\b(support|solutions|quality)\b/i.test(text)) {
+    extra.push("l3 support", "solutions engineer", "quality engineer");
+  }
   return extra;
 }
 

@@ -110,11 +110,11 @@ export async function bootstrap(opts: { seedBoards?: boolean } = {}) {
         })
         .catch((e) => log.error("bootstrap.junk-place.failed", { err: e }));
     }
-    if (stored.craftGateVersion !== "1") {
+    if (stored.craftGateVersion !== "2") {
       const { repairProfileGateFilings } = await import("./scan.js");
       await repairProfileGateFilings()
         .then(async (r) => {
-          await updateSettings({ craftGateVersion: "1" });
+          await updateSettings({ craftGateVersion: "2" });
           if (r.withdrawn || r.regated) log.info("bootstrap.craft-gate", r);
         })
         .catch((e) => log.error("bootstrap.craft-gate.failed", { err: e }));

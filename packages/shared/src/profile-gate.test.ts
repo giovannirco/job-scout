@@ -10,6 +10,7 @@ describe("profile gate", () => {
     ]);
     expect(titleExcludesFromNorthStar("Remote Java backend.")).toEqual([
       "frontend", "front-end", "front end", "data engineer", "data engineering",
+      "l3 support", "solutions engineer", "quality engineer",
     ]);
     const gate = applyProfileToGate(
       { ...DEFAULT_GATE, titleInclude: ["software engineer", "backend engineer"], titleExclude: ["manager"] },
@@ -27,6 +28,10 @@ describe("profile gate", () => {
     expect(gateListing({ title: "Staff Software Engineer (SRE)", locationRaw: "Remote" }, mina).reason).toBe("title_exclude:sre");
     expect(gateListing({ title: "Senior Software Engineer, Data Engineering Platform", locationRaw: "Remote" }, mina).reason).toBe("title_exclude:data engineer");
     expect(gateListing({ title: "Senior Java Engineer", locationRaw: "Remote" }, mina).pass).toBe(true);
+    expect(gateListing({ title: "Software Engineer - L3 Support", locationRaw: "Remote" }, mina).reason).toBe("title_exclude:l3 support");
+    expect(gateListing({ title: "Software Engineer - Solutions Engineering", locationRaw: "Remote" }, mina).reason).toBe("title_exclude:solutions engineer");
+    expect(gateListing({ title: "Senior Software Engineer, Quality Engineering", locationRaw: "Remote" }, mina).reason).toBe("title_exclude:quality engineer");
+    expect(gateListing({ title: "Security Software Engineer", locationRaw: "Remote" }, mina).pass).toBe(true);
     const both = applyProfileToGate(DEFAULT_GATE, { northStar: "Frontend and backend product work." });
     expect(gateListing({ title: "Senior Software Engineer, Frontend", locationRaw: "Remote", workplaceType: "remote" }, { ...both, titleInclude: ["software engineer"] }).pass).toBe(true);
   });
