@@ -22,6 +22,7 @@ export const BOARD_MIGRATIONS: BoardMigration[] = [
   { company: "Temporal", from: { provider: "greenhouse", token: "temporaltechnologies" }, to: { provider: "ashby", token: "temporal" }, verified: "2026-09-09", jobsAtVerification: 68 },
   { company: "Cursor", from: { provider: "ashby", token: "anysphere" }, to: { provider: "ashby", token: "cursor" }, verified: "2026-09-09", jobsAtVerification: 125 },
   { company: "Marqeta", from: { provider: "greenhouse", token: "marqeta" }, to: { provider: "ashby", token: "marqeta-inc" }, verified: "2026-09-09", jobsAtVerification: 42 },
+  { company: "Kraken", from: { provider: "ashby", token: "kraken" }, to: { provider: "ashby", token: "kraken.com" }, verified: "2026-09-23", jobsAtVerification: 77 },
 ];
 
 /**
@@ -29,11 +30,12 @@ export const BOARD_MIGRATIONS: BoardMigration[] = [
  * manual_watch with a reason rather than left as a permanently-404ing list_api
  * source, which reads as coverage it does not have.
  */
-export const UNSUPPORTED_BOARDS: Array<{ company: string; provider: string; token: string; reason: string }> = [
+export const UNSUPPORTED_BOARDS: Array<{ company: string; provider: string; token: string; reason: string; careersUrl?: string }> = [
   { company: "Netflix", provider: "lever", token: "netflix", reason: "Moved to Eightfold (explore.jobs.netflix.net); no supported list API. Verified 2026-09-09." },
   { company: "Chainlink Labs", provider: "ashby", token: "chainlink-labs", reason: "No board on greenhouse/ashby/lever under any known token. Verified 2026-09-09." },
   { company: "Chainalysis", provider: "greenhouse", token: "chainalysis", reason: "No board on greenhouse/ashby/lever under any known token. Verified 2026-09-09." },
   { company: "HashiCorp", provider: "greenhouse", token: "hashicorp", reason: "No board on greenhouse/ashby/lever; careers moved post-IBM acquisition. Verified 2026-09-09." },
+  { company: "Bitso", provider: "greenhouse", token: "bitso", careersUrl: "https://bitso.com/jobs", reason: "Greenhouse board bitso returns 404. Openings are on BambooHR (bitso.bamboohr.com); no list adapter. Verified 2026-09-23." },
 ];
 
 /**
@@ -82,6 +84,7 @@ export async function reconcileBoardSources({ dryRun = true } = {}) {
     if (!dryRun) {
       await db.update(boardSources).set({
         enabled: false, capability: "manual_watch", lastError: null, notes: u.reason,
+        ...(u.careersUrl ? { careersUrl: u.careersUrl } : {}),
         metadata: { ...(src.metadata || {}), demotedAt: new Date().toISOString(), demotedReason: u.reason },
       }).where(eq(boardSources.id, src.id));
     }
