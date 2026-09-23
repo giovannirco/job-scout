@@ -72,15 +72,22 @@ describe("interviews corpus", () => {
 
   it("patches a transcript and queues a brief unless skipped", async () => {
     const { addInterview, patchInterview, getInterview } = await import("./interviews.js");
+    const { coreEnv } = await import("./env.js");
     const created = await addInterview(positionId, { stage: "hiring_manager", skipBrief: true });
-    const patched = await patchInterview(positionId, created.id, {
-      transcriptMarkdown: "**Ryan** hello\n**Alex** hi",
-      transcriptSource: "whisper",
-      reviewMarkdown: "## Verdict\nadvanced",
-      sourcePath: "interviews/acme/meetings/interview-1.md",
-    });
-    expect(patched?.briefJobId).toBeTruthy();
-    expect(patched?.transcriptSource).toBe("whisper");
+    const prev = coreEnv.openaiApiKey;
+    coreEnv.openaiApiKey = "test-key";
+    try {
+      const patched = await patchInterview(positionId, created.id, {
+        transcriptMarkdown: "**Ryan** hello\n**Alex** hi",
+        transcriptSource: "whisper",
+        reviewMarkdown: "## Verdict\nadvanced",
+        sourcePath: "interviews/acme/meetings/interview-1.md",
+      });
+      expect(patched?.briefJobId).toBeTruthy();
+      expect(patched?.transcriptSource).toBe("whisper");
+    } finally {
+      coreEnv.openaiApiKey = prev;
+    }
     const got = await getInterview(positionId, created.id);
     expect(got?.sourcePath).toContain("interview-1.md");
     expect(got?.transcriptMarkdown).toContain("Ryan");
@@ -89,6 +96,20 @@ describe("interviews corpus", () => {
     const slim = listed.find((r) => r.id === created.id);
     expect(slim?.transcriptChars).toBeGreaterThan(0);
     expect("transcriptMarkdown" in (slim ?? {})).toBe(false);
+  });
+
+  it("saves a transcript without queueing a brief when no model key is set", async () => {
+    const { addInterview } = await import("./interviews.js");
+    const { coreEnv } = await import("./env.js");
+    const prev = coreEnv.openaiApiKey;
+    coreEnv.openaiApiKey = "";
+    try {
+      const row = await addInterview(positionId, { stage: "technical", transcriptMarkdown: "A pasted transcript of the round." });
+      expect(row.briefJobId).toBeNull();
+      expect(row.transcriptMarkdown).toContain("pasted transcript");
+    } finally {
+      coreEnv.openaiApiKey = prev;
+    }
   });
 
   it("lists every round on the desk and live processes after a status bump", async () => {

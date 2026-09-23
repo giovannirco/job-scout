@@ -379,7 +379,7 @@ function BriefTab({ p, noKey, onTriage }: { p: PositionDetail; noKey: boolean; o
         </Panel>
 
         <ContactsPanel positionId={p.id} />
-        <InterviewsPanel positionId={p.id} />
+        <InterviewsPanel positionId={p.id} noKey={noKey} />
 
         <CareerOpsStamp p={p} />
       </div>
@@ -856,7 +856,7 @@ function ContactsPanel({ positionId }: { positionId: string }) {
   );
 }
 
-function InterviewsPanel({ positionId }: { positionId: string }) {
+function InterviewsPanel({ positionId, noKey }: { positionId: string; noKey: boolean }) {
   const qc = useQueryClient();
   const q = useApi<Interview[]>(["interviews", positionId], `/api/v1/positions/${positionId}/interviews`);
   const [stage, setStage] = useState<string>("screen");
@@ -905,7 +905,7 @@ function InterviewsPanel({ positionId }: { positionId: string }) {
       setNotes("");
       setTranscript("");
       refresh();
-      toast.success(transcript.trim() ? "Interview logged — AI brief queued" : "Interview logged");
+      toast.success(transcript.trim() ? (noKey ? "Interview logged. The brief waits for a model key." : "Interview logged — AI brief queued") : "Interview logged");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed");
     } finally {
@@ -1008,7 +1008,7 @@ function InterviewsPanel({ positionId }: { positionId: string }) {
           ))}
         </Select>
         <Input label="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
-        <Textarea label="Transcript" value={transcript} onChange={(e) => setTranscript(e.target.value)} placeholder="Paste merged transcript — queues an AI brief vs the JD" className="min-h-[72px]" />
+        <Textarea label="Transcript" value={transcript} onChange={(e) => setTranscript(e.target.value)} placeholder={noKey ? "Paste a transcript. The brief waits until a model key is set." : "Paste merged transcript — queues an AI brief vs the JD"} className="min-h-[72px]" />
         <div className="flex justify-end">
           <Btn variant="primary" type="submit" disabled={busy}>
             Add
