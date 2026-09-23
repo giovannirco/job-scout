@@ -91,6 +91,34 @@ export function employmentLabel(raw: string | null | undefined): string {
   return EMPLOYMENT_LABELS[key] || EMPLOYMENT_LABELS[key.replace(/_/g, "")] || text;
 }
 
+const SCAN_SOURCE: Record<string, string> = {
+  discovery: "discovery",
+  greenhouse: "Greenhouse",
+  ashby: "Ashby",
+  lever: "Lever",
+  remoteok: "Remote OK",
+};
+
+/** Stored creation lines name the scanner. The history tab should name the place. */
+export function createdFromLabel(title: string | null | undefined): string {
+  const text = title || "";
+  const scan = text.match(/^Created from scan:([a-z0-9]+)$/i);
+  if (scan) {
+    const key = scan[1].toLowerCase();
+    const name = SCAN_SOURCE[key] || scan[1];
+    return key === "discovery" ? "Created from discovery" : `Created from ${name}`;
+  }
+  if (text === "Created from manual") return "Added by hand";
+  return text;
+}
+
+/** A question with status open has not been answered yet. */
+export function questionStatusLabel(status: string | null | undefined): string {
+  if (status === "open") return "unanswered";
+  if (!status) return "";
+  return status.replace(/_/g, " ");
+}
+
 export function titleCase(s: string | null | undefined): string {
   if (!s) return "";
   return s.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());

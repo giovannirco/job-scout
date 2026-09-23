@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countLabel, employmentLabel, jdChangedAt, money } from "./format.js";
+import { countLabel, createdFromLabel, employmentLabel, jdChangedAt, money, questionStatusLabel } from "./format.js";
 
 describe("jdChangedAt", () => {
   it("ignores a change stamp that is the first snapshot", () => {
@@ -23,6 +23,24 @@ describe("employmentLabel", () => {
     expect(employmentLabel("FULL_TIME")).toBe("Full-time");
     expect(employmentLabel("Part-time")).toBe("Part-time");
     expect(employmentLabel("Something else")).toBe("Something else");
+  });
+});
+
+describe("createdFromLabel", () => {
+  it("names the scanner instead of the stored source code", () => {
+    expect(createdFromLabel("Created from scan:discovery")).toBe("Created from discovery");
+    expect(createdFromLabel("Created from scan:greenhouse")).toBe("Created from Greenhouse");
+    expect(createdFromLabel("Created from scan:remoteok")).toBe("Created from Remote OK");
+    expect(createdFromLabel("Created from manual")).toBe("Added by hand");
+    expect(createdFromLabel("First JD snapshot")).toBe("First JD snapshot");
+  });
+});
+
+describe("questionStatusLabel", () => {
+  it("does not call an unanswered question open", () => {
+    expect(questionStatusLabel("open")).toBe("unanswered");
+    expect(questionStatusLabel("answered")).toBe("answered");
+    expect(questionStatusLabel("skipped")).toBe("skipped");
   });
 });
 
