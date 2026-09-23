@@ -51,12 +51,19 @@ export function canonicalExternalIdentity(value?: string | null): string | null 
   return parts.join(":");
 }
 
+const TRAILING_PLACE = String.raw`republic of ireland|united kingdom|united states|the netherlands|new zealand|south africa|czech republic|australia|singapore|germany|ireland|sweden|spain|poland|france|portugal|greece|norway|israel|switzerland|romania|hungary|japan|india|brazil|brasil|chile|mexico|argentina|colombia|turkiye|turkey|canada|netherlands|uk|usa|us|remote`;
+
 /** Seniority is meaningful: Canonical's Senior and non-Senior roles must remain distinct. */
 export function decisionTitle(title: string): string {
-  return title.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
-    .replace(/\b(sr\.?)(?=\s)/g, "senior")
-    .replace(/\s*[-|,(]\s*(remote|brazil|brasil|chile|mexico|argentina|colombia|turkiye|turkey|canada|united kingdom|the netherlands)(?:\s+remote)?\)?\s*$/i, "")
-    .replace(/[^a-z0-9]+/g, " ").trim();
+  let text = title.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/\b(sr\.?)(?=\s)/g, "senior");
+  const trailing = new RegExp(String.raw`\s*[-|,(]\s*(?:${TRAILING_PLACE})(?:\s+remote)?\)?\s*$`, "i");
+  for (let i = 0; i < 4; i++) {
+    const next = text.replace(trailing, "");
+    if (next === text) break;
+    text = next;
+  }
+  return text.replace(/[^a-z0-9]+/g, " ").trim();
 }
 
 /** ATS posting IDs are not requisition IDs. Only explicit identifiers in the JD count. */

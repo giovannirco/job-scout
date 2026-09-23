@@ -28,6 +28,11 @@ describe("posting identity and eligibility", () => {
   it("keeps levels and requisitions distinct", () => {
     expect(decisionTitle("Senior SRE - Remote")).toBe(decisionTitle("Sr. SRE (Brazil)"));
     expect(decisionTitle("Senior SRE")).not.toBe(decisionTitle("SRE"));
+    expect(decisionTitle("Staff Backend Engineer - Databases - Analytics | UK | Remote"))
+      .toBe(decisionTitle("Staff Backend Engineer - Databases Analytics | Spain | Remote"));
+    expect(decisionTitle("Senior Backend Engineer - Databases - Analytics | Germany | Remote"))
+      .not.toBe(decisionTitle("Staff Backend Engineer - Databases - Analytics | Germany | Remote"));
+    expect(decisionTitle("Senior Backend Software Engineer | IDX Team")).toBe("senior backend software engineer idx team");
     expect(requisitionId("Req R6926, Brazil")).toBe("R6926");
     expect(requisitionId("Requisition ID: 1524")).toBe("1524");
     expect(requisitionId("We require 5 years")).toBeNull();
