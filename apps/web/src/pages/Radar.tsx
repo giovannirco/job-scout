@@ -28,7 +28,7 @@ export function RadarPage() {
   const raw = useApi<{ lanes: { lane: string; c: number; positions?: number }[]; boards: { total: number; enabled: number; scanned24h: number; errored: number } }>(["radar", "summary", hours], `/api/v1/radar/discovery/summary?hours=${hours}`, {
     refetchInterval: 60_000,
   });
-  const summary = raw.data ? { lanes: Object.fromEntries(raw.data.lanes.map((l) => [l.lane, l.c])) as Record<string, number>, boards: raw.data.boards } : undefined;
+  const summary = raw.data ? { lanes: Object.fromEntries(raw.data.lanes.map((l) => [l.lane, l.c])) as Record<string, number>, boards: raw.data.boards, passedPositions: raw.data.lanes.find((l) => l.lane === "passed")?.positions } : undefined;
   const seen = summary ? Object.values(summary.lanes).reduce((n, c) => n + c, 0) : 0;
 
   return (
@@ -100,7 +100,7 @@ function HoursSelect({ value, onChange }: { value: number; onChange: (h: number)
 
 /* ---------------- Discovery ---------------- */
 
-function Discovery({ search, set, summary }: { search: RadarSearch; set: (p: Partial<RadarSearch>) => void; summary?: { lanes: Record<string, number> } }) {
+function Discovery({ search, set, summary }: { search: RadarSearch; set: (p: Partial<RadarSearch>) => void; summary?: { lanes: Record<string, number>; passedPositions?: number } }) {
   const lane = search.lane || "passed";
   const page = search.page || 1;
   const hours = search.hours || 72;
@@ -136,7 +136,7 @@ function Discovery({ search, set, summary }: { search: RadarSearch; set: (p: Par
           value={lane}
           onChange={(l) => set({ lane: l === "passed" ? undefined : l })}
           options={[
-            { value: "passed", label: "Passed gate", count: summary?.lanes.passed ?? null, tone: "good" },
+            { value: "passed", label: "Passed gate", count: summary?.passedPositions ?? summary?.lanes.passed ?? null, tone: "good" },
             { value: "marginal", label: "Marginal", count: summary?.lanes.marginal ?? null, tone: "warn" },
             { value: "filtered", label: "Filtered", count: summary?.lanes.filtered ?? null },
             { value: "all", label: "All" },
