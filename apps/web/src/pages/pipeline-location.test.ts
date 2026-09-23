@@ -15,4 +15,9 @@ describe("family location label", () => {
   it("is empty when nothing was stored", () => {
     expect(familyLocationLabel([null, "  "], null)).toBeNull();
   });
+
+  it("drops placeholder locations", () => {
+    expect(familyLocationLabel(["N/A"])).toBeNull();
+    expect(familyLocationLabel(["HQ", "AMER"])).toEqual({ text: "AMER", title: "AMER" });
+  });
 });

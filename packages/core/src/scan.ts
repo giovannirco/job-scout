@@ -633,6 +633,15 @@ export async function followUpIntake(
 /** Manual intake: URL -> position (status triaged) -> triage job. */
 export async function intakeUrl(url: string, opts: { companyName?: string; status?: "triaged" | "review"; source?: string } = {}) {
   const job = await fetchJobFromUrl(url);
+  if ((opts.source || "").startsWith("scan:")) {
+    const settings = await getSettings();
+    const verdict = listingGate(job, settings.gate, await profileGate(), { listedNow: true });
+    if (!verdict.pass) {
+      const db = await getDb();
+      await db.update(discoveryFeed).set({ lane: "filtered", gateReason: verdict.reason }).where(eq(discoveryFeed.url, url));
+      return { position: null, created: false, revived: false, triageJobId: null, skipped: true as const, reason: verdict.reason };
+    }
+  }
   const { position, created, revived } = await upsertFromJob(job, {
     source: opts.source || "manual",
     companyName: opts.companyName,
