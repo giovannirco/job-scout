@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultPipelinePreset, pipelineSortFallback } from "./pipeline-defaults.js";
+import { defaultPipelinePreset, pipelineSortFallback, pipelineSortOptions } from "./pipeline-defaults.js";
 
 describe("pipeline default", () => {
   it("opens the filings when no model key is set", () => {
@@ -21,6 +21,11 @@ describe("pipeline default", () => {
   it("sorts open filings by first seen", () => {
     expect(pipelineSortFallback({ status: "active" })).toBe("first_seen_desc");
     expect(pipelineSortFallback({ verdict: "none", status: "triaged" })).toBe("first_seen_desc");
+  });
+
+  it("keeps an oldest-posted sort visible in the menu", () => {
+    const options = pipelineSortOptions("posted_asc");
+    expect(options.find((option) => option.value === "posted_asc")?.label).toBe("posted, oldest");
   });
 
   it("sorts working and archived lists by recent updates", () => {

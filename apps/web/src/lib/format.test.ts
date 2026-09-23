@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { countLabel, createdFromLabel, employmentLabel, jdChangedAt, money, questionStatusLabel, readableJd, sourceLabel } from "./format.js";
+import { ago, countLabel, createdFromLabel, employmentLabel, jdChangedAt, money, questionStatusLabel, readableJd, sourceLabel } from "./format.js";
+
+describe("ago", () => {
+  it("uses years once a date is at least two years old", () => {
+    const old = new Date(Date.now() - 800 * 86_400_000).toISOString();
+    expect(ago(old)).toBe("2y");
+    const recent = new Date(Date.now() - 40 * 86_400_000).toISOString();
+    expect(ago(recent)).toBe("40d");
+  });
+});
 
 describe("jdChangedAt", () => {
   it("ignores a change stamp that is the first snapshot", () => {
