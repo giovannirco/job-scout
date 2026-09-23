@@ -504,7 +504,8 @@ describe("listBoard remotive", () => {
 describe("bamboohr and ashby forms", () => {
   it("treats a BambooHR location type 1 with no city as remote", () => {
     expect(bambooHrPlace({ locationType: "1", location: { city: null } })).toEqual({ locationRaw: "Remote", isRemote: true });
-    expect(bambooHrPlace({ locationType: "2", location: { city: "Miguel Hidalgo", addressCountry: "Mexico" } }).locationRaw).toBe("Miguel Hidalgo, Mexico");
+    expect(bambooHrPlace({ locationType: "1", location: { city: null } }, "Software Engineer - Latam & Europe").locationRaw).toBe("Latam & Europe");
+    expect(bambooHrPlace({ locationType: "2", location: { city: "Miguel Hidalgo", state: "miguel hidalgo", addressCountry: "Mexico" } }).locationRaw).toBe("Miguel Hidalgo, Mexico");
   });
 
   it("maps Ashby form fields to required prompts and choices", () => {

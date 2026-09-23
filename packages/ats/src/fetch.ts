@@ -1095,11 +1095,31 @@ type BambooOpening = {
   location?: { city?: string | null; state?: string | null; addressCountry?: string | null } | null;
 };
 
-export function bambooHrPlace(job: BambooOpening): { locationRaw?: string; isRemote?: boolean } {
+function bambooPlacePart(value: string): string {
+  const text = value.trim();
+  if (!text || text !== text.toLowerCase()) return text;
+  return text.replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
+}
+
+function regionFromTitle(title: string): string | undefined {
+  const tail = title.split(/\s[-–—]\s+/).slice(1).join(" - ").trim();
+  if (!tail) return undefined;
+  if (!/\b(latam|latin america|europe|emea|apac|americas|united states|\bus\b|\buk\b)\b/i.test(tail)) return undefined;
+  return tail;
+}
+
+export function bambooHrPlace(job: BambooOpening, title = ""): { locationRaw?: string; isRemote?: boolean } {
   const loc = job.location || {};
-  const place = [loc.city, loc.state, loc.addressCountry].map((part) => (part || "").trim()).filter(Boolean).join(", ");
+  const city = bambooPlacePart(loc.city || "");
+  const stateRaw = (loc.state || "").trim();
+  const state = city && stateRaw.toLowerCase() === city.toLowerCase() ? "" : bambooPlacePart(stateRaw);
+  const country = bambooPlacePart(loc.addressCountry || "");
+  const place = [city, state, country].filter(Boolean).join(", ");
   const remote = job.isRemote === true || String(job.locationType) === "1";
-  if (!place) return { locationRaw: remote ? "Remote" : undefined, isRemote: remote || undefined };
+  if (!place) {
+    const region = regionFromTitle(title);
+    return { locationRaw: region || (remote ? "Remote" : undefined), isRemote: remote || undefined };
+  }
   return { locationRaw: place, isRemote: remote || undefined };
 }
 
@@ -1109,7 +1129,7 @@ export async function listBambooHrBoard(token: string, company: string): Promise
   if (!ok) throw new Error(`bamboohr board ${token}: ${status}`);
   const data = JSON.parse(body) as { result?: BambooOpening[]; meta?: { totalCount?: number } };
   const jobs = (data.result || []).map((job) => {
-    const place = bambooHrPlace(job);
+    const place = bambooHrPlace(job, job.jobOpeningName || "");
     const id = String(job.id || "");
     return {
       provider: "bamboohr",
@@ -1135,7 +1155,7 @@ export async function fetchBambooHrJob(token: string, jobId: string): Promise<At
   if (!ok) throw new Error(`bamboohr job ${token}/${jobId}: ${status}`);
   const opening = (JSON.parse(body) as { result?: { jobOpening?: BambooOpening & { description?: string; jobOpeningStatus?: string } } }).result?.jobOpening;
   if (!opening) throw new Error(`bamboohr job ${token}/${jobId}: empty`);
-  const place = bambooHrPlace(opening);
+  const place = bambooHrPlace(opening, opening.jobOpeningName || "");
   const html = opening.description || "";
   return {
     provider: "bamboohr",
