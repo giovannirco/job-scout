@@ -331,7 +331,7 @@ function BriefTab({ p, noKey, home, onTriage }: { p: PositionDetail; noKey: bool
       <div className="space-y-5 min-w-0">
         <Panel title="Facts">
           <div className="space-y-1.5">
-            <Field label="Employment">{employmentLabel(p.employmentType) || "—"}</Field>
+            {p.employmentType ? <Field label="Employment">{employmentLabel(p.employmentType)}</Field> : null}
             <Field label="Workplace">{p.workplace && p.workplace !== "unknown" ? p.workplace : "—"}</Field>
             {loc ? <Field label="Location">{loc}</Field> : null}
             <Field label="Geo">

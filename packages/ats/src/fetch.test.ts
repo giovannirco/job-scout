@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ashbyListingLocation, fetchAshbyJob, greenhouseListingLocation, greenhouseOfficeIsRemote, listBoard, regionsDisagree, salaryFromBaseSalary } from "./fetch.js";
+import { ashbyListingLocation, fetchAshbyJob, greenhouseEmployment, greenhouseListingLocation, greenhouseOfficeIsRemote, listBoard, regionsDisagree, salaryFromBaseSalary } from "./fetch.js";
 
 const REMOTEOK_API = "https://remoteok.com/api";
 const WWR_RSS = "https://weworkremotely.com/categories/remote-devops-sysadmin-jobs.rss";
@@ -519,6 +519,26 @@ describe("greenhouse office remote signal", () => {
       locationRaw: "Menlo Park, California",
       regionOffice: false,
     });
+    expect(
+      greenhouseListingLocation("Remote (United States)", ["Remote (Canada)", "Remote (United Kingdom)", "Remote (United States) "]),
+    ).toEqual({
+      locationRaw: "Remote (Canada) · Remote (United Kingdom) · Remote (United States)",
+      regionOffice: false,
+    });
+    expect(greenhouseListingLocation("United States (Remote)", ["Canada (Remote)", "USA (Remote)"])).toEqual({
+      locationRaw: "Canada (Remote) · USA (Remote)",
+      regionOffice: false,
+    });
+    expect(greenhouseListingLocation("Remote, Canada · Remote, United States", ["Canada", "United States of America"])).toEqual({
+      locationRaw: "Remote, Canada · Remote, United States",
+      regionOffice: false,
+    });
+  });
+
+  it("reads Greenhouse employment type metadata", () => {
+    expect(greenhouseEmployment([{ name: "Employment Type", value: "Full-time" }])).toBe("Full-time");
+    expect(greenhouseEmployment([{ name: "Employment Length", value: "Full-time" }])).toBe("Full-time");
+    expect(greenhouseEmployment([{ name: "Cost Center", value: "4120" }])).toBeUndefined();
   });
 
   it("uses the street address when Ashby only says HQ", () => {

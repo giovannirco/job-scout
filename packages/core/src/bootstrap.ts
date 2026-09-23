@@ -182,6 +182,15 @@ export async function bootstrap(opts: { seedBoards?: boolean } = {}) {
         })
         .catch((e) => log.error("bootstrap.labels.failed", { err: e }));
     }
+    if (stored.officeListVersion !== "1") {
+      const { expandStoredOfficeLocations } = await import("./positions.js");
+      await expandStoredOfficeLocations()
+        .then(async (r) => {
+          await updateSettings({ officeListVersion: "1" });
+          if (r.updated) log.info("bootstrap.offices", r);
+        })
+        .catch((e) => log.error("bootstrap.offices.failed", { err: e }));
+    }
     if (stored.entityDecodeVersion !== "1") {
       const { decodeStoredJdEntities } = await import("./positions.js");
       await decodeStoredJdEntities()
