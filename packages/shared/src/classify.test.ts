@@ -64,6 +64,7 @@ describe("geo_class", () => {
     expect(geoClass("San Francisco · New York City · Seattle · US - Remote", "remote")).toBe("hard_geo");
     expect(geoClass("Remote-Friendly (Travel-Required) · San Francisco, CA · Seattle, WA", "remote")).toBe("hard_geo");
     expect(geoClass("United States (Remote) · Seattle, Washington · San Francisco, California", "remote")).toBe("hard_geo");
+    expect(geoClass("Washington, District of Columbia · Canada (Remote) · United States (Remote)", "remote")).toBe("ambiguous_remote");
   });
 
   it("treats a remote multi-country list without only/must-reside as TZ overlap, not hard_geo", () => {

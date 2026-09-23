@@ -795,7 +795,8 @@ export async function reclassifyUsPlaceLists(): Promise<{ positions: number; dis
       id: positions.id,
       geo: positions.geoClass,
       workplace: positions.workplace,
-      location: sql<string | null>`(select location_raw from jd_revisions jr where jr.position_id = ${positions.id} order by jr.revision desc limit 1)`,
+      // Qualify positions.id. A bare "id" binds to jd_revisions.id inside the subquery and comes back empty.
+      location: sql<string | null>`(select jr.location_raw from jd_revisions jr where jr.position_id = "positions"."id" order by jr.revision desc limit 1)`,
     })
     .from(positions)
     .where(eq(positions.geoClass, "ambiguous_remote"));

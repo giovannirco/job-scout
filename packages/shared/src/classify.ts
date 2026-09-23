@@ -138,9 +138,20 @@ function isUsLocalSegment(segment: string): boolean {
   return false;
 }
 
-/** Every concrete place is in the US. Remote wording does not make it a foreign list. */
+/** Drop remote wording so "US-Remote" stays "US", and "Canada (Remote)" stays "Canada". */
+function placeWithoutRemoteWording(segment: string): string {
+  return segment
+    .replace(/\bremote[-\s]?friendly\b/gi, " ")
+    .replace(/\b(remote|remoto)\b/gi, " ")
+    .replace(/\btravel[-\s]?required\b/gi, " ")
+    .replace(/[()\-/]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Every concrete place is in the US. A foreign country in the same list still counts. */
 export function usOnlyPlaces(location: string): boolean {
-  const places = locationSegments(location).filter((segment) => !/\bremote\b/i.test(segment));
+  const places = locationSegments(location).map(placeWithoutRemoteWording).filter(Boolean);
   return places.length > 0 && places.every(isUsLocalSegment);
 }
 
