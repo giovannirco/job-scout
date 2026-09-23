@@ -9,7 +9,7 @@ import { qs, STATUSES, useApi, useApiMeta, type PipelineStatus, type PositionRow
 import { homeMarket } from "@job-scout/shared";
 import { defaultPipelinePreset, pipelineSortFallback, pipelineSortOptions } from "./pipeline-defaults";
 import { familyLocationLabel } from "./pipeline-location";
-import { ago, jdChangedAt, money } from "@/lib/format";
+import { ago, departmentLabel, jdChangedAt, money } from "@/lib/format";
 import { archiveReasonLabel } from "@/lib/gate-reason";
 import type { PipelineSearch } from "@/router";
 import { Btn, Card, Dot, Empty, Loading, Monogram, Page, PageHeader, Pager, Seg, SortHead, Table, Td, Th, Tr, cn, ErrorNote } from "@/ui/kit";
@@ -268,6 +268,7 @@ function PositionsTable({ rows, home }: { rows: PositionRow[]; home?: string | n
                   {r.company.name}
                 </Link>
               </div>
+              {departmentLabel(r.departments) ? <div className="text-[11px] text-faint truncate">{departmentLabel(r.departments)}</div> : null}
               {r.triageOneLiner ? <div className="text-[11.5px] text-muted truncate">{r.triageOneLiner}</div> : null}
               {r.status === "archived" && r.archiveReason ? <div className="text-[11px] text-faint truncate" title={r.archiveReason}>{archiveReasonLabel(r.archiveReason)}</div> : null}
               {(r.siblingCount || 0) > 1 ? <div className="text-[11px] text-muted">{new Set((r.locations || []).filter(Boolean)).size <= 1 ? `${r.siblingCount} copies of this posting` : `${r.siblingCount} related postings`}</div> : null}
@@ -355,6 +356,7 @@ function Board({ rows }: { rows: PositionRow[] }) {
                         <span className="text-[11px] text-muted truncate">{r.company.name}</span>
                       </div>
                       <div className="text-[12.5px] leading-snug line-clamp-2">{r.title}</div>
+                      {departmentLabel(r.departments) ? <div className="text-[11px] text-faint truncate mt-0.5">{departmentLabel(r.departments)}</div> : null}
                       {r.locationRaw ? <div className="text-[11px] text-muted truncate mt-1">{r.locationRaw}</div> : null}
                       {money(r.salaryMin, r.salaryMax, r.salaryCurrency) ? <div className="text-[11px] font-mono text-fg truncate mt-1">{money(r.salaryMin, r.salaryMax, r.salaryCurrency)}</div> : null}
                       {r.postedAt || r.firstSeenAt ? (
