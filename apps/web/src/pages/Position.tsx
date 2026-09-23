@@ -279,6 +279,7 @@ function BriefTab({ p, noKey, onTriage }: { p: PositionDetail; noKey: boolean; o
     void qc.invalidateQueries({ queryKey: ["position", p.id] });
     toast.success("Saved");
   }
+  const comp = money(p.salaryMin, p.salaryMax, p.salaryCurrency) || p.salaryRaw;
   const latestEval = p.evaluations.find((e) => e.kind === "evaluate");
   const ej = (latestEval?.json || null) as null | { score?: number; verdict?: string; headline?: string };
   const loc = sourceLocation(p);
