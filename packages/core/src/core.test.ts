@@ -401,6 +401,36 @@ describe("core on pglite", () => {
     expect((await regateRecentDiscovery()).withdrawn).toBe(0);
   });
 
+  it("returns one company when the same name is created together", async () => {
+    const { resolveCompanyForName } = await import("./companies.js");
+    const name = `Parallel Labs ${Date.now()}`;
+    const rows = await Promise.all(Array.from({ length: 8 }, () => resolveCompanyForName(name)));
+    expect(new Set(rows.map((r) => r.id)).size).toBe(1);
+    expect(rows[0]?.slug).toBe(name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""));
+  });
+
+  it("classifies a duplicate company slug as a unique violation", async () => {
+    const { getDb, companies, id } = await import("@job-scout/db");
+    const db = await getDb();
+    const slug = `dup-${Date.now()}`;
+    await db.insert(companies).values({ id: id("co"), slug, name: "Dup", metadata: {} });
+    try {
+      await db.insert(companies).values({ id: id("co"), slug, name: "Dup", metadata: {} });
+      expect.fail("duplicate slug should throw");
+    } catch (err) {
+      const seen = new Set<unknown>();
+      let unique = false;
+      let cur: unknown = err;
+      while (cur && typeof cur === "object" && !seen.has(cur)) {
+        seen.add(cur);
+        const o = cur as { code?: unknown; message?: unknown; cause?: unknown };
+        if (o.code === "23505" || (typeof o.message === "string" && /duplicate key|unique constraint|already exists/i.test(o.message))) unique = true;
+        cur = o.cause;
+      }
+      expect(unique).toBe(true);
+    }
+  });
+
   it("listDiscovery attaches an existing position by ATS identity when positionId is missing", async () => {
     const { upsertFromJob } = await import("./positions.js");
     const { listDiscovery } = await import("./radar.js");
