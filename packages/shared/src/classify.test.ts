@@ -263,6 +263,7 @@ describe("classifyListing", () => {
     expect(classifyListing({ locationRaw: "Bay Area, CA, United States of America" }).workplace).toBe("onsite");
     expect(classifyListing({ locationRaw: "San Francisco, CA • New York, NY • United States" }).workplace).toBe("onsite");
     expect(classifyListing({ locationRaw: "Home based - Worldwide" }).workplace).toBe("remote");
+    expect(classifyListing({ locationRaw: "San Francisco, CA • New York, NY • United States", title: "Software Engineer - Distributed Systems" }).workplace).toBe("onsite");
     expect(classifyListing({ locationRaw: "Lugano" }).workplace).toBe("onsite");
     expect(classifyListing({ locationRaw: "Sao Paulo" }).workplace).toBe("onsite");
     expect(classifyListing({ locationRaw: "Poland · Brazil · Sweden · Colombia", company: "Kraken" }).workplace).toBe("unknown");

@@ -179,7 +179,7 @@ export function workplaceOf(
   if (/(on[\s-]*site|office based|in-office|in office)/.test(blob) && !/\bremote\b/.test(blob)) return "onsite";
   if (wt === "remote" || isRemote === true) return "remote";
   if (/\b(remote|remoto|home[-\s]?based)\b/.test(blob)) return "remote";
-  if (/\b(worldwide|anywhere|global|distributed)\b/.test(loc)) return "remote";
+  if (/\b(worldwide|anywhere|global)\b/.test(loc)) return "remote";
   return "unknown";
 }
 
