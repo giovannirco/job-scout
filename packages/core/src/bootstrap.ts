@@ -101,6 +101,15 @@ export async function bootstrap(opts: { seedBoards?: boolean } = {}) {
         })
         .catch((e) => log.error("bootstrap.blank-greenhouse.failed", { err: e }));
     }
+    if (stored.rolePhraseVersion !== "1") {
+      const { regateRecentDiscovery } = await import("./scan.js");
+      await regateRecentDiscovery()
+        .then(async (r) => {
+          await updateSettings({ rolePhraseVersion: "1" });
+          log.info("bootstrap.role-phrase", r);
+        })
+        .catch((e) => log.error("bootstrap.role-phrase.failed", { err: e }));
+    }
     if (stored.titleHyphenVersion !== "1") {
       const { trimStoredTitles } = await import("./positions.js");
       await trimStoredTitles()

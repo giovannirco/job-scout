@@ -269,6 +269,8 @@ export const Settings = z.object({
   archivedDiscoveryVersion: z.string().nullable().optional(),
   /** One-shot: a hyphen glued to a word gets a space, as in "Engineer- Money". */
   titleHyphenVersion: z.string().nullable().optional(),
+  /** One-shot: "Backend/API Engineer" and "Engineer, Backend" match the backend role. */
+  rolePhraseVersion: z.string().nullable().optional(),
 });
 export type Settings = z.infer<typeof Settings>;
 

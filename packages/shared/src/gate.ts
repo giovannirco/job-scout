@@ -53,6 +53,33 @@ function includeTerms(term: string): string[] {
   return [t];
 }
 
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * A role phrase also matches a slash compound ("Backend/API Engineer") and the
+ * reversed order ("Engineer, Backend"). Words in between still miss, so
+ * "Software Security Engineer" is not a software engineer.
+ */
+function specialtyBesideRole(title: string, specialty: string, role: string): boolean {
+  const spec = escapeRe(specialty);
+  const slash = new RegExp(`(?:^|[^a-z0-9])${spec}(?:/[a-z0-9]+)*\\s+${role}(?:[^a-z0-9]|$)`);
+  if (slash.test(title)) return true;
+  const reversed = new RegExp(`(?:^|[^a-z0-9])${role}[^a-z0-9]{1,8}${spec}(?:[^a-z0-9]|$)`);
+  return reversed.test(title);
+}
+
+function titleHasInclude(title: string, term: string): boolean {
+  if (has(title, term)) return true;
+  const parts = term.match(/^(.*)\s+(engineer|developer)$/);
+  if (!parts?.[1]) return false;
+  const specialty = parts[1];
+  const role = parts[2] === "developer" ? "developer" : "engineer";
+  const other = role === "engineer" ? "developer" : "engineer";
+  return specialtyBesideRole(title, specialty, role) || specialtyBesideRole(title, specialty, other);
+}
+
 /**
  * Deterministic pre-LLM gate. Cheap, explainable, tunable from Settings > Gate.
  * Order: exclude title -> require include title -> stale -> geo block -> geo allow/unknown.
@@ -68,7 +95,7 @@ export function gateListing(input: GateInput, cfg: GateConfig): GateVerdict {
 
   let matchedInclude: string | null = null;
   for (const term of cfg.titleInclude) {
-    const hit = includeTerms(term).find((candidate) => has(title, candidate));
+    const hit = includeTerms(term).find((candidate) => titleHasInclude(title, candidate));
     if (hit) {
       matchedInclude = hit;
       break;
