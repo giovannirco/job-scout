@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countLabel, jdChangedAt } from "./format.js";
+import { countLabel, employmentLabel, jdChangedAt } from "./format.js";
 
 describe("jdChangedAt", () => {
   it("ignores a change stamp that is the first snapshot", () => {
@@ -7,6 +7,15 @@ describe("jdChangedAt", () => {
     expect(jdChangedAt(at, at)).toBeNull();
     expect(jdChangedAt(at, "2026-09-23T18:00:00.400Z")).toBeNull();
     expect(jdChangedAt(at, "2026-09-23T19:30:00.000Z")).toBe("2026-09-23T19:30:00.000Z");
+  });
+});
+
+describe("employmentLabel", () => {
+  it("turns schema.org enums into words", () => {
+    expect(employmentLabel("FullTime")).toBe("Full-time");
+    expect(employmentLabel("FULL_TIME")).toBe("Full-time");
+    expect(employmentLabel("Part-time")).toBe("Part-time");
+    expect(employmentLabel("Something else")).toBe("Something else");
   });
 });
 

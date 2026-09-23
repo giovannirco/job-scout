@@ -98,6 +98,10 @@ export async function getCompany(idOrSlug: string) {
       triageVerdict: positions.triageVerdict,
       listingStatus: positions.listingStatus,
       primaryUrl: positions.primaryUrl,
+      salaryMin: positions.salaryMin,
+      salaryMax: positions.salaryMax,
+      salaryCurrency: positions.salaryCurrency,
+      locationRaw: sql<string | null>`(select jr.location_raw from jd_revisions jr where jr.position_id = "positions"."id" order by jr.revision desc limit 1)`,
       updatedAt: positions.updatedAt,
     })
     .from(positions)

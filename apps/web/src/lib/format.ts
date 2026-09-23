@@ -65,6 +65,29 @@ export function compact(n: number | null | undefined): string {
   return String(n);
 }
 
+const EMPLOYMENT_LABELS: Record<string, string> = {
+  fulltime: "Full-time",
+  full_time: "Full-time",
+  parttime: "Part-time",
+  part_time: "Part-time",
+  contractor: "Contract",
+  contract: "Contract",
+  temporary: "Temporary",
+  intern: "Intern",
+  internship: "Intern",
+  volunteer: "Volunteer",
+  perdiem: "Per diem",
+  per_diem: "Per diem",
+};
+
+/** Schema.org values such as FullTime and FULL_TIME read as "Full-time". */
+export function employmentLabel(raw: string | null | undefined): string {
+  const text = (raw || "").trim();
+  if (!text) return "";
+  const key = text.toLowerCase().replace(/[\s-]+/g, "_");
+  return EMPLOYMENT_LABELS[key] || EMPLOYMENT_LABELS[key.replace(/_/g, "")] || text;
+}
+
 export function titleCase(s: string | null | undefined): string {
   if (!s) return "";
   return s.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
