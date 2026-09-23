@@ -1,4 +1,4 @@
-import { isCraftMatch } from "@job-scout/shared";
+import { extractSalaryRaw, isCraftMatch } from "@job-scout/shared";
 import {
   detectAts,
   externalIdentityFromDetect,
@@ -133,15 +133,7 @@ function extractJsonLdJob(html: string): Partial<AtsJob> | null {
 }
 
 function salaryFromGhContent(html: string): string | undefined {
-  const text = stripHtml(html);
-  const m =
-    text.match(
-      /\$\s*[\d,]+(?:\.\d+)?\s*[–\-—to]+\s*\$?\s*[\d,]+(?:\.\d+)?(?:\s*(?:USD|usd))?/,
-    ) ||
-    text.match(
-      /(?:USD|US\$)\s*[\d,]+(?:\.\d+)?\s*[–\-—to]+\s*(?:USD|US\$)?\s*[\d,]+/,
-    );
-  return m?.[0]?.replace(/\s+/g, " ").trim();
+  return extractSalaryRaw(stripHtml(html));
 }
 
 export async function fetchGreenhouseJob(
