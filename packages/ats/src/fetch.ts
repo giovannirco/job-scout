@@ -1,4 +1,4 @@
-import { extractSalaryRaw, isCraftMatch } from "@job-scout/shared";
+import { extractSalaryRaw, isCityOffice, isCraftMatch } from "@job-scout/shared";
 import {
   detectAts,
   externalIdentityFromDetect,
@@ -141,6 +141,35 @@ export function greenhouseOfficeIsRemote(offices: string[]): boolean {
   return offices.some((name) => /\b(remote|distributed|global|anywhere)\b/i.test(name));
 }
 
+const JUNK_PLACE = /^(n\/a|hq|tbd|none|null|-+|—+)$/i;
+
+/** When the board location is N/A or HQ, the office list is the place. A region office is not a desk. */
+export function greenhouseListingLocation(
+  locationName: string | undefined,
+  offices: string[],
+): { locationRaw?: string; regionOffice: boolean } {
+  const name = (locationName || "").trim();
+  const usable = offices.map((office) => office.trim()).filter((office) => office && !JUNK_PLACE.test(office));
+  if (name && !JUNK_PLACE.test(name)) return { locationRaw: name, regionOffice: false };
+  if (!usable.length) return { locationRaw: undefined, regionOffice: false };
+  const regionOffice = usable.every((office) => !isCityOffice(office) && !/,/.test(office));
+  return { locationRaw: usable.join(" · "), regionOffice };
+}
+
+export function ashbyListingLocation(
+  location: AshbyLocation,
+  secondary?: AshbyLocation[] | null,
+  address?: { postalAddress?: { addressLocality?: string; addressRegion?: string; addressCountry?: string } } | null,
+): string | undefined {
+  const joined = joinAshbyLocations(location, secondary);
+  if (joined && !JUNK_PLACE.test(joined)) return joined;
+  const postal = address?.postalAddress;
+  const parts = [postal?.addressLocality, postal?.addressRegion, postal?.addressCountry]
+    .map((part) => (part || "").trim())
+    .filter(Boolean);
+  return parts.length ? parts.join(", ") : joined;
+}
+
 export async function fetchGreenhouseJob(
   token: string,
   jobId: string,
@@ -201,6 +230,7 @@ export async function fetchGreenhouseJob(
   const offices = (data.offices || [])
     .map((o) => o.name || o.location || "")
     .filter(Boolean);
+  const place = greenhouseListingLocation(data.location?.name, offices);
   return {
     provider: "greenhouse",
     boardToken: token,
@@ -210,13 +240,13 @@ export async function fetchGreenhouseJob(
     company: data.company_name,
     url: data.absolute_url || `https://job-boards.greenhouse.io/${token}/jobs/${jobId}`,
     applyUrl: data.absolute_url,
-    locationRaw: data.location?.name,
+    locationRaw: place.locationRaw,
     descriptionHtml: html,
     descriptionText: text,
     salaryRaw: salaryFromGhContent(html),
     departments: (data.departments || []).map((d) => d.name || "").filter(Boolean),
     offices,
-    isRemote: greenhouseOfficeIsRemote(offices) || undefined,
+    isRemote: greenhouseOfficeIsRemote(offices) || place.regionOffice || undefined,
     requisitionId: data.requisition_id,
     postedAt: data.first_published,
     updatedAt: data.updated_at,
@@ -326,6 +356,7 @@ export async function fetchAshbyJob(org: string, jobId: string, opts: { render?:
             team?: string;
             publishedAt?: string;
             secondaryLocations?: AshbyLocation[];
+            address?: { postalAddress?: { addressLocality?: string; addressRegion?: string; addressCountry?: string } };
             compensation?: {
               compensationTiers?: Array<{
                 title?: string;
@@ -345,7 +376,7 @@ export async function fetchAshbyJob(org: string, jobId: string, opts: { render?:
               ? `${cur} ${comp.minValue}–${comp.maxValue}`
               : `${cur} ${comp.minValue || comp.maxValue}`;
         }
-        const locationsJoined = joinAshbyLocations(job.location, job.secondaryLocations);
+        const locationsJoined = ashbyListingLocation(job.location, job.secondaryLocations, job.address);
         const applyUrl = job.applyUrl || job.jobUrl || pageUrl;
         let questions: string[] | undefined;
         try {

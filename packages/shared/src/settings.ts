@@ -251,6 +251,8 @@ export const Settings = z.object({
   placeSplitVersion: z.string().nullable().optional(),
   /** One-shot: careers-page filings with no location are refetched from the greenhouse board. */
   blankGreenhouseVersion: z.string().nullable().optional(),
+  /** One-shot: N/A and HQ locations are replaced from the office or street address. */
+  junkPlaceVersion: z.string().nullable().optional(),
 });
 export type Settings = z.infer<typeof Settings>;
 

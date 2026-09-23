@@ -118,7 +118,7 @@ function isCountryList(location: string): boolean {
 }
 
 /** A city or US state in the location, not a country name on its own. */
-function isCityOffice(location: string): boolean {
+export function isCityOffice(location: string): boolean {
   if (!isNamedOffice(location)) return false;
   return locationSegments(location).some((segment) => HARD_CITY.test(segment) || segmentIsUsState(segment));
 }

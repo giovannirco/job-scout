@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchAshbyJob, greenhouseOfficeIsRemote, listBoard } from "./fetch.js";
+import { ashbyListingLocation, fetchAshbyJob, greenhouseListingLocation, greenhouseOfficeIsRemote, listBoard } from "./fetch.js";
 
 const REMOTEOK_API = "https://remoteok.com/api";
 const WWR_RSS = "https://weworkremotely.com/categories/remote-devops-sysadmin-jobs.rss";
@@ -495,5 +495,24 @@ describe("greenhouse office remote signal", () => {
     expect(greenhouseOfficeIsRemote(["Distributed, Global"])).toBe(true);
     expect(greenhouseOfficeIsRemote(["Boston", "New York"])).toBe(false);
     expect(greenhouseOfficeIsRemote(["Boston", "Remote"])).toBe(true);
+  });
+
+  it("uses the office when the board location is N/A", () => {
+    expect(greenhouseListingLocation("N/A", ["US"])).toEqual({ locationRaw: "US", regionOffice: true });
+    expect(greenhouseListingLocation("N/A", ["India Locations"])).toEqual({ locationRaw: "India Locations", regionOffice: true });
+    expect(greenhouseListingLocation("Remote - USA", ["US - Remote Zone 1"])).toEqual({ locationRaw: "Remote - USA", regionOffice: false });
+    expect(greenhouseListingLocation("HQ", ["Menlo Park, California"])).toEqual({
+      locationRaw: "Menlo Park, California",
+      regionOffice: false,
+    });
+  });
+
+  it("uses the street address when Ashby only says HQ", () => {
+    expect(
+      ashbyListingLocation("HQ", [], {
+        postalAddress: { addressLocality: "Menlo Park", addressRegion: "California", addressCountry: "United States" },
+      }),
+    ).toBe("Menlo Park, California, United States");
+    expect(ashbyListingLocation("Remote", [], { postalAddress: { addressLocality: "Menlo Park" } })).toBe("Remote");
   });
 });
