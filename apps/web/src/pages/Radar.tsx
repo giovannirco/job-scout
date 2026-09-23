@@ -7,6 +7,7 @@ import { LaneBadge, ScoreMeter, StatusBadge } from "@/components/badges";
 import { useChatScope } from "@/frame/store";
 import { apiMeta, del, patch, post, qs, useApi, useApiMeta, type Board, type DeltaRow, type DiscoveryRow, type Watch } from "@/lib/api";
 import { ago, dateTime, titleCase } from "@/lib/format";
+import { discoveryQueuedMessage } from "@/lib/discovery-toast";
 import type { RadarSearch } from "@/router";
 import { Btn, Card, Dot, Empty, IconBtn, Input, Kpi, Loading, Monogram, Page, PageHeader, Pager, Seg, Select, SortHead, Table, Tabs, Td, Th, Tr, cn, ErrorNote } from "@/ui/kit";
 
@@ -38,7 +39,9 @@ export function RadarPage() {
           <Btn
             onClick={async () => {
               const r = await post<{ enqueued: number }>("/api/v1/radar/boards/scan-all");
-              toast.success(`Discovery queued for ${r.enqueued} boards`);
+              const text = discoveryQueuedMessage(r);
+              if (r.enqueued > 0) toast.success(text);
+              else toast.message(text);
             }}
           >
             <Play className="h-3.5 w-3.5" /> Scan due boards

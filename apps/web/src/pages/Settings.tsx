@@ -7,6 +7,7 @@ import { clipBookmarklet } from "@job-scout/shared";
 import { useChatScope, useTheme, type ThemePref } from "@/frame/store";
 import { api, del, patch, post, qs, useApi, type ApiToken, type AutopilotConfig, type AutopilotState, type Job, type LlmStatus, type ModelsCatalog, type NotificationsConfig, type NotifyChannel, type Profile, type Settings, type SystemInfo } from "@/lib/api";
 import { ago, compact, dateTime } from "@/lib/format";
+import { discoveryQueuedMessage } from "@/lib/discovery-toast";
 import type { SettingsSearch } from "@/router";
 import { Btn, Budget, Card, Chip, Dot, Empty, IconBtn, Input, Loading, Page, Panel, Seg, Select, Switch, Table, Td, Textarea, Th, Tr, cn } from "@/ui/kit";
 
@@ -913,7 +914,7 @@ function SystemTab() {
         meta={`${by("running")} running · ${by("queued")} queued · ${by("failed")} failed`}
         actions={
           <>
-            <Btn size="xs" variant="ghost" onClick={() => post<{ enqueued: number }>("/api/v1/radar/boards/scan-all").then((r) => toast.success(`${r.enqueued} boards queued`))}>
+            <Btn size="xs" variant="ghost" onClick={() => post<{ enqueued: number }>("/api/v1/radar/boards/scan-all").then((r) => { const text = discoveryQueuedMessage(r); if (r.enqueued > 0) toast.success(text); else toast.message(text); })}>
               Discovery
             </Btn>
             <Btn size="xs" variant="ghost" onClick={() => enqueue("watch_check")}>
