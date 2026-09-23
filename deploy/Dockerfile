@@ -15,7 +15,8 @@ ARG APP_VERSION=2.0.0
 ENV APP_VERSION=${APP_VERSION}
 RUN pnpm build
 # drop dev-only weight (vite, tailwind, drizzle-kit, vitest) — runtime is tsx + hono + drizzle + pg
-RUN pnpm prune --prod
+# CI skips pnpm's "reinstall from scratch?" prompt, which otherwise waits on a TTY.
+RUN CI=true pnpm prune --prod
 
 FROM node:22-bookworm-slim AS runner
 WORKDIR /app
