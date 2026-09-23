@@ -119,6 +119,15 @@ export async function bootstrap(opts: { seedBoards?: boolean } = {}) {
         })
         .catch((e) => log.error("bootstrap.craft-gate.failed", { err: e }));
     }
+    if (stored.salaryObjectVersion !== "1") {
+      const { repairObjectSalaries } = await import("./positions.js");
+      await repairObjectSalaries()
+        .then(async (r) => {
+          await updateSettings({ salaryObjectVersion: "1" });
+          if (r.checked) log.info("bootstrap.salary-object", r);
+        })
+        .catch((e) => log.error("bootstrap.salary-object.failed", { err: e }));
+    }
     if (stored.regionOfficeVersion !== "1") {
       const { refetchDisagreeingRegions } = await import("./scan.js");
       await refetchDisagreeingRegions()

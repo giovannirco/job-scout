@@ -17,3 +17,4 @@ export * from "./clip.js";
 export * from "./position-identity.js";
 export * from "./home-geo.js";
 export * from "./profile-gate.js";
+export * from "./search.js";
