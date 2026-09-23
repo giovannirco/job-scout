@@ -203,7 +203,7 @@ function Discovery({ search, set, summary }: { search: RadarSearch; set: (p: Par
                 <Td>
                   {r.positionSlug ? (
                     <Link to="/positions/$id" params={{ id: r.positionSlug }} className="flex items-center gap-2">
-                      <ScoreMeter score={r.triageScore} verdict={r.triageVerdict} />
+                      {r.triageScore != null ? <ScoreMeter score={r.triageScore} verdict={r.triageVerdict} /> : null}
                       {r.positionStatus ? <StatusBadge status={r.positionStatus} /> : null}
                     </Link>
                   ) : (
@@ -425,9 +425,10 @@ function Boards({ search, set }: { search: RadarSearch; set: (p: Partial<RadarSe
                 <Td right mono className="text-muted">
                   {ago(b.lastScannedAt)}
                 </Td>
-                <Td className="max-w-[260px] text-bad text-[11px]">
+                <Td className="max-w-[260px] text-[11px]">
                   {b.lastError ? <div className={b.errorKind === "transient" ? "text-warn" : "text-bad"}>{b.errorKind === "transient" ? "Temporary failure" : b.errorKind === "missing" ? "Board not found" : b.errorKind === "auth" ? "Access denied" : "Unclassified error"}</div> : null}
-                  <div className="truncate" title={b.lastError || ""}>
+                  {!b.enabled && b.notes ? <div className="text-muted truncate" title={b.notes}>Not scanned. {b.notes}</div> : null}
+                  <div className="truncate text-bad" title={b.lastError || ""}>
                     {b.lastError || ""}
                   </div>
                 </Td>

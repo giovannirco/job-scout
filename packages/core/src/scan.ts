@@ -2,7 +2,7 @@ import { and, desc, eq, gte, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { boardDeltas, boardSnapshots, boardSources, discoveryFeed, getDb, id, positions } from "@job-scout/db";
 import { detectAts, externalIdentityFromDetect, fetchGreenhouseJob, greenhouseListingNeedsBoardFetch, listBoard, type AtsJob, type BoardJobSummary } from "@job-scout/ats";
 import { fetchJob as fetchJobFromUrl } from "./fetch-job.js";
-import { classifyListing, craftFamily, gateListing, geoClass, homeMarket, isNoiseJobTitle, missesHomeMarket, parseClipListing, type GateConfig, type GateVerdict } from "@job-scout/shared";
+import { applyProfileToGate, classifyListing, cleanJobTitle, craftFamily, gateListing, geoClass, homeMarket, isNoiseJobTitle, missesHomeMarket, parseClipListing, type GateConfig, type GateVerdict } from "@job-scout/shared";
 import { enqueueJob } from "./jobs.js";
 import { llmConfigured } from "./llm.js";
 import { archivePosition, upsertFromJob } from "./positions.js";
@@ -67,11 +67,12 @@ export async function scanBoard(boardId: string, opts: { force?: boolean } = {})
 
   const passedJobs: Array<{ j: BoardJobSummary; verdict: GateVerdict }> = [];
   const nowIso = new Date();
-  const home = await profileLocation();
+  const profile = await profileGate();
   for (const j of list) {
+    j.title = cleanJobTitle(j.title);
     const verdict: GateVerdict = isNoiseJobTitle(j.title)
       ? { pass: false, reason: "junk_title", matchedInclude: null }
-      : listingGate(j, settings.gate, home);
+      : listingGate(j, settings.gate, profile, { listedNow: true });
     const lane = verdict.pass ? "passed" : "filtered";
     if (verdict.pass) {
       res.passed++;
@@ -265,31 +266,36 @@ export async function enqueueDueBoardScans(opts: { limit?: number; all?: boolean
   return { due: due.length, enqueued };
 }
 
-async function profileLocation(): Promise<string> {
+type ProfileGate = { home: string; northStar: string };
+
+async function profileGate(): Promise<ProfileGate> {
   const { getProfile } = await import("./profile.js");
-  return (await getProfile()).location || "";
+  const profile = await getProfile();
+  return { home: profile.location || "", northStar: profile.northStar || "" };
 }
 
 function listingGate(
   input: { title: string; locationRaw?: string | null; postedAt?: string | Date | null; workplaceType?: string | null; isRemote?: boolean | null },
   gate: GateConfig,
-  home = "",
+  profile: ProfileGate = { home: "", northStar: "" },
+  opts: { listedNow?: boolean } = {},
 ): GateVerdict {
-  if (isNoiseJobTitle(input.title)) return { pass: false, reason: "junk_title", matchedInclude: null };
+  const title = cleanJobTitle(input.title);
+  if (isNoiseJobTitle(title)) return { pass: false, reason: "junk_title", matchedInclude: null };
   const facts = classifyListing({
     locationRaw: input.locationRaw,
     workplaceType: input.workplaceType,
     isRemote: input.isRemote,
-    title: input.title,
+    title,
   });
   const workplaceType = input.workplaceType || (facts.workplace !== "unknown" ? facts.workplace : undefined);
   const verdict = gateListing({
-    title: input.title,
+    title,
     locationRaw: input.locationRaw,
     postedAt: input.postedAt,
     workplaceType,
-  }, gate);
-  if (verdict.pass && missesHomeMarket(input.locationRaw || "", home)) {
+  }, applyProfileToGate(gate, { home: profile.home, northStar: profile.northStar, listedNow: opts.listedNow }));
+  if (verdict.pass && missesHomeMarket(input.locationRaw || "", profile.home)) {
     return { pass: false, reason: "geo_home", matchedInclude: verdict.matchedInclude };
   }
   return verdict;
@@ -380,7 +386,7 @@ export async function regateRecentDiscovery(hours = 24 * 7): Promise<{
   let promoted = 0;
   let withdrawn = 0;
   const considered = new Set<string>();
-  const home = await profileLocation();
+  const profile = await profileGate();
   const positionIds = [...new Set(rows.map((r) => r.positionId).filter((id): id is string => Boolean(id)))];
   const storedWorkplace = new Map<string, string | null>();
   if (positionIds.length) {
@@ -394,7 +400,7 @@ export async function regateRecentDiscovery(hours = 24 * 7): Promise<{
       locationRaw: row.locationRaw,
       postedAt: row.postedAt,
       workplaceType: workplaceType && workplaceType !== "unknown" ? workplaceType : undefined,
-    }, settings.gate, home);
+    }, settings.gate, profile, { listedNow: true });
     const lane = verdict.pass ? "passed" : "filtered";
     const miss = filingMiss(verdict);
     if (miss && row.positionId && !considered.has(row.positionId)) {
@@ -497,7 +503,7 @@ export async function repairOfficeDiscoveryFilings(): Promise<{ withdrawn: numbe
     .from(positions)
     .where(and(eq(positions.status, "triaged"), inArray(positions.workplace, ["onsite", "hybrid"])));
   let withdrawn = 0;
-  const home = await profileLocation();
+  const profile = await profileGate();
   for (const row of rows) {
     const feed = (
       await db
@@ -512,7 +518,7 @@ export async function repairOfficeDiscoveryFilings(): Promise<{ withdrawn: numbe
       locationRaw: feed?.locationRaw,
       postedAt: feed?.postedAt,
       workplaceType: row.workplace,
-    }, settings.gate, home);
+    }, settings.gate, profile);
     const miss = filingMiss(verdict);
     if (!miss?.startsWith("geo_")) continue;
     if (await withdrawUntouchedScanPosition(row.id, settings.gate, { allowManual: row.source === "manual", reason: miss })) withdrawn++;
@@ -527,8 +533,8 @@ export async function repairOfficeDiscoveryFilings(): Promise<{ withdrawn: numbe
 export async function repairHomeMarketFilings(): Promise<{ withdrawn: number }> {
   const db = await getDb();
   const settings = await getSettings({ fresh: true });
-  const home = await profileLocation();
-  if (!homeMarket(home)) return { withdrawn: 0 };
+  const profile = await profileGate();
+  if (!homeMarket(profile.home)) return { withdrawn: 0 };
   const rows = await db
     .select({
       id: positions.id,
@@ -553,11 +559,44 @@ export async function repairHomeMarketFilings(): Promise<{ withdrawn: number }> 
       locationRaw: feed?.locationRaw,
       postedAt: feed?.postedAt,
       workplaceType: row.workplace && row.workplace !== "unknown" ? row.workplace : undefined,
-    }, settings.gate, home);
+    }, settings.gate, profile);
     if (verdict.reason !== "geo_home") continue;
     if (await withdrawUntouchedScanPosition(row.id, settings.gate, { allowManual: row.source === "manual", reason: "geo_home" })) withdrawn++;
   }
   return { withdrawn };
+}
+
+/** Re-apply profile rules (north star excludes, home market, listed-now age) and archive untouched misses. */
+export async function repairProfileGateFilings(): Promise<{ withdrawn: number; regated: number }> {
+  const regate = await regateRecentDiscovery();
+  const db = await getDb();
+  const settings = await getSettings({ fresh: true });
+  const profile = await profileGate();
+  const rows = await db
+    .select({ id: positions.id, title: positions.title, workplace: positions.workplace, source: positions.source })
+    .from(positions)
+    .where(eq(positions.status, "triaged"));
+  let withdrawn = 0;
+  for (const row of rows) {
+    const feed = (
+      await db
+        .select({ locationRaw: discoveryFeed.locationRaw, postedAt: discoveryFeed.postedAt })
+        .from(discoveryFeed)
+        .where(eq(discoveryFeed.positionId, row.id))
+        .limit(1)
+    )[0];
+    if (row.source === "manual" && !feed) continue;
+    const verdict = listingGate({
+      title: row.title,
+      locationRaw: feed?.locationRaw,
+      postedAt: feed?.postedAt,
+      workplaceType: row.workplace && row.workplace !== "unknown" ? row.workplace : undefined,
+    }, settings.gate, profile, { listedNow: true });
+    const miss = filingMiss(verdict);
+    if (!miss) continue;
+    if (await withdrawUntouchedScanPosition(row.id, settings.gate, { allowManual: row.source === "manual", reason: miss })) withdrawn++;
+  }
+  return { withdrawn: withdrawn + regate.withdrawn, regated: regate.nowPassed };
 }
 
 export async function followUpIntake(

@@ -70,6 +70,19 @@ export async function bootstrap(opts: { seedBoards?: boolean } = {}) {
         })
         .catch((e) => log.error("bootstrap.home-gate.failed", { err: e }));
     }
+    if (stored.profileGateVersion !== "1") {
+      const { repairProfileGateFilings } = await import("./scan.js");
+      const { trimStoredTitles } = await import("./positions.js");
+      await repairProfileGateFilings()
+        .then(async (r) => {
+          await updateSettings({ profileGateVersion: "1" });
+          if (r.withdrawn || r.regated) log.info("bootstrap.profile-gate", r);
+        })
+        .catch((e) => log.error("bootstrap.profile-gate.failed", { err: e }));
+      await trimStoredTitles()
+        .then((r) => { if (r.updated) log.info("bootstrap.titles", r); })
+        .catch((e) => log.error("bootstrap.titles.failed", { err: e }));
+    }
   }
   const db = await getDb();
   if (opts.seedBoards !== false) {

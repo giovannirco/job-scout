@@ -169,8 +169,8 @@ export async function runListingClassify(positionId: string) {
 }
 
 export async function backfillListingFacts(opts: { force?: boolean } = {}) {
-  // v7: keep CAD on a dollar range labeled CAD. v6 stored that Elastic band as USD.
-  const BACKFILL_VERSION = "7";
+  // v8: "$143,800.00 to $231,900.00" and a band whose top was glued to the next number.
+  const BACKFILL_VERSION = "8";
   const s = await getSettings({ fresh: true });
   if (!opts.force && s.listingFactsBackfillVersion === BACKFILL_VERSION) {
     return { skipped: true as const, archivedSkipped: 0, updated: 0, enqueued: 0 };

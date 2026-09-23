@@ -3,6 +3,7 @@ import {
   applicationMaterials,
   applicationQuestions,
   companies,
+  discoveryFeed,
   evaluations,
   getDb,
   id,
@@ -28,7 +29,7 @@ import {
   summarizeDiffs,
   HOT_STATUSES,
   PipelineStatus,
-  isNoiseJobTitle, cleanLocation, canonicalExternalIdentity, normalizePostingUrl,
+  isNoiseJobTitle, cleanJobTitle, cleanLocation, canonicalExternalIdentity, normalizePostingUrl,
   employerFromPosting, unresolvedCompany, UNRESOLVED_COMPANY, requisitionId,
 } from "@job-scout/shared";
 import { resolveCompanyForName } from "./companies.js";
@@ -693,10 +694,31 @@ export async function clearRepairedChangedBadges(): Promise<{ cleared: number }>
 }
 
 /** Create-or-update a position from an ATS job. New positions start as `triaged` (untriaged until the LLM runs). */
+export async function trimStoredTitles(): Promise<{ updated: number }> {
+  const db = await getDb();
+  let updated = 0;
+  const posRows = await db.select({ id: positions.id, title: positions.title }).from(positions);
+  for (const row of posRows) {
+    const title = cleanJobTitle(row.title);
+    if (!title || title === row.title) continue;
+    await db.update(positions).set({ title, updatedAt: new Date() }).where(eq(positions.id, row.id));
+    updated++;
+  }
+  const feedRows = await db.select({ id: discoveryFeed.id, title: discoveryFeed.title }).from(discoveryFeed);
+  for (const row of feedRows) {
+    const title = cleanJobTitle(row.title);
+    if (!title || title === row.title) continue;
+    await db.update(discoveryFeed).set({ title }).where(eq(discoveryFeed.id, row.id));
+    updated++;
+  }
+  return { updated };
+}
+
 export async function upsertFromJob(
   job: AtsJob,
   opts: { status?: PositionStatus; source?: string; companyName?: string; reviveArchived?: boolean } = {},
 ): Promise<{ position: NonNullable<Awaited<ReturnType<typeof getPosition>>>; created: boolean; revived: boolean }> {
+  job = { ...job, title: cleanJobTitle(job.title) };
   const db = await getDb();
   if (!job.url?.trim() || isPlaceholderAtsUrl(job.url)) {
     ingestQuality.labels({ reason: "placeholder_url" }).inc();

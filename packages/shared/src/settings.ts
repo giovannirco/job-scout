@@ -245,6 +245,8 @@ export const Settings = z.object({
   gateLaneVersion: z.string().nullable().optional(),
   /** One-shot: a US profile location drops remote roles that require another country. */
   homeGateVersion: z.string().nullable().optional(),
+  /** One-shot: north star excludes, US-only wording, and age on jobs the board still lists. */
+  profileGateVersion: z.string().nullable().optional(),
 });
 export type Settings = z.infer<typeof Settings>;
 
@@ -325,6 +327,7 @@ export function resolveSettings(stored: unknown): Settings {
     officeGateVersion: typeof s.officeGateVersion === "string" ? s.officeGateVersion : null,
     gateLaneVersion: typeof s.gateLaneVersion === "string" ? s.gateLaneVersion : null,
     homeGateVersion: typeof s.homeGateVersion === "string" ? s.homeGateVersion : null,
+    profileGateVersion: typeof s.profileGateVersion === "string" ? s.profileGateVersion : null,
   };
   return Settings.parse(merged);
 }

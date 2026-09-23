@@ -20,15 +20,27 @@ function moneyNumber(raw: string): number | null {
   return null;
 }
 
+/** Drop a trailing thousands group that was glued on from the next sentence. */
+function plausibleAmount(token: string): number | null {
+  let s = token.trim();
+  let n = moneyNumber(s);
+  while (n != null && n > 2_000_000 && /[.,]\d{3}$/.test(s)) {
+    s = s.replace(/[.,]\d{3}$/, "");
+    n = moneyNumber(s);
+  }
+  return n;
+}
+
 /** A posted range, or nothing. Ignores a lone stipend such as "USD$500 home office". */
 export function extractSalaryRaw(text: string | null | undefined): string | undefined {
   if (!text) return undefined;
   const src = decodeSalaryEntities(text);
-  const re = /(?:(USD|EUR|GBP|CAD|£|€|\$)\s*)?(\d{1,3}(?:[.,]\d{3})+|\d{2,})(?:\s*[kK])?\s*[—–\-]\s*(?:(USD|EUR|GBP|CAD|£|€|\$)\s*)?(\d{1,3}(?:[.,]\d{3})+|\d{2,})(?:\s*[kK])?/g;
+  const amount = String.raw`\d{1,3}(?:[.,]\d{3})+(?:\.\d+)?|\d{2,}(?:\.\d+)?`;
+  const re = new RegExp(String.raw`(?:(USD|EUR|GBP|CAD|£|€|\$)\s*)?(${amount})(?:\s*[kK])?\s*(?:[—–\-]|to)\s*(?:(USD|EUR|GBP|CAD|£|€|\$)\s*)?(${amount})(?:\s*[kK])?`, "g");
   let m: RegExpExecArray | null;
   while ((m = re.exec(src))) {
-    let min = moneyNumber(m[2]);
-    let max = moneyNumber(m[4]);
+    let min = plausibleAmount(m[2]);
+    let max = plausibleAmount(m[4]);
     if (min == null || max == null) continue;
     if (/k/i.test(m[0]) && max < 10000) {
       min *= 1000;
