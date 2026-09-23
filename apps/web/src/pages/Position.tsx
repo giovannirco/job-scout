@@ -705,7 +705,59 @@ type FormQuestion = {
   required: boolean;
   inputType: string | null;
   status: string;
+  metadata?: { options?: string[] } | null;
 };
+
+function questionOptions(row: FormQuestion): string[] {
+  const raw = row.metadata?.options;
+  return Array.isArray(raw) ? raw.filter((option) => option.trim()) : [];
+}
+
+function QuestionAnswer({ row, onChange, onCommit }: { row: FormQuestion; onChange: (value: string) => void; onCommit: (value: string) => Promise<void> }) {
+  const options = questionOptions(row);
+  const kind = row.inputType || "unknown";
+  if ((kind === "select" || kind === "multi") && options.length) {
+    return (
+      <Select
+        value={row.answer || ""}
+        onChange={(e) => {
+          onChange(e.target.value);
+          void onCommit(e.target.value);
+        }}
+      >
+        <option value="">Choose…</option>
+        {row.answer && !options.includes(row.answer) ? <option value={row.answer}>{row.answer}</option> : null}
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </Select>
+    );
+  }
+  if (kind === "file") {
+    return (
+      <Input
+        value={row.answer || ""}
+        placeholder="Link, if you want one here"
+        hint="Upload the file on the employer site."
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={(e) => void onCommit(e.target.value)}
+      />
+    );
+  }
+  if (kind === "text") {
+    return <Input value={row.answer || ""} onChange={(e) => onChange(e.target.value)} onBlur={(e) => void onCommit(e.target.value)} />;
+  }
+  return (
+    <Textarea
+      value={row.answer || ""}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={(e) => void onCommit(e.target.value)}
+      className="min-h-[64px]"
+    />
+  );
+}
 
 function FormsTab({ p, noKey, onDraft }: { p: PositionDetail; noKey: boolean; onDraft: () => void }) {
   const qc = useQueryClient();
@@ -717,13 +769,20 @@ function FormsTab({ p, noKey, onDraft }: { p: PositionDetail; noKey: boolean; on
   const q = useApi<FormQuestion[]>(questionKey, `/api/v1/positions/${id}/questions${qs({ sort: search.sort })}`);
   if (q.isLoading) return <Loading rows={5} />;
   const rows = q.data || [];
+  const required = rows.filter((row) => row.required).length;
   return (
     <div className="space-y-3 max-w-3xl">
       {harvestError && !rows.length ? (
-        <div className="rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-[12.5px] text-warn">could not fetch form</div>
+        <div className="rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-[12.5px] text-warn">This posting did not include its application form. Open the employer page to read the questions.</div>
       ) : null}
       <div className="flex items-center justify-between gap-3">
-        <div className="text-[12.5px] text-muted">{rows.length ? `${rows.length} application questions` : "No form harvested yet. Refresh the JD or wait for a renderer."}</div>
+        <div className="text-[12.5px] text-muted">
+          {rows.length
+            ? `${rows.length} application questions${required ? ` · ${required} required` : ""}`
+            : harvestError
+              ? "No questions stored for this posting."
+              : "No form harvested yet. Refresh the JD or wait for a renderer."}
+        </div>
         <div className="flex items-center gap-2">
           <SortHead label="Question" field="question" sort={search.sort} onSort={(n) => navigate({ search: (prev) => ({ ...prev, sort: n, tab: "forms" }) })} />
           <SortHead label="Status" field="status" sort={search.sort} onSort={(n) => navigate({ search: (prev) => ({ ...prev, sort: n, tab: "forms" }) })} />
@@ -738,16 +797,14 @@ function FormsTab({ p, noKey, onDraft }: { p: PositionDetail; noKey: boolean; on
             {row.question}
             {row.required ? <span className="text-bad ml-1">*</span> : null}
           </div>
-          <Textarea
-            value={row.answer || ""}
-            onChange={(e) => {
-              const v = e.target.value;
+          <QuestionAnswer
+            row={row}
+            onChange={(v) => {
               if (q.data) qc.setQueryData(questionKey, rows.map((r) => (r.id === row.id ? { ...r, answer: v } : r)));
             }}
-            onBlur={async (e) => {
-              await patch(`/api/v1/positions/${id}/questions/${row.id}`, { answer: e.target.value || null });
+            onCommit={async (v) => {
+              await patch(`/api/v1/positions/${id}/questions/${row.id}`, { answer: v || null });
             }}
-            className="min-h-[64px]"
           />
           <div className="flex gap-2">
             <Btn

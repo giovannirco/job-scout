@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseApplicationQuestions } from "./application-form.js";
+import { greenhouseQuestionPrompts, parseApplicationQuestions } from "./application-form.js";
 
 describe("parseApplicationQuestions", () => {
   it("reads required labels from Ashby-like HTML", () => {
@@ -12,6 +12,25 @@ describe("parseApplicationQuestions", () => {
       "What is your experience with bitcoin and lightning?",
     ]);
     expect(parsed.every((p) => p.required)).toBe(true);
+  });
+
+  it("keeps Greenhouse required flags, file fields, and select labels", () => {
+    const parsed = greenhouseQuestionPrompts([
+      { label: "First Name", required: true, fields: [{ type: "input_text" }] },
+      { label: "Address Line 2 (Optional)", required: false, fields: [{ type: "input_text" }] },
+      { label: "Resume/CV", required: true, fields: [{ type: "input_file" }, { type: "textarea" }] },
+      {
+        label: "Will you require sponsorship?",
+        required: true,
+        fields: [{ type: "multi_value_single_select", values: [{ label: "Yes" }, { label: "No" }] }],
+      },
+    ]);
+    expect(parsed).toEqual([
+      { question: "First Name", required: true, inputType: "text" },
+      { question: "Address Line 2 (Optional)", required: false, inputType: "text" },
+      { question: "Resume/CV", required: true, inputType: "file" },
+      { question: "Will you require sponsorship?", required: true, inputType: "select", options: ["Yes", "No"] },
+    ]);
   });
 
   it("falls back to starred lines when there are no label tags", () => {
