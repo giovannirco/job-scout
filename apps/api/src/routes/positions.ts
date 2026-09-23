@@ -34,6 +34,7 @@ import {
   enqueueInterviewBrief,
   runInterviewBrief,
   reconcileCareerOps,
+  llmConfigured,
 } from "@job-scout/core";
 import type { EvaluationKind } from "@job-scout/db";
 import { body, fail, ok, queryMap } from "../envelope.js";
@@ -105,6 +106,7 @@ const LLM_ACTIONS = ["triage", "evaluate", "materials", "jd_review", "company_re
 positionsRoutes.post("/:id/actions/:action", async (c) => {
   const action = c.req.param("action") as (typeof LLM_ACTIONS)[number];
   if (!LLM_ACTIONS.includes(action)) return fail(c, "VALIDATION_ERROR", `unknown action ${action}`);
+  if (!llmConfigured()) return fail(c, "VALIDATION_ERROR", "No model key is set. Add one in Settings before this can run.");
   const p = await getPositionDetail(c.req.param("id"));
   if (!p) return fail(c, "NOT_FOUND", "position not found");
   const b = await body<{ force?: boolean; surface?: string }>(c);
