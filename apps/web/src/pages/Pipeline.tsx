@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { GeoChip, ListingBadge, ScoreMeter, STATUS_LABEL, STATUS_PATH, STATUS_TONE, WorkplaceChip } from "@/components/badges";
 import { StatusMenu, useStatusChange } from "@/components/status-menu";
 import { useChatScope } from "@/frame/store";
-import { qs, STATUSES, useApi, useApiMeta, type PipelineStatus, type PositionRow, type SystemInfo } from "@/lib/api";
+import { qs, STATUSES, useApi, useApiMeta, type PipelineStatus, type PositionRow, type Profile, type SystemInfo } from "@/lib/api";
 import { defaultPipelinePreset } from "./pipeline-defaults";
 import { familyLocationLabel } from "./pipeline-location";
 import { ago, money } from "@/lib/format";
@@ -33,6 +33,7 @@ export function PipelinePage() {
   const search = useSearch({ from: "/pipeline" });
   const navigate = useNavigate({ from: "/pipeline" });
   const sys = useApi<SystemInfo>(["system"], "/api/v1/settings/system", { staleTime: 30_000 });
+  const profile = useApi<Profile>(["profile"], "/api/v1/settings/profile", { staleTime: 30_000 });
   const untouched = !search.status && !search.verdict && !search.q && !search.company;
   const llmKnown = sys.isError || sys.data !== undefined;
   const presetReady = !untouched || llmKnown;
@@ -171,7 +172,7 @@ export function PipelinePage() {
       ) : s.view === "board" ? (
         <Board rows={rows} />
       ) : (
-        <PositionsTable rows={rows} />
+        <PositionsTable rows={rows} home={profile.data?.location} />
       )}
       {total > PAGE_SIZE && s.view !== "board" ? <Pager page={page} pageSize={PAGE_SIZE} total={total} onPage={(p) => navigate({ search: (prev) => ({ ...prev, page: p > 1 ? p : undefined }) })} /> : null}
     </Page>
@@ -190,7 +191,7 @@ function stripUndefined<T extends object>(o: T): T {
   return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T;
 }
 
-function PositionsTable({ rows }: { rows: PositionRow[] }) {
+function PositionsTable({ rows, home }: { rows: PositionRow[]; home?: string | null }) {
   const navigate = useNavigate({ from: "/pipeline" });
   const search = useSearch({ from: "/pipeline" });
   const [cursor, setCursor] = useState<number>(-1);
@@ -282,7 +283,7 @@ function PositionsTable({ rows }: { rows: PositionRow[] }) {
               </div>
             </Td>
             <Td>
-              <GeoChip geo={r.geoClass} />
+              <GeoChip geo={r.geoClass} location={r.locationRaw} home={home} />
             </Td>
             <Td mono title={r.familySalarySpan ? "Lowest to highest posted band across the related locations" : undefined}>{money(r.salaryMin, r.salaryMax, r.salaryCurrency) || <span className="text-faint">—</span>}</Td>
             <Td>

@@ -9,7 +9,7 @@ import { Markdown } from "@/components/markdown";
 import { StatusMenu, useStatusChange } from "@/components/status-menu";
 import { openDock, useChatScope } from "@/frame/store";
 import { INTERVIEW_OUTCOMES, INTERVIEW_STAGES, INTERVIEW_STATUSES, isCompanyNameLocation } from "@job-scout/shared";
-import { api, del, patch, post, qs, useApi, type Evaluation, type Interview, type Material, type Person, type PipelineStatus, type PositionDetail, type Revision, type SystemInfo, type TimelineEvent, type TriageJson } from "@/lib/api";
+import { api, del, patch, post, qs, useApi, type Evaluation, type Interview, type Material, type Person, type PipelineStatus, type PositionDetail, type Profile, type Revision, type SystemInfo, type TimelineEvent, type TriageJson } from "@/lib/api";
 import { ago, dateShort, dateTime, host, money, titleCase } from "@/lib/format";
 import { Btn, Card, Chip, Dot, Empty, ErrorNote, Field, IconBtn, Input, Loading, Monogram, Page, Panel, Select, SortHead, Tabs, Textarea, TONE_DOT, TONE_TEXT, cn } from "@/ui/kit";
 
@@ -33,6 +33,7 @@ export function PositionPage() {
   const polling = pendingUntil > Date.now();
   const q = useApi<PositionDetail>(["position", id], `/api/v1/positions/${id}`, { refetchInterval: polling ? 4000 : false });
   const sys = useApi<SystemInfo>(["system"], "/api/v1/settings/system", { staleTime: 30_000 });
+  const profile = useApi<Profile>(["profile"], "/api/v1/settings/profile", { staleTime: 30_000 });
   const noKey = sys.data?.llmConfigured === false;
   const p = q.data;
   const qc = useQueryClient();
@@ -129,7 +130,7 @@ export function PositionPage() {
             </div>
             <h1 className="font-display text-[24px] leading-[1.15] font-semibold tracking-[-0.01em] mt-0.5">{p.title || <span className="text-faint">Untitled</span>}</h1>
             <div className="flex items-center gap-x-3 gap-y-1 flex-wrap mt-1.5 text-[12px] text-muted">
-              <GeoChip geo={p.geoClass} remote={p.remoteClass} />
+              <GeoChip geo={p.geoClass} remote={p.remoteClass} location={loc} home={profile.data?.location} />
               {loc ? <span className="max-w-[420px] truncate" title={loc}>{loc}</span> : null}
               {comp ? <span className="font-mono text-[11.5px] text-fg">{comp}</span> : null}
               {p.employmentType ? <span>{p.employmentType}</span> : null}

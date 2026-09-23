@@ -23,3 +23,11 @@ export function missesHomeMarket(listingLocation = "", profileLocation = ""): bo
   if (OPEN_TO_US.test(loc) || US_PLACE.test(loc)) return false;
   return FOREIGN_PLACE.test(loc);
 }
+
+/** A place restriction that matches the profile, so the chip should not read as a block. */
+export function fitsHomeMarket(geo: string | null | undefined, listingLocation: string | null | undefined, profileLocation: string | null | undefined): boolean {
+  if (geo !== "hard_geo" || !homeMarket(profileLocation || "")) return false;
+  const loc = (listingLocation || "").trim();
+  if (!loc) return false;
+  return !missesHomeMarket(loc, profileLocation || "");
+}
