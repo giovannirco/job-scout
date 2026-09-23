@@ -180,7 +180,9 @@ export function classifyListing(input: {
   const raw = (input.locationRaw || "").trim();
   const locationDiscarded = isCompanyNameLocation(raw, company);
   const locationClean = locationDiscarded ? "" : raw;
-  const workplace = workplaceOf(input.workplaceType, input.isRemote, [locationClean, input.title || ""].filter(Boolean).join(" "));
+  let workplace = workplaceOf(input.workplaceType, input.isRemote, [locationClean, input.title || ""].filter(Boolean).join(" "));
+  // A named city or country, with no remote or hybrid marker, is an office. Unknown was hiding these from both filters.
+  if (workplace === "unknown" && specificPlace(locationClean) && !FRIENDLY_PLACE.test(locationClean)) workplace = "onsite";
   const workplaceBlob = workplace === "remote" ? "remote" : input.workplaceType || "";
   let g = geoClass(locationClean, workplaceBlob);
   const noPlace = !locationClean || /^\s*remote\s*$/i.test(locationClean);

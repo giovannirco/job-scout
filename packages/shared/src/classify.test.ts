@@ -252,6 +252,15 @@ describe("classifyListing", () => {
     expect(r.locationDiscarded).toBe(false);
   });
 
+  it("treats a named place with no remote marker as an office", () => {
+    expect(classifyListing({ locationRaw: "Spain", company: "Elastic" }).workplace).toBe("onsite");
+    expect(classifyListing({ locationRaw: "Seattle, WA", company: "Stripe" }).workplace).toBe("onsite");
+    expect(classifyListing({ locationRaw: "San Francisco, CA · New York City, NY", company: "Anthropic" }).workplace).toBe("onsite");
+    expect(classifyListing({ locationRaw: "Remote, Poland", workplaceType: "Remote", company: "GitLab" }).workplace).toBe("remote");
+    expect(classifyListing({ locationRaw: "San Francisco", workplaceType: "Hybrid", company: "OpenAI" }).workplace).toBe("hybrid");
+    expect(classifyListing({ locationRaw: "", company: "Acme" }).workplace).toBe("unknown");
+  });
+
   it("keeps Brazil remote as brazil_friendly", () => {
     const r = classifyListing({
       locationRaw: "Remote — Brazil",

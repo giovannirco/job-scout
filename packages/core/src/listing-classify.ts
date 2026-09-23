@@ -167,8 +167,8 @@ export async function runListingClassify(positionId: string) {
 }
 
 export async function backfillListingFacts(opts: { force?: boolean } = {}) {
-  // v3: a named country or city is hard_geo. v2 left Spain, Ireland, Seattle, and San Francisco as unknown.
-  const BACKFILL_VERSION = "3";
+  // v4: a named place with no remote marker is onsite. v3 left Spain and Seattle as workplace unknown.
+  const BACKFILL_VERSION = "4";
   const s = await getSettings({ fresh: true });
   if (!opts.force && s.listingFactsBackfillVersion === BACKFILL_VERSION) {
     return { skipped: true as const, archivedSkipped: 0, updated: 0, enqueued: 0 };
