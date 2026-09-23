@@ -188,7 +188,7 @@ export function PositionPage() {
           { value: "evaluation", label: "Evaluation", count: p.evaluations.filter((e) => e.kind !== "company_research").length || null },
           { value: "jd", label: "JD", count: p.revisions.filter((r) => r.revision > 1 && r.material).length || null, tone: p.revisions.some((r) => r.material && r.revision > 1) ? "warn" : undefined },
           { value: "materials", label: "Materials", count: p.materials.filter((m) => m.isCurrent).length || null },
-          { value: "forms", label: "Forms" },
+          { value: "forms", label: "Forms", count: p.questions?.open || null },
           { value: "company", label: "Company" },
           { value: "history", label: "History" },
         ]}
