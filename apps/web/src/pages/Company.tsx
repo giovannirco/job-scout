@@ -7,7 +7,7 @@ import { ListingBadge, ScoreMeter, StatusBadge } from "@/components/badges";
 import { Markdown } from "@/components/markdown";
 import { openDock, useChatScope } from "@/frame/store";
 import { post, useApi, type CompanyDetail, type SystemInfo } from "@/lib/api";
-import { ago, dateTime, departmentLabel, host, money } from "@/lib/format";
+import { ago, companySite, dateTime, departmentLabel, money } from "@/lib/format";
 import { Btn, Card, Chip, Dot, Empty, ErrorNote, IconBtn, Loading, Monogram, Page, Panel, Table, Td, Th, Tr, cn } from "@/ui/kit";
 
 export function CompanyPage() {
@@ -39,6 +39,7 @@ export function CompanyPage() {
   if (q.isError) return <Page><ErrorNote error={q.error} /></Page>;
   if (!c) return <Page><Empty>Company not found.</Empty></Page>;
 
+  const site = companySite(c.website, c.careersUrl);
   const open = c.positions.filter((p) => p.status !== "archived");
   const archived = c.positions.length - open.length;
   const hot = open.filter((p) => ["review", "materials", "applied", "screen", "interview", "offer"].includes(p.status)).length;
@@ -51,9 +52,9 @@ export function CompanyPage() {
         <div className="min-w-0 flex-1">
           <h1 className="font-display text-[26px] leading-tight font-semibold tracking-[-0.01em]">{c.name}</h1>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] mt-1 text-muted">
-            {c.website ? (
-              <a href={c.website} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-fg">
-                {host(c.website)} <ExternalLink className="h-3 w-3" />
+            {site ? (
+              <a href={site.href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-fg">
+                {site.label} <ExternalLink className="h-3 w-3" />
               </a>
             ) : null}
             {c.careersUrl ? (

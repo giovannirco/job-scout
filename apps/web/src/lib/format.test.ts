@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ago, countLabel, createdFromLabel, departmentLabel, employmentLabel, jdChangedAt, money, multiAnswerValues, questionStatusLabel, readableJd, sourceLabel, toggleMultiAnswer } from "./format.js";
+import { ago, companySite, countLabel, createdFromLabel, departmentLabel, employmentLabel, jdChangedAt, money, multiAnswerValues, questionStatusLabel, readableJd, sourceLabel, toggleMultiAnswer } from "./format.js";
 
 describe("ago", () => {
   it("uses years once a date is at least two years old", () => {
@@ -32,6 +32,14 @@ describe("employmentLabel", () => {
     expect(employmentLabel("FULL_TIME")).toBe("Full-time");
     expect(employmentLabel("Part-time")).toBe("Part-time");
     expect(employmentLabel("Something else")).toBe("Something else");
+  });
+});
+
+describe("companySite", () => {
+  it("uses the company domain on a careers link and skips an ATS board", () => {
+    expect(companySite(null, "https://tailscale.com/careers")).toEqual({ href: "https://tailscale.com", label: "tailscale.com" });
+    expect(companySite("https://www.stripe.com", null)).toEqual({ href: "https://www.stripe.com", label: "stripe.com" });
+    expect(companySite(null, "https://jobs.ashbyhq.com/temporal")).toBeNull();
   });
 });
 

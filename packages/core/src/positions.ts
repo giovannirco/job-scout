@@ -1141,6 +1141,9 @@ export async function expandStoredOfficeLocations(): Promise<{ checked: number; 
       company: companies.name,
       metadata: positions.metadata,
       salaryRaw: positions.salaryRaw,
+      workplace: positions.workplace,
+      status: positions.status,
+      archiveReason: positions.archiveReason,
     })
     .from(positions)
     .innerJoin(companies, eq(companies.id, positions.companyId))
@@ -1154,8 +1157,15 @@ export async function expandStoredOfficeLocations(): Promise<{ checked: number; 
       await db.select().from(jdRevisions).where(eq(jdRevisions.positionId, row.id)).orderBy(desc(jdRevisions.revision)).limit(1)
     )[0];
     if (!rev?.locationRaw) continue;
-    const next = greenhouseListingLocation(rev.locationRaw, offices).locationRaw?.trim();
+    let next = greenhouseListingLocation(rev.locationRaw, offices).locationRaw?.trim();
+    const distributed = greenhouseListingLocation("Distributed", offices).locationRaw?.trim();
+    const bareOffices = distributed?.replace(/^Distributed · /, "");
+    const withdrawnAsOnsite = offices.length >= 3 && row.workplace === "onsite" && (row.archiveReason || "").includes("geo_block:onsite");
+    if (withdrawnAsOnsite && distributed && bareOffices && rev.locationRaw.trim() === bareOffices && distributed !== rev.locationRaw.trim()) {
+      next = distributed;
+    }
     if (!next || next === rev.locationRaw.trim()) continue;
+    const restore = next.startsWith("Distributed · ") && withdrawnAsOnsite;
     const facts = classifyListing({
       locationRaw: next,
       workplaceType: ats?.workplaceType,
@@ -1181,12 +1191,17 @@ export async function expandStoredOfficeLocations(): Promise<{ checked: number; 
         remoteClass: facts.remoteClass,
         workplace: facts.workplace,
         contentHash: hash,
+        ...(restore ? { status: "triaged" as const, archiveReason: null } : {}),
         updatedAt: new Date(),
       })
       .where(eq(positions.id, row.id));
     await db
       .update(discoveryFeed)
-      .set({ locationRaw: next, geoClass: facts.geoClass })
+      .set({
+        locationRaw: next,
+        geoClass: facts.geoClass,
+        ...(restore ? { lane: "passed" as const, gateReason: null } : {}),
+      })
       .where(and(eq(discoveryFeed.positionId, row.id), eq(discoveryFeed.locationRaw, rev.locationRaw)));
     updated++;
   }

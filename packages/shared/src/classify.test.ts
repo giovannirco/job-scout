@@ -286,6 +286,7 @@ describe("classifyListing", () => {
     expect(classifyListing({ locationRaw: "United States", isRemote: true }).workplace).toBe("remote");
     expect(classifyListing({ locationRaw: "Boston, Massachusetts, USA; New York, New York, USA", isRemote: true }).workplace).toBe("onsite");
     expect(classifyListing({ locationRaw: "Distributed" }).workplace).toBe("remote");
+    expect(classifyListing({ locationRaw: "Distributed · Austin, TX · Atlanta, GA · Canada" }).workplace).toBe("remote");
     expect(classifyListing({ locationRaw: "", descriptionText: "Job ID: P1\n#LI-Remote" }).workplace).toBe("remote");
     expect(classifyListing({ locationRaw: "Poland · Brazil · Sweden · Colombia", company: "Kraken" }).workplace).toBe("unknown");
     expect(classifyListing({ locationRaw: "Menlo Park, California, United States" }).workplace).toBe("onsite");

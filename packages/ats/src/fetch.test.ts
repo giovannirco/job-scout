@@ -533,6 +533,11 @@ describe("greenhouse office remote signal", () => {
       locationRaw: "Remote, Canada · Remote, United States",
       regionOffice: false,
     });
+    expect(greenhouseListingLocation("Distributed", ["Atlanta, GA", "Austin, TX", "Canada"])).toEqual({
+      locationRaw: "Distributed · Atlanta, GA · Austin, TX · Canada",
+      regionOffice: false,
+    });
+    expect(greenhouseListingLocation("Remote", ["Remote"])).toEqual({ locationRaw: "Remote", regionOffice: false });
   });
 
   it("reads Greenhouse employment type metadata", () => {
