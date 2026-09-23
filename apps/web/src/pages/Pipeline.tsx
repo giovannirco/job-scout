@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import { GeoChip, ListingBadge, ScoreMeter, STATUS_LABEL, STATUS_PATH, STATUS_TONE, WorkplaceChip } from "@/components/badges";
 import { StatusMenu, useStatusChange } from "@/components/status-menu";
 import { useChatScope } from "@/frame/store";
-import { qs, STATUSES, useApiMeta, type PipelineStatus, type PositionRow } from "@/lib/api";
+import { qs, STATUSES, useApi, useApiMeta, type PipelineStatus, type PositionRow, type SystemInfo } from "@/lib/api";
+import { defaultPipelinePreset } from "./pipeline-defaults";
 import { ago, money } from "@/lib/format";
 import type { PipelineSearch } from "@/router";
 import { Btn, Card, Dot, Empty, Loading, Monogram, Page, PageHeader, Pager, Seg, SortHead, Table, Td, Th, Tr, cn, ErrorNote } from "@/ui/kit";
@@ -30,8 +31,12 @@ export function PipelinePage() {
   useChatScope({ scope: "global" });
   const search = useSearch({ from: "/pipeline" });
   const navigate = useNavigate({ from: "/pipeline" });
+  const sys = useApi<SystemInfo>(["system"], "/api/v1/settings/system", { staleTime: 30_000 });
   const untouched = !search.status && !search.verdict && !search.q && !search.company;
-  const s: PipelineSearch = untouched ? { ...PRESETS[0]!.params, ...stripUndefined(search) } : { sort: "updated_desc", ...stripUndefined(search) };
+  const llmKnown = sys.isError || sys.data !== undefined;
+  const presetReady = !untouched || llmKnown;
+  const opening = defaultPipelinePreset(sys.data?.llmConfigured === true);
+  const s: PipelineSearch = untouched ? { ...PRESETS.find((p) => p.value === opening)!.params, ...stripUndefined(search) } : { sort: "updated_desc", ...stripUndefined(search) };
   const page = s.page || 1;
   const [q, setQ] = useState(s.q || "");
   useEffect(() => setQ(s.q || ""), [s.q]);
@@ -41,7 +46,7 @@ export function PipelinePage() {
   const list = useApiMeta<PositionRow[]>(
     ["positions", "list", s],
     `/api/v1/positions${qs({ page, pageSize: s.view === "board" ? 200 : PAGE_SIZE, status: s.status, verdict: s.verdict, sort: s.sort, q: s.q, company: s.company, workplace: s.workplace, geoClass: s.geoClass, actionable: ["decide", "marginal"].includes(presetOf(s) || "") ? "true" : undefined, collapseFamilies: "true", includeArchived: s.status === "archived" ? "true" : undefined })}`,
-    { placeholderData: (prev) => prev },
+    { placeholderData: (prev) => prev, enabled: presetReady },
   );
   const rows = list.data?.data || [];
   const total = Number(list.data?.meta.total || 0);
@@ -140,12 +145,28 @@ export function PipelinePage() {
         </div>
       </PageHeader>
 
-      {list.isLoading ? (
+      {!presetReady || list.isLoading ? (
         <Loading rows={8} />
       ) : list.error ? (
         <ErrorNote error={list.error} />
       ) : rows.length === 0 ? (
-        <Empty>{preset === "decide" ? "No PASS verdicts waiting. Nothing to decide." : "Nothing matches these filters."}</Empty>
+        <Empty>
+          {preset === "decide" ? (
+            sys.data && !sys.data.llmConfigured ? (
+              <>
+                No model key is set, so nothing has a PASS verdict.{" "}
+                <button type="button" className="text-accent hover:underline" onClick={() => set({ verdict: undefined, status: "active", sort: "updated_desc" })}>
+                  Show all open filings
+                </button>
+                .
+              </>
+            ) : (
+              "No PASS verdicts waiting. Nothing to decide."
+            )
+          ) : (
+            "Nothing matches these filters."
+          )}
+        </Empty>
       ) : s.view === "board" ? (
         <Board rows={rows} />
       ) : (
