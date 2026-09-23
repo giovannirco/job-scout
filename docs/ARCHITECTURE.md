@@ -31,8 +31,8 @@ Both api and worker import `@job-scout/core`; there is no HTTP between them, the
 
 | type | enqueued by | does |
 |--|--|--|
-| `board_scan` | discovery scheduler, Radar, MCP | fetch a board, diff against the last snapshot, run the gate, upsert positions, enqueue `triage` |
-| `scan_url` | Add URL, MCP `intake` | fetch one JD, create/refresh the position, enqueue `triage` |
+| `board_scan` | discovery scheduler, Discovery, MCP | fetch a board, diff against the last snapshot, run the gate, upsert positions, enqueue `triage` only when a model key is set |
+| `scan_url` | Add URL, MCP `intake` | fetch one JD, create/refresh the position, enqueue `triage` only when a model key is set |
 | `watch_check` | watch scheduler, Position › refresh | re-fetch a JD, write a `jd_revisions` row if it changed, detect closed listings |
 | `triage` | gate pass, autopilot | cheap 1–5 score + hard disqualifiers; sets `triage_*` on the position |
 | `evaluate` | you, autopilot | A–H markdown report + summary JSON → `evaluations` |
