@@ -355,6 +355,17 @@ export function resolveSettings(stored: unknown): Settings {
     homeGateVersion: typeof s.homeGateVersion === "string" ? s.homeGateVersion : null,
     profileGateVersion: typeof s.profileGateVersion === "string" ? s.profileGateVersion : null,
     placeSplitVersion: typeof s.placeSplitVersion === "string" ? s.placeSplitVersion : null,
+    blankGreenhouseVersion: typeof s.blankGreenhouseVersion === "string" ? s.blankGreenhouseVersion : null,
+    junkPlaceVersion: typeof s.junkPlaceVersion === "string" ? s.junkPlaceVersion : null,
+    entityDecodeVersion: typeof s.entityDecodeVersion === "string" ? s.entityDecodeVersion : null,
+    craftGateVersion: typeof s.craftGateVersion === "string" ? s.craftGateVersion : null,
+    labelVersion: typeof s.labelVersion === "string" ? s.labelVersion : null,
+    regionOfficeVersion: typeof s.regionOfficeVersion === "string" ? s.regionOfficeVersion : null,
+    salaryObjectVersion: typeof s.salaryObjectVersion === "string" ? s.salaryObjectVersion : null,
+    usPlaceGeoVersion: typeof s.usPlaceGeoVersion === "string" ? s.usPlaceGeoVersion : null,
+    archivedDiscoveryVersion: typeof s.archivedDiscoveryVersion === "string" ? s.archivedDiscoveryVersion : null,
+    titleHyphenVersion: typeof s.titleHyphenVersion === "string" ? s.titleHyphenVersion : null,
+    rolePhraseVersion: typeof s.rolePhraseVersion === "string" ? s.rolePhraseVersion : null,
     officeListVersion: typeof s.officeListVersion === "string" ? s.officeListVersion : null,
   };
   return Settings.parse(merged);

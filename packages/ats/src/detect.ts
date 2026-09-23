@@ -282,7 +282,7 @@ export function detectAts(url: string): DetectedAts {
     // ── BambooHR ────────────────────────────────────────────────────────────
     if (host.includes("bamboohr.com")) {
       const subdomain = host.split(".")[0];
-      m = path.match(/\/jobs\/view\.php\?id=(\d+)/i) || path.match(/[?&]id=(\d+)/);
+      m = path.match(/\/careers\/(\d+)(?:\/|$)/i) || path.match(/\/jobs\/view\.php\?id=(\d+)/i) || path.match(/[?&]id=(\d+)/);
       const idFromQuery = u.searchParams.get("id");
       return {
         provider: "bamboohr",

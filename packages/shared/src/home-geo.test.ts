@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fitsHomeMarket, homeMarket, missesHomeMarket } from "./home-geo.js";
+import { fitsHomeMarket, homeMarket, listedAtHome, missesHomeMarket } from "./home-geo.js";
 
 describe("home market", () => {
   it("reads a US city and ignores a blank or foreign profile", () => {
@@ -39,5 +39,8 @@ describe("home market", () => {
     expect(fitsHomeMarket("hard_geo", "Remote, Poland", "Austin, TX")).toBe(false);
     expect(fitsHomeMarket("hard_geo", "Remote - USA", "")).toBe(false);
     expect(fitsHomeMarket("worldwideish", "Remote - USA", "Austin, TX")).toBe(false);
+    expect(listedAtHome("ambiguous_remote", "Distributed · Atlanta, GA · Austin, TX · Canada", "Austin, TX")).toBe(true);
+    expect(listedAtHome("ambiguous_remote", "Remote", "Austin, TX")).toBe(false);
+    expect(listedAtHome("hard_geo", "Remote, Poland", "Austin, TX")).toBe(false);
   });
 });

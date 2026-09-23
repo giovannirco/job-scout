@@ -23,6 +23,7 @@ export const BOARD_MIGRATIONS: BoardMigration[] = [
   { company: "Cursor", from: { provider: "ashby", token: "anysphere" }, to: { provider: "ashby", token: "cursor" }, verified: "2026-09-09", jobsAtVerification: 125 },
   { company: "Marqeta", from: { provider: "greenhouse", token: "marqeta" }, to: { provider: "ashby", token: "marqeta-inc" }, verified: "2026-09-09", jobsAtVerification: 42 },
   { company: "Kraken", from: { provider: "ashby", token: "kraken" }, to: { provider: "ashby", token: "kraken.com" }, verified: "2026-09-23", jobsAtVerification: 77 },
+  { company: "Bitso", from: { provider: "greenhouse", token: "bitso" }, to: { provider: "bamboohr", token: "bitso" }, verified: "2026-09-23", jobsAtVerification: 5 },
 ];
 
 /**
@@ -35,7 +36,6 @@ export const UNSUPPORTED_BOARDS: Array<{ company: string; provider: string; toke
   { company: "Chainlink Labs", provider: "ashby", token: "chainlink-labs", reason: "No board on greenhouse/ashby/lever under any known token. Verified 2026-09-09." },
   { company: "Chainalysis", provider: "greenhouse", token: "chainalysis", reason: "No board on greenhouse/ashby/lever under any known token. Verified 2026-09-09." },
   { company: "HashiCorp", provider: "greenhouse", token: "hashicorp", reason: "No board on greenhouse/ashby/lever; careers moved post-IBM acquisition. Verified 2026-09-09." },
-  { company: "Bitso", provider: "greenhouse", token: "bitso", careersUrl: "https://bitso.com/jobs", reason: "Greenhouse board bitso returns 404. Openings are on BambooHR (bitso.bamboohr.com); no list adapter. Verified 2026-09-23." },
 ];
 
 /**

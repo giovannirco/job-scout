@@ -41,3 +41,24 @@ export function fitsHomeMarket(geo: string | null | undefined, listingLocation: 
   if (!loc) return false;
   return !missesHomeMarket(loc, profileLocation || "");
 }
+
+/** The profile city appears as its own word in the listing location. */
+export function namesProfileCity(listingLocation: string, profileLocation: string): boolean {
+  const city = profileLocation.split(",")[0]?.trim() || "";
+  if (city.length < 4) return false;
+  const escaped = city.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`\\b${escaped}\\b`, "i").test(listingLocation);
+}
+
+/**
+ * Home chip and home filter. A hard geo that fits still counts.
+ * So does a listing that names the profile city, even when other places make the class ambiguous.
+ * A location that is only "Remote" does not.
+ */
+export function listedAtHome(geo: string | null | undefined, listingLocation: string | null | undefined, profileLocation: string | null | undefined): boolean {
+  if (fitsHomeMarket(geo, listingLocation, profileLocation)) return true;
+  if (!homeMarket(profileLocation || "")) return false;
+  const loc = (listingLocation || "").trim();
+  if (!loc || /^remote$/i.test(loc)) return false;
+  return namesProfileCity(loc, profileLocation || "");
+}

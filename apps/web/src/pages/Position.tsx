@@ -8,9 +8,9 @@ import { InterviewRoundBody } from "@/components/interview-round";
 import { Markdown } from "@/components/markdown";
 import { StatusMenu, useStatusChange } from "@/components/status-menu";
 import { openDock, useChatScope } from "@/frame/store";
-import { INTERVIEW_OUTCOMES, INTERVIEW_STAGES, INTERVIEW_STATUSES, changeKindLabel, fitsHomeMarket, humanDiffSummary, isCompanyNameLocation } from "@job-scout/shared";
+import { INTERVIEW_OUTCOMES, INTERVIEW_STAGES, INTERVIEW_STATUSES, changeKindLabel, humanDiffSummary, isCompanyNameLocation, listedAtHome } from "@job-scout/shared";
 import { api, del, patch, post, qs, useApi, type Evaluation, type Interview, type Material, type Person, type PipelineStatus, type PositionDetail, type Profile, type Revision, type SystemInfo, type TimelineEvent, type TriageJson } from "@/lib/api";
-import { ago, createdFromLabel, dateShort, dateTime, employmentLabel, host, jdChangedAt, money, multiAnswerValues, questionStatusLabel, readableJd, sourceLabel, titleCase, toggleMultiAnswer } from "@/lib/format";
+import { ago, boardTruncatedJd, createdFromLabel, dateShort, dateTime, employmentLabel, host, jdChangedAt, money, multiAnswerValues, questionStatusLabel, readableJd, sourceLabel, titleCase, toggleMultiAnswer } from "@/lib/format";
 import { Btn, Card, Chip, Dot, Empty, ErrorNote, Field, IconBtn, Input, Loading, Monogram, Page, Panel, Select, SortHead, Tabs, Textarea, TONE_DOT, TONE_TEXT, cn } from "@/ui/kit";
 
 type Tab = "brief" | "evaluation" | "jd" | "materials" | "forms" | "company" | "history";
@@ -323,6 +323,7 @@ function BriefTab({ p, noKey, home, onTriage }: { p: PositionDetail; noKey: bool
 
         {p.jd?.descriptionText ? (
           <Panel title="Job description" meta={`rev ${p.jd.revision}`} bodyClass="max-h-[520px] overflow-y-auto">
+            {boardTruncatedJd(p.jd.descriptionText) ? <p className="text-[12px] text-warn mb-2">The board sent this description cut off. The rest of the sentence is not in the posting we fetched.</p> : null}
             <div className="prewrap text-[12.5px] text-fg/90 leading-relaxed">{readableJd(p.jd.descriptionText)}</div>
           </Panel>
         ) : null}
@@ -335,7 +336,7 @@ function BriefTab({ p, noKey, home, onTriage }: { p: PositionDetail; noKey: bool
             <Field label="Workplace">{p.workplace && p.workplace !== "unknown" ? p.workplace : "—"}</Field>
             {loc ? <Field label="Location">{loc}</Field> : null}
             <Field label="Geo">
-              {fitsHomeMarket(p.geoClass, loc, home)
+              {listedAtHome(p.geoClass, loc, home)
                 ? "home"
                 : p.geoClass && p.geoClass !== "unknown"
                   ? p.geoClass.replace(/_/g, " ").replace("worldwideish", "worldwide")
@@ -510,7 +511,7 @@ function JdTab({ p }: { p: PositionDetail }) {
     <div className="grid lg:grid-cols-[280px_1fr] gap-5 items-start">
       <Panel title="Revisions" meta={`${p.revisions.length}`} flush>
         <div className="divide-y divide-border/60">
-          {p.revisions.map((x) => (
+          {p.revisions.filter((x) => x.changeKind !== "noise_rebase").map((x) => (
             <button key={x.id} type="button" onClick={() => setRev(x.revision)} className={cn("w-full text-left px-3 py-2 text-[12px] hover:bg-surface-2/60", currentRev === x.revision && "bg-surface-2")}>
               <div className="flex items-center justify-between gap-2">
                 <span className="font-mono inline-flex items-center gap-1.5">
@@ -521,6 +522,19 @@ function JdTab({ p }: { p: PositionDetail }) {
               {x.diffSummary ? <div className="text-[11px] text-muted line-clamp-2 mt-0.5">{humanDiffSummary(x.diffSummary)}</div> : null}
             </button>
           ))}
+          {p.revisions.some((x) => x.changeKind === "noise_rebase") ? (
+            <details className="px-3 py-2 text-[12px]">
+              <summary className="cursor-pointer text-muted">{p.revisions.filter((x) => x.changeKind === "noise_rebase").length} rewritten here</summary>
+              <p className="text-[11px] text-faint mt-1">These snapshots are this app cleaning stored text. The employer did not edit the posting.</p>
+              <div className="mt-1 space-y-1">
+                {p.revisions.filter((x) => x.changeKind === "noise_rebase").map((x) => (
+                  <button key={x.id} type="button" onClick={() => setRev(x.revision)} className="block text-left text-muted hover:text-fg">
+                    r{x.revision} · {dateTime(x.observedAt)}
+                  </button>
+                ))}
+              </div>
+            </details>
+          ) : null}
           {p.revisions.length === 0 ? <div className="p-3 text-faint text-xs">No JD captured yet.</div> : null}
         </div>
       </Panel>
@@ -545,6 +559,7 @@ function JdTab({ p }: { p: PositionDetail }) {
                 ))}
               </div>
             ) : null}
+            {boardTruncatedJd(r.data.descriptionText) ? <p className="text-[12px] text-warn">The board sent this description cut off. The rest of the sentence is not in the posting we fetched.</p> : null}
             <div className="prewrap text-[12.5px] text-fg/90 leading-relaxed">{r.data.descriptionText ? readableJd(r.data.descriptionText) : <span className="text-faint">No text.</span>}</div>
           </div>
         ) : (

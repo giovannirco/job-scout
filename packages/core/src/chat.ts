@@ -283,6 +283,7 @@ const LOCAL_TOOLS: LocalTool[] = [
     run: async (a) => {
       const { intakeUrl } = await import("./scan.js");
       const r = await intakeUrl(str(a.url), { companyName: str(a.company) || undefined });
+      if (!r.position) throw new Error("position missing");
       return { slug: r.position.slug, title: r.position.title, company: r.position.company?.name, created: r.created, revived: r.revived, triageJobId: r.triageJobId, url: r.position.primaryUrl };
     },
   },

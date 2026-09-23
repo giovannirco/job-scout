@@ -1,7 +1,6 @@
 import { eq } from "drizzle-orm";
 import { getDb, id, profiles } from "@job-scout/db";
-import { DEFAULT_SCOUT_BRIEF } from "@job-scout/llm";
-import { DEFAULT_GATE } from "@job-scout/shared";
+import { DEFAULT_GATE, isStarterScoutBrief } from "@job-scout/shared";
 import { createHash } from "node:crypto";
 import { updateSettings, getSettings } from "./settings.js";
 import { regateRecentDiscovery } from "./scan.js";
@@ -19,12 +18,18 @@ export function profileFingerprint(p: Profile): string {
 export async function getProfile(): Promise<Profile> {
   const db = await getDb();
   const row = (await db.select().from(profiles).limit(1))[0];
-  if (row) return row;
+  if (row) {
+    if (isStarterScoutBrief(row.scoutBrief)) {
+      await db.update(profiles).set({ scoutBrief: "", updatedAt: new Date() }).where(eq(profiles.id, row.id));
+      return { ...row, scoutBrief: "" };
+    }
+    return row;
+  }
   const pid = id("prof");
   await db.insert(profiles).values({
     id: pid,
     displayName: "Operator",
-    scoutBrief: DEFAULT_SCOUT_BRIEF,
+    scoutBrief: "",
     targetRoles: ["Platform Engineer", "SRE", "DevOps Engineer"],
     resumeSurfaces: {},
   });
@@ -60,7 +65,9 @@ export async function updateProfile(patch: Record<string, unknown>): Promise<Pro
 }
 
 export function briefOf(p: Profile): string {
-  return (p.scoutBrief || DEFAULT_SCOUT_BRIEF).trim();
+  const text = (p.scoutBrief || "").trim();
+  if (!text || isStarterScoutBrief(text)) return "";
+  return text;
 }
 
 /** Words that only describe seniority or a generic job shape. A specialty token such as "java" is kept on its own. */

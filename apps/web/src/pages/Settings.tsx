@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { Bot, Copy, Globe, Hand, MessageCircle, Play, RefreshCw, Sparkles, Trash2, Zap } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { clipBookmarklet, pausedGeoBlocks, titleExcludesFromNorthStar } from "@job-scout/shared";
+import { clipBookmarklet, isStarterScoutBrief, pausedGeoBlocks, titleExcludesFromNorthStar } from "@job-scout/shared";
 import { useChatScope, useTheme, type ThemePref } from "@/frame/store";
 import { api, del, patch, post, qs, useApi, type ApiToken, type AutopilotConfig, type AutopilotState, type Job, type LlmStatus, type ModelsCatalog, type NotificationsConfig, type NotifyChannel, type Profile, type Settings, type SystemInfo } from "@/lib/api";
 import { ago, compact, dateTime } from "@/lib/format";
@@ -177,7 +177,7 @@ function ProfileTab() {
   const qc = useQueryClient();
   const [f, setF] = useState<Partial<Profile>>({});
   useEffect(() => {
-    if (q.data) setF(q.data);
+    if (q.data) setF({ ...q.data, scoutBrief: isStarterScoutBrief(q.data.scoutBrief) ? "" : q.data.scoutBrief || "" });
   }, [q.data]);
   const dirty = useMemo(() => JSON.stringify(f) !== JSON.stringify(q.data || {}), [f, q.data]);
 
@@ -223,11 +223,13 @@ function ProfileTab() {
       </Panel>
       <Panel title="What the models read">
         <div className="space-y-3">
-          <Textarea label="North star — one paragraph on what you want next" hint="The model reads this after a key is set. Some sentences also exclude titles before any model runs. Saving the profile applies that list." value={f.northStar || ""} onChange={(e) => set("northStar", e.target.value)} className="min-h-[60px]" />
+          <Textarea label="North star — one paragraph on what you want next" hint="Before a model key exists, only a few phrases change the gate: “not infrastructure”; backend without frontend; backend without data engineer; backend without support, solutions, or quality. Any other sentence is kept for the model and does not filter listings." value={f.northStar || ""} onChange={(e) => set("northStar", e.target.value)} className="min-h-[60px]" />
           {northStarExcludes.length ? (
-            <p className="text-[12px] text-muted">Also excluded from this paragraph: {northStarExcludes.join(", ")}.</p>
-          ) : null}
-          <Textarea label="Scout brief (triage prompt: archetypes, hard DQs, comp floor, location rules)" value={f.scoutBrief || ""} onChange={(e) => set("scoutBrief", e.target.value)} className="min-h-[220px] font-mono text-[12px]" />
+            <p className="text-[12px] text-muted">This paragraph changes the gate. Also excluded: {northStarExcludes.join(", ")}.</p>
+          ) : (
+            <p className="text-[12px] text-muted">This paragraph does not use those phrases, so it does not filter listings.</p>
+          )}
+          <Textarea label="Scout brief" hint="What triage should know: what you do, where you can work, archetypes, and what is a no. Leave this empty until you write it. A starter template is not sent to a model." value={isStarterScoutBrief(f.scoutBrief) ? "" : f.scoutBrief || ""} onChange={(e) => set("scoutBrief", e.target.value)} className="min-h-[220px] font-mono text-[12px]" />
           <Textarea label="Identity (who you are, proof points; used by evaluate)" value={f.identityMarkdown || ""} onChange={(e) => set("identityMarkdown", e.target.value)} className="min-h-[160px] font-mono text-[12px]" />
           <Textarea label="Master resume (markdown)" value={f.masterResumeMarkdown || ""} onChange={(e) => set("masterResumeMarkdown", e.target.value)} className="min-h-[320px] font-mono text-[12px]" />
           <Textarea label="Master cover letter template (markdown)" value={f.masterCoverMarkdown || ""} onChange={(e) => set("masterCoverMarkdown", e.target.value)} className="min-h-[160px] font-mono text-[12px]" />

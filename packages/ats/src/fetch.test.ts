@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ashbyListingLocation, fetchAshbyJob, greenhouseEmployment, greenhouseListingLocation, greenhouseOfficeIsRemote, listBoard, regionsDisagree, salaryFromBaseSalary } from "./fetch.js";
+import { ashbyFieldPrompts, ashbyListingLocation, bambooHrPlace, fetchAshbyJob, greenhouseEmployment, greenhouseListingLocation, greenhouseOfficeIsRemote, listBoard, regionsDisagree, salaryFromBaseSalary } from "./fetch.js";
 
 const REMOTEOK_API = "https://remoteok.com/api";
 const WWR_RSS = "https://weworkremotely.com/categories/remote-devops-sysadmin-jobs.rss";
@@ -498,6 +498,26 @@ describe("listBoard remotive", () => {
   it("throws when the feed is unavailable", async () => {
     mockRemotiveFetch({ error: "nope" }, 403);
     await expect(listBoard("market", "remotive", "Remotive")).rejects.toThrow(/remotive/i);
+  });
+});
+
+describe("bamboohr and ashby forms", () => {
+  it("treats a BambooHR location type 1 with no city as remote", () => {
+    expect(bambooHrPlace({ locationType: "1", location: { city: null } })).toEqual({ locationRaw: "Remote", isRemote: true });
+    expect(bambooHrPlace({ locationType: "2", location: { city: "Miguel Hidalgo", addressCountry: "Mexico" } }).locationRaw).toBe("Miguel Hidalgo, Mexico");
+  });
+
+  it("maps Ashby form fields to required prompts and choices", () => {
+    expect(ashbyFieldPrompts([
+      { isRequired: true, field: { title: "Email Address", type: "Email" } },
+      { isRequired: true, field: { title: "Resume", type: "File" } },
+      { isRequired: false, field: { title: "How did you hear about us?", type: "ValueSelect", selectableValues: [{ label: "LinkedIn" }, { label: "Friend" }] } },
+      { isRequired: false, field: { title: "Hidden", type: "String", isPrivate: true } },
+    ])).toEqual([
+      { question: "Email Address", required: true, inputType: "text" },
+      { question: "Resume", required: true, inputType: "file" },
+      { question: "How did you hear about us?", required: false, inputType: "select", options: ["LinkedIn", "Friend"] },
+    ]);
   });
 });
 

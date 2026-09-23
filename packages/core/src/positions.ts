@@ -30,7 +30,7 @@ import {
   HOT_STATUSES,
   PipelineStatus,
   isNoiseJobTitle, cleanJobTitle, cleanLocation, canonicalExternalIdentity, normalizePostingUrl,
-  searchWords, likeContains, fitsHomeMarket, homeMarket,
+  searchWords, likeContains, homeMarket, listedAtHome,
   employerFromPosting, unresolvedCompany, UNRESOLVED_COMPANY, requisitionId,
 } from "@job-scout/shared";
 import { resolveCompanyForName } from "./companies.js";
@@ -167,7 +167,7 @@ export async function listPositions(q: ListPositionsQuery) {
     } else if (v.length) conds.push(inArray(positions.triageVerdict, v as never));
   }
   const homeOnly = q.geoClass === "home";
-  if (homeOnly) conds.push(eq(positions.geoClass, "hard_geo"));
+  if (homeOnly) conds.push(or(eq(positions.geoClass, "hard_geo"), eq(positions.geoClass, "ambiguous_remote"))!);
   else if (q.geoClass) conds.push(eq(positions.geoClass, q.geoClass));
   if (q.workplace) conds.push(eq(positions.workplace, q.workplace));
   if (q.listingStatus) conds.push(eq(positions.listingStatus, q.listingStatus));
@@ -259,7 +259,7 @@ export async function listPositions(q: ListPositionsQuery) {
   let total = 0;
   if (homeOnly) {
     const home = profile.location || "";
-    const matched = homeMarket(home) ? queried.filter((row) => fitsHomeMarket("hard_geo", row.locationRaw, home)) : [];
+    const matched = homeMarket(home) ? queried.filter((row) => listedAtHome(row.geoClass, row.locationRaw, home)) : [];
     total = matched.length;
     const start = (page - 1) * pageSize;
     listed = matched.slice(start, start + pageSize);
@@ -1206,6 +1206,31 @@ export async function expandStoredOfficeLocations(): Promise<{ checked: number; 
     updated++;
   }
   return { checked: rows.length, updated };
+}
+
+/** Pull Ashby application questions for filings that only had the empty HTML shell. */
+export async function repairAshbyForms(): Promise<{ checked: number; updated: number; failed: number }> {
+  const db = await getDb();
+  const rows = await db
+    .select({ id: positions.id, token: positions.atsBoardToken, jobId: positions.atsJobId, status: positions.status })
+    .from(positions)
+    .where(eq(positions.atsProvider, "ashby"));
+  const open = rows.filter((row) => row.status !== "archived" && row.token && row.jobId);
+  const { fetchAshbyJob } = await import("@job-scout/ats");
+  const { harvestFromJob } = await import("./questions.js");
+  let updated = 0;
+  let failed = 0;
+  for (const row of open) {
+    try {
+      const job = await fetchAshbyJob(row.token!, row.jobId!);
+      if (!job.questionPrompts?.length) continue;
+      await harvestFromJob(row.id, job);
+      updated++;
+    } catch {
+      failed++;
+    }
+  }
+  return { checked: open.length, updated, failed };
 }
 
 /** Fill employment type from Greenhouse metadata without writing a new JD revision. */
