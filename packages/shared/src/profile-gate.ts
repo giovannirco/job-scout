@@ -8,6 +8,8 @@ export function titleExcludesFromNorthStar(text = ""): string[] {
     extra.push(
       "infrastructure", "infra", "kubernetes", "k8s", "devops", "sre", "site reliability",
       "linux", "embedded", "kernel", "compiler", "openstack", "ceph",
+      "sustaining", "container image", "virtualisation", "virtualization", "maas", "ubuntu",
+      "data platform", "cloud image", "app store",
     );
   }
   if (/\bbackend\b/i.test(text) && !/\bfront[-\s]?end\b/i.test(text)) {
