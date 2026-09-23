@@ -167,8 +167,8 @@ export async function runListingClassify(positionId: string) {
 }
 
 export async function backfillListingFacts(opts: { force?: boolean } = {}) {
-  // v4: a named place with no remote marker is onsite. v3 left Spain and Seattle as workplace unknown.
-  const BACKFILL_VERSION = "4";
+  // v5: London and England count as a place. v4 left "London, England" as workplace unknown.
+  const BACKFILL_VERSION = "5";
   const s = await getSettings({ fresh: true });
   if (!opts.force && s.listingFactsBackfillVersion === BACKFILL_VERSION) {
     return { skipped: true as const, archivedSkipped: 0, updated: 0, enqueued: 0 };
