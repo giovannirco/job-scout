@@ -38,7 +38,17 @@ export function applyProfileToGate(
     if (add.length) next = { ...next, titleExclude: [...next.titleExclude, ...add] };
   }
   if (homeMarket(opts.home || "") === "us") {
-    next = { ...next, geoBlock: next.geoBlock.filter((term) => !/^(us only|usa only)$/i.test(term.trim())) };
+    next = { ...next, geoBlock: next.geoBlock.filter((term) => !usOnlyBlock(term)) };
   }
   return next;
+}
+
+function usOnlyBlock(term: string): boolean {
+  return /^(us only|usa only)$/i.test(term.trim());
+}
+
+/** Saved geo blocks that a US home does not apply, so “Remote - US only” still passes. */
+export function pausedGeoBlocks(home: string | null | undefined, geoBlock: string[]): string[] {
+  if (homeMarket(home || "") !== "us") return [];
+  return geoBlock.filter(usOnlyBlock);
 }

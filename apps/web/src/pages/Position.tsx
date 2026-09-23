@@ -8,9 +8,9 @@ import { InterviewRoundBody } from "@/components/interview-round";
 import { Markdown } from "@/components/markdown";
 import { StatusMenu, useStatusChange } from "@/components/status-menu";
 import { openDock, useChatScope } from "@/frame/store";
-import { INTERVIEW_OUTCOMES, INTERVIEW_STAGES, INTERVIEW_STATUSES, changeKindLabel, humanDiffSummary, isCompanyNameLocation } from "@job-scout/shared";
+import { INTERVIEW_OUTCOMES, INTERVIEW_STAGES, INTERVIEW_STATUSES, changeKindLabel, fitsHomeMarket, humanDiffSummary, isCompanyNameLocation } from "@job-scout/shared";
 import { api, del, patch, post, qs, useApi, type Evaluation, type Interview, type Material, type Person, type PipelineStatus, type PositionDetail, type Profile, type Revision, type SystemInfo, type TimelineEvent, type TriageJson } from "@/lib/api";
-import { ago, createdFromLabel, dateShort, dateTime, employmentLabel, host, jdChangedAt, money, questionStatusLabel, titleCase } from "@/lib/format";
+import { ago, createdFromLabel, dateShort, dateTime, employmentLabel, host, jdChangedAt, money, questionStatusLabel, sourceLabel, titleCase } from "@/lib/format";
 import { Btn, Card, Chip, Dot, Empty, ErrorNote, Field, IconBtn, Input, Loading, Monogram, Page, Panel, Select, SortHead, Tabs, Textarea, TONE_DOT, TONE_TEXT, cn } from "@/ui/kit";
 
 type Tab = "brief" | "evaluation" | "jd" | "materials" | "forms" | "company" | "history";
@@ -194,7 +194,7 @@ export function PositionPage() {
         ]}
       />
 
-      {tab === "brief" ? <BriefTab p={p} noKey={noKey} onTriage={() => runAction("triage", { force: true })} /> : null}
+      {tab === "brief" ? <BriefTab p={p} noKey={noKey} home={profile.data?.location} onTriage={() => runAction("triage", { force: true })} /> : null}
       {tab === "evaluation" ? <EvaluationTab p={p} hasEval={hasEval} hasJdReview={hasJdReview} noKey={noKey} onRun={runAction} /> : null}
       {tab === "jd" ? <JdTab p={p} /> : null}
       {tab === "materials" ? <MaterialsTab p={p} noKey={noKey} onRun={runAction} /> : null}
@@ -264,7 +264,7 @@ function Stepper({ id, status, archiveReason }: { id: string; status: PipelineSt
 
 /* ---------------- Brief ---------------- */
 
-function BriefTab({ p, noKey, onTriage }: { p: PositionDetail; noKey: boolean; onTriage: () => void }) {
+function BriefTab({ p, noKey, home, onTriage }: { p: PositionDetail; noKey: boolean; home?: string | null; onTriage: () => void }) {
   const t = p.triageJson;
   const qc = useQueryClient();
   const [notes, setNotes] = useState(p.notes || "");
@@ -334,16 +334,18 @@ function BriefTab({ p, noKey, onTriage }: { p: PositionDetail; noKey: boolean; o
             <Field label="Workplace">{p.workplace && p.workplace !== "unknown" ? p.workplace : "—"}</Field>
             {loc ? <Field label="Location">{loc}</Field> : null}
             <Field label="Geo">
-              {p.geoClass && p.geoClass !== "unknown"
-                ? p.geoClass.replace(/_/g, " ").replace("worldwideish", "worldwide")
-                : "—"}
+              {fitsHomeMarket(p.geoClass, loc, home)
+                ? "home"
+                : p.geoClass && p.geoClass !== "unknown"
+                  ? p.geoClass.replace(/_/g, " ").replace("worldwideish", "worldwide")
+                  : "—"}
             </Field>
             {p.departments?.length ? <Field label="Team">{p.departments.join(" · ")}</Field> : null}
             {p.geoNotes ? <Field label="Geo notes">{p.geoNotes}</Field> : null}
             <Field label="Comp">{comp || "—"}</Field>
             {p.equityNotes ? <Field label="Equity">{p.equityNotes}</Field> : null}
             <Field label="Craft">{titleCase(p.craftFamily) || "—"}</Field>
-            <Field label="Source">{p.source || "—"}</Field>
+            <Field label="Source">{sourceLabel(p.source) || "—"}</Field>
             <Field label="Surface">{p.resumeSurface || "—"}</Field>
             {p.jd?.techTags?.length ? (
               <Field label="Stack">

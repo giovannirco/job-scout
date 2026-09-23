@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { Bot, Copy, Globe, Hand, MessageCircle, Play, RefreshCw, Sparkles, Trash2, Zap } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { clipBookmarklet, titleExcludesFromNorthStar } from "@job-scout/shared";
+import { clipBookmarklet, pausedGeoBlocks, titleExcludesFromNorthStar } from "@job-scout/shared";
 import { useChatScope, useTheme, type ThemePref } from "@/frame/store";
 import { api, del, patch, post, qs, useApi, type ApiToken, type AutopilotConfig, type AutopilotState, type Job, type LlmStatus, type ModelsCatalog, type NotificationsConfig, type NotifyChannel, type Profile, type Settings, type SystemInfo } from "@/lib/api";
 import { ago, compact, dateTime } from "@/lib/format";
@@ -274,6 +274,7 @@ function GateTab() {
   const profile = useApi<Profile>(["profile"], "/api/v1/settings/profile");
   const northStarExcludes = titleExcludesFromNorthStar(profile.data?.northStar || "");
   if (!gate || !triage || !scan) return <Loading rows={6} />;
+  const pausedBlocks = pausedGeoBlocks(profile.data?.location, gate.geoBlock);
   const dirty = JSON.stringify({ gate, triage, scan }) !== JSON.stringify({ gate: q.data?.gate, triage: q.data?.triage, scan: q.data?.scan });
 
   async function save() {
@@ -301,7 +302,8 @@ function GateTab() {
           <ListEditor label="One per line" value={gate.geoAllow} onChange={(v) => setGate({ ...gate, geoAllow: v })} hint="Location strings containing any of these pass." />
         </Panel>
         <Panel title="Geo block">
-          <ListEditor label="One per line" value={gate.geoBlock} onChange={(v) => setGate({ ...gate, geoBlock: v })} hint="Checked after allow; wins on conflict (e.g. “US only”)." />
+          <ListEditor label="One per line" value={gate.geoBlock} onChange={(v) => setGate({ ...gate, geoBlock: v })} hint="Checked after allow. A block wins when the location also matches an allow term." />
+          {pausedBlocks.length ? <p className="text-[12px] text-muted mt-2">Saved, but not applied while the profile is in the US: {pausedBlocks.join(", ")}. A US city still keeps “Remote - US only”.</p> : null}
         </Panel>
       </div>
       <Panel title="Thresholds and cadence">
