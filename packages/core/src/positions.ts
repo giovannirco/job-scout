@@ -688,7 +688,7 @@ export async function upsertFromJob(
     ingestQuality.labels({ reason: "unresolved_company" }).inc();
     log.warn("ingest.unresolved_company", { url: job.url });
   }
-  const company = await resolveCompanyForName(companyName, { careersUrl: job.url });
+  const company = await resolveCompanyForName(companyName);
   const externalIdentity =
     canonicalExternalIdentity(job.externalIdentity || (job.provider && job.jobId ? `${job.provider}:${job.boardToken || company.slug}:${job.jobId}` : null));
   job.externalIdentity = externalIdentity || undefined;

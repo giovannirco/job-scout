@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canonicalExternalIdentity, cleanLocation, decisionTitle, employerFromPosting, normalizePostingUrl, requisitionId } from "./position-identity.js";
+import { canonicalExternalIdentity, cleanLocation, decisionTitle, employerFromPosting, isJobPostingUrl, normalizePostingUrl, requisitionId } from "./position-identity.js";
 import { geoClass } from "./classify.js";
 import { isNoiseJobTitle, isPlaceholderAtsUrl } from "./listing-title.js";
 
@@ -10,6 +10,14 @@ describe("posting identity and eligibility", () => {
     ["Rio de Janeiro, Rio de Janeiro", "brazil_friendly"], ["Remoto", "ambiguous_remote"], ["All", "ambiguous_remote"],
     ["Fully remote, US only", "hard_geo"], ["Remote, Brazil · Mexico", "brazil_friendly"],
   ])("classifies %s as %s", (location, expected) => expect(geoClass(location)).toBe(expected));
+
+  it("tells a single opening from a careers root", () => {
+    expect(isJobPostingUrl("https://jobs.ashbyhq.com/airbyte/b59bbc91-fb77-4a08-9c47-0fca7f755942")).toBe(true);
+    expect(isJobPostingUrl("https://job-boards.greenhouse.io/alpaca/jobs/6194973004")).toBe(true);
+    expect(isJobPostingUrl("https://stripe.com/jobs/search?gh_jid=8197891")).toBe(true);
+    expect(isJobPostingUrl("https://stripe.com/jobs")).toBe(false);
+    expect(isJobPostingUrl("https://www.elastic.co/careers")).toBe(false);
+  });
 
   it("normalizes aliases and tracking without destroying job query IDs", () => {
     expect(normalizePostingUrl("http://boards.greenhouse.io/gympass/jobs/123/?utm_source=x#apply"))
