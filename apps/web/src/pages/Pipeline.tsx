@@ -284,7 +284,7 @@ function PositionsTable({ rows }: { rows: PositionRow[] }) {
             <Td>
               <GeoChip geo={r.geoClass} />
             </Td>
-            <Td mono>{money(r.salaryMin, r.salaryMax, r.salaryCurrency) || <span className="text-faint">—</span>}</Td>
+            <Td mono title={r.familySalarySpan ? "Lowest to highest posted band across the related locations" : undefined}>{money(r.salaryMin, r.salaryMax, r.salaryCurrency) || <span className="text-faint">—</span>}</Td>
             <Td>
               <div className="flex items-center gap-1.5">
                 <StatusMenu id={r.id} value={r.status} />

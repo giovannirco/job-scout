@@ -6,6 +6,7 @@ export type GroupRow = {
   id: string; title: string; company: string; craftFamily: string | null; contentHash: string | null;
   primaryUrl: string | null; externalIdentity: string | null; status: string; listingStatus: string | null;
   geoClass: string | null; locationRaw: string | null; firstSeenAt: Date | null; appliedAt: Date | null;
+  salaryMin: number | null; salaryMax: number | null; salaryCurrency: string | null;
   metadata: Record<string, unknown> | null;
 };
 export const terminalCareerStatus = (status: unknown) => /^(skip|discarded|rejected|withdrawn|closed)$/i.test(String(status || "").trim());
@@ -22,6 +23,7 @@ export async function groupingRows(): Promise<GroupRow[]> {
     status: positions.status, listingStatus: positions.listingStatus, geoClass: positions.geoClass,
     firstSeenAt: positions.firstSeenAt, appliedAt: positions.appliedAt,
     metadata: positions.metadata,
+    salaryMin: positions.salaryMin, salaryMax: positions.salaryMax, salaryCurrency: positions.salaryCurrency,
     locationRaw: sql<string | null>`(select location_raw from jd_revisions where position_id = ${positions.id} order by revision desc limit 1)`,
   }).from(positions).innerJoin(companies, eq(positions.companyId, companies.id));
 }
@@ -69,13 +71,29 @@ export function groupRows(rows: GroupRow[], families = false): GroupRow[][] {
   return [...buckets.values()].map(bucket => bucket.sort(rank));
 }
 
+/** Lowest to highest posted band when every known salary in the family uses one currency. */
+export function familySalaryBand(group: Array<Pick<GroupRow, "salaryMin" | "salaryMax" | "salaryCurrency">>): {
+  salaryMin: number; salaryMax: number; salaryCurrency: string; familySalarySpan: true;
+} | null {
+  const known = group.filter((r): r is typeof r & { salaryMin: number; salaryCurrency: string } => r.salaryMin != null && Boolean(r.salaryCurrency));
+  if (known.length < 2) return null;
+  const currency = known[0].salaryCurrency;
+  if (known.some((r) => r.salaryCurrency !== currency)) return null;
+  const salaryMin = Math.min(...known.map((r) => r.salaryMin));
+  const salaryMax = Math.max(...known.map((r) => r.salaryMax ?? r.salaryMin));
+  if (salaryMax < salaryMin) return null;
+  return { salaryMin, salaryMax, salaryCurrency: currency, familySalarySpan: true };
+}
+
 export function groupSummary(group: GroupRow[]) {
   const representative = group[0];
+  const band = familySalaryBand(group);
   return {
     roleFamilyId: representative.id,
     siblingCount: group.length,
     locations: [...new Set(group.map(r => r.locationRaw).filter(Boolean))],
     siblings: group.map(r => ({ id: r.id, title: r.title, status: r.status, location: r.locationRaw, url: r.primaryUrl })),
+    ...(band || {}),
   };
 }
 
