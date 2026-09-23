@@ -180,11 +180,15 @@ function ProfileTab() {
   const dirty = useMemo(() => JSON.stringify(f) !== JSON.stringify(q.data || {}), [f, q.data]);
 
   async function save() {
+    const rolesChanged = JSON.stringify(f.targetRoles || []) !== JSON.stringify(q.data?.targetRoles || []);
     const { id: _id, ...rest } = f as Profile;
     void _id;
     await patch("/api/v1/settings/profile", rest);
     void qc.invalidateQueries({ queryKey: ["profile"] });
-    toast.success("Profile saved");
+    void qc.invalidateQueries({ queryKey: ["settings"] });
+    void qc.invalidateQueries({ queryKey: ["radar"] });
+    void qc.invalidateQueries({ queryKey: ["today"] });
+    toast.success(rolesChanged ? "Profile saved. Target roles now filter listings." : "Profile saved");
   }
   if (q.isLoading || !q.data) return <Loading rows={6} />;
   const set = <K extends keyof Profile>(k: K, v: Profile[K]) => setF((prev) => ({ ...prev, [k]: v }));
@@ -192,7 +196,7 @@ function ProfileTab() {
   return (
     <div className="space-y-4 max-w-4xl">
       <p className="text-[12.5px] text-muted">
-        The <b className="text-fg font-medium">scout brief</b> is the compact version triage reads on every listing. The master resume and identity feed evaluate and materials.
+        The <b className="text-fg font-medium">scout brief</b> is what triage reads. <b className="text-fg font-medium">Target roles</b> are the title gate: saving them rechecks listings from the last 7 days. Extra include or exclude terms stay under Gate.
       </p>
       <Panel title="Identity">
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
