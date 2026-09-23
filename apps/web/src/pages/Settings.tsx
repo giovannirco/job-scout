@@ -323,6 +323,7 @@ function GateTab() {
           <Input label="Board scan interval (min)" type="number" value={scan.boardIntervalMinutes} onChange={(e) => setScan({ ...scan, boardIntervalMinutes: Number(e.target.value) })} />
           <Input label="Boards per tick" type="number" value={scan.boardsPerTick} onChange={(e) => setScan({ ...scan, boardsPerTick: Number(e.target.value) })} />
         </div>
+        <p className="text-[12px] text-muted mt-3">A listing still on the board is kept even when it is older than the max posting age.</p>
       </Panel>
       <p className="text-[11.5px] text-faint">
         Board sources and URL watches are managed in{" "}

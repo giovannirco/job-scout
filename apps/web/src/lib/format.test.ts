@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ago, countLabel, createdFromLabel, departmentLabel, employmentLabel, jdChangedAt, money, questionStatusLabel, readableJd, sourceLabel } from "./format.js";
+import { ago, countLabel, createdFromLabel, departmentLabel, employmentLabel, jdChangedAt, money, multiAnswerValues, questionStatusLabel, readableJd, sourceLabel, toggleMultiAnswer } from "./format.js";
 
 describe("ago", () => {
   it("uses years once a date is at least two years old", () => {
@@ -32,6 +32,17 @@ describe("employmentLabel", () => {
     expect(employmentLabel("FULL_TIME")).toBe("Full-time");
     expect(employmentLabel("Part-time")).toBe("Part-time");
     expect(employmentLabel("Something else")).toBe("Something else");
+  });
+});
+
+describe("toggleMultiAnswer", () => {
+  it("keeps several choices and preserves the option order", () => {
+    const options = ["Canada", "Germany", "United States"];
+    const one = toggleMultiAnswer("", "Germany", options);
+    expect(one).toBe("Germany");
+    expect(toggleMultiAnswer(one, "Canada", options)).toBe("Canada\nGermany");
+    expect(toggleMultiAnswer("Canada\nGermany", "Germany", options)).toBe("Canada");
+    expect(multiAnswerValues("Canada\nGermany")).toEqual(["Canada", "Germany"]);
   });
 });
 
