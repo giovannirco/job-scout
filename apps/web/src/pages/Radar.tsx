@@ -8,6 +8,7 @@ import { useChatScope } from "@/frame/store";
 import { apiMeta, del, patch, post, qs, useApi, useApiMeta, type Board, type DeltaRow, type DiscoveryRow, type Watch } from "@/lib/api";
 import { ago, dateTime, titleCase } from "@/lib/format";
 import { discoveryQueuedMessage } from "@/lib/discovery-toast";
+import { gateReasonLabel } from "@/lib/gate-reason";
 import type { RadarSearch } from "@/router";
 import { Btn, Card, Dot, Empty, IconBtn, Input, Kpi, Loading, Monogram, Page, PageHeader, Pager, Seg, Select, SortHead, Table, Tabs, Td, Th, Tr, cn, ErrorNote } from "@/ui/kit";
 
@@ -196,8 +197,8 @@ function Discovery({ search, set, summary }: { search: RadarSearch; set: (p: Par
                 <Td className="max-w-[200px] text-muted">
                   <div className="truncate">{r.locationRaw || "—"}</div>
                 </Td>
-                <Td mono className={cn(lane === "filtered" || r.lane === "filtered" ? "text-faint" : "text-muted")}>
-                  {lane === "filtered" || r.lane === "filtered" ? r.gateReason || "—" : titleCase(r.craftFamily) || "—"}
+                <Td className={cn(lane === "filtered" || r.lane === "filtered" ? "text-faint" : "text-muted")}>
+                  {lane === "filtered" || r.lane === "filtered" ? <span title={r.gateReason || undefined}>{gateReasonLabel(r.gateReason)}</span> : titleCase(r.craftFamily) || "—"}
                 </Td>
                 <Td>
                   {r.positionSlug ? (
