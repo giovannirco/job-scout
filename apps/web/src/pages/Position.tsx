@@ -9,7 +9,7 @@ import { Markdown } from "@/components/markdown";
 import { StatusMenu, useStatusChange } from "@/components/status-menu";
 import { openDock, useChatScope } from "@/frame/store";
 import { INTERVIEW_OUTCOMES, INTERVIEW_STAGES, INTERVIEW_STATUSES, isCompanyNameLocation } from "@job-scout/shared";
-import { api, del, patch, post, qs, useApi, type Evaluation, type Interview, type Material, type Person, type PipelineStatus, type PositionDetail, type Revision, type TimelineEvent, type TriageJson } from "@/lib/api";
+import { api, del, patch, post, qs, useApi, type Evaluation, type Interview, type Material, type Person, type PipelineStatus, type PositionDetail, type Revision, type SystemInfo, type TimelineEvent, type TriageJson } from "@/lib/api";
 import { ago, dateShort, dateTime, host, money, titleCase } from "@/lib/format";
 import { Btn, Card, Chip, Dot, Empty, ErrorNote, Field, IconBtn, Input, Loading, Monogram, Page, Panel, Select, SortHead, Tabs, Textarea, TONE_DOT, TONE_TEXT, cn } from "@/ui/kit";
 
@@ -32,6 +32,8 @@ export function PositionPage() {
   const [pendingUntil, setPendingUntil] = useState<number>(0);
   const polling = pendingUntil > Date.now();
   const q = useApi<PositionDetail>(["position", id], `/api/v1/positions/${id}`, { refetchInterval: polling ? 4000 : false });
+  const sys = useApi<SystemInfo>(["system"], "/api/v1/settings/system", { staleTime: 30_000 });
+  const noKey = sys.data?.llmConfigured === false;
   const p = q.data;
   const qc = useQueryClient();
   const pollingKey = useRef<string | null>(null);
@@ -52,6 +54,10 @@ export function PositionPage() {
 
   async function runAction(action: string, body: Record<string, unknown> = {}) {
     if (!p) return;
+    if (noKey) {
+      toast.message("Add a model key in Settings before this can run.");
+      return;
+    }
     try {
       pollingKey.current = `${p.evaluations.length}:${p.materials.length}:${p.triagedAt}:${p.updatedAt}`;
       const r = await post<{ jobId: string; deduped: boolean }>(`/api/v1/positions/${p.id}/actions/${action}`, body);
@@ -141,10 +147,10 @@ export function PositionPage() {
                   <Dot tone="accent" pulse /> working
                 </span>
               ) : null}
-              <Btn variant={hasEval ? "default" : "primary"} onClick={() => runAction("evaluate")} title="Full A–H evaluation with the configured model">
+              <Btn variant={hasEval ? "default" : "primary"} disabled={noKey} onClick={() => runAction("evaluate")} title={noKey ? "Add a model key in Settings" : "Full A–H evaluation with the configured model"}>
                 <Sparkles className="h-3.5 w-3.5" /> {hasEval ? "Re-evaluate" : "Evaluate"}
               </Btn>
-              <Btn onClick={() => runAction("materials")} title="Tailored resume + cover for this position">
+              <Btn disabled={noKey} onClick={() => runAction("materials")} title={noKey ? "Add a model key in Settings" : "Tailored resume + cover for this position"}>
                 <FileText className="h-3.5 w-3.5" /> Materials
               </Btn>
               <IconBtn label="Chat about this position" onClick={() => openDock("chat")}>
@@ -186,7 +192,7 @@ export function PositionPage() {
         ]}
       />
 
-      {tab === "brief" ? <BriefTab p={p} onTriage={() => runAction("triage", { force: true })} /> : null}
+      {tab === "brief" ? <BriefTab p={p} noKey={noKey} onTriage={() => runAction("triage", { force: true })} /> : null}
       {tab === "evaluation" ? <EvaluationTab p={p} hasEval={hasEval} hasJdReview={hasJdReview} onRun={runAction} /> : null}
       {tab === "jd" ? <JdTab p={p} /> : null}
       {tab === "materials" ? <MaterialsTab p={p} onRun={runAction} /> : null}
@@ -256,7 +262,7 @@ function Stepper({ id, status, archiveReason }: { id: string; status: PipelineSt
 
 /* ---------------- Brief ---------------- */
 
-function BriefTab({ p, onTriage }: { p: PositionDetail; onTriage: () => void }) {
+function BriefTab({ p, noKey, onTriage }: { p: PositionDetail; noKey: boolean; onTriage: () => void }) {
   const t = p.triageJson;
   const qc = useQueryClient();
   const [notes, setNotes] = useState(p.notes || "");
@@ -283,12 +289,20 @@ function BriefTab({ p, onTriage }: { p: PositionDetail; onTriage: () => void }) 
           title="Triage"
           meta={t?.model ? t.model : undefined}
           actions={
-            <Btn size="xs" variant="ghost" onClick={onTriage}>
+            <Btn size="xs" variant="ghost" disabled={noKey} onClick={onTriage} title={noKey ? "Add a model key in Settings" : undefined}>
               <RefreshCw className="h-3 w-3" /> {t ? "Re-triage" : "Triage now"}
             </Btn>
           }
         >
-          {!t ? <Empty>Not triaged yet. It is queued, or triage is off in Settings › AI.</Empty> : <TriageCard t={t} />}
+          {!t ? (
+            <Empty>
+              {noKey ? (
+                <>No model key is set, so this role is not scored. <Link to="/settings" search={{ tab: "ai" }} className="text-accent hover:underline">Add one in Settings</Link>.</>
+              ) : (
+                "Not triaged yet. It is queued, or triage is off in Settings › AI."
+              )}
+            </Empty>
+          ) : <TriageCard t={t} />}
         </Panel>
 
         {ej ? (
