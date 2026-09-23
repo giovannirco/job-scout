@@ -47,7 +47,7 @@ export function verdictTone(v: Verdict | null | undefined): Tone {
 }
 
 export function VerdictBadge({ verdict, score, className }: { verdict: Verdict | null | undefined; score?: number | null; className?: string }) {
-  if (!verdict) return <Chip tone="faint" className={className}>untriaged</Chip>;
+  if (!verdict) return <Chip tone="faint" className={className}>not scored</Chip>;
   return (
     <Chip tone={verdictTone(verdict)} className={className}>
       {verdict}

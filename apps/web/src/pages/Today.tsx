@@ -323,7 +323,7 @@ function Funnel({
         <span>{total} live</span>
         {untriaged && !unscored ? (
           <Link to="/pipeline" search={{ verdict: "none", status: "triaged" }} className="text-warn hover:underline">
-            {untriaged} untriaged
+            {untriaged} not scored
           </Link>
         ) : null}
         <span>{terminal} rejected/skipped</span>
