@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
 import { getDb, id, positions, watches } from "@job-scout/db";
+import { detectAts, fetchGreenhouseJob } from "@job-scout/ats";
 import { fetchJob as fetchJobFromUrl } from "./fetch-job.js";
 import { contentHash, HOT_STATUSES } from "@job-scout/shared";
 import { enqueueJob } from "./jobs.js";
@@ -42,14 +43,25 @@ export async function checkWatch(watchId: string) {
 
 /** Refresh the JD of a watched or hot position. */
 export async function checkPosition(positionId: string) {
-  return applySnapshot({ positionId, job: await fetchJobFromUrl((await requireUrl(positionId))), source: "watch" });
+  return applySnapshot({ positionId, job: await fetchPositionJob(positionId), source: "watch" });
 }
 
-async function requireUrl(positionId: string) {
+async function fetchPositionJob(positionId: string) {
   const db = await getDb();
-  const p = (await db.select({ url: positions.primaryUrl }).from(positions).where(eq(positions.id, positionId)).limit(1))[0];
+  const p = (
+    await db
+      .select({ url: positions.primaryUrl, atsBoardToken: positions.atsBoardToken })
+      .from(positions)
+      .where(eq(positions.id, positionId))
+      .limit(1)
+  )[0];
   if (!p?.url) throw new Error("position has no URL");
-  return p.url;
+  const detected = detectAts(p.url);
+  if (detected.provider === "greenhouse" && detected.jobId && !detected.boardToken && p.atsBoardToken) {
+    const direct = await fetchGreenhouseJob(p.atsBoardToken, detected.jobId);
+    if (direct.descriptionText?.trim()) return { ...direct, url: p.url };
+  }
+  return fetchJobFromUrl(p.url);
 }
 
 /** Enqueue watch_check for positions due (hot or watchEnabled, open, not checked in N hours). */

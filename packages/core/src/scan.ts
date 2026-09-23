@@ -1,6 +1,6 @@
 import { and, desc, eq, gte, isNull, lt, or, sql } from "drizzle-orm";
 import { boardDeltas, boardSnapshots, boardSources, discoveryFeed, getDb, id, positions } from "@job-scout/db";
-import { detectAts, externalIdentityFromDetect, fetchGreenhouseJob, listBoard, type AtsJob, type BoardJobSummary } from "@job-scout/ats";
+import { detectAts, externalIdentityFromDetect, fetchGreenhouseJob, greenhouseListingNeedsBoardFetch, listBoard, type AtsJob, type BoardJobSummary } from "@job-scout/ats";
 import { fetchJob as fetchJobFromUrl } from "./fetch-job.js";
 import { craftFamily, gateListing, geoClass, isNoiseJobTitle, parseClipListing, type GateConfig, type GateVerdict } from "@job-scout/shared";
 import { enqueueJob } from "./jobs.js";
@@ -188,11 +188,13 @@ export async function scanBoard(boardId: string, opts: { force?: boolean } = {})
         log.warn("scan.listing.fetch_failed", { company: board.company, url: j.url, err: e });
       }
       if (
-        board.provider === "greenhouse" &&
-        j.jobId &&
         board.token &&
-        (!job || !job.descriptionText?.trim()) &&
-        job?.boardToken !== board.token
+        j.jobId &&
+        greenhouseListingNeedsBoardFetch(job, {
+          provider: board.provider,
+          token: board.token,
+          jobId: j.jobId,
+        })
       ) {
         const direct = await fetchGreenhouseJob(board.token, j.jobId);
         if (direct.descriptionText?.trim()) job = { ...direct, url: j.url || direct.url };

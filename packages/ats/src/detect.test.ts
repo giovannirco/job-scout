@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   detectAts,
+  greenhouseListingNeedsBoardFetch,
   isPlaceholderAtsDetection,
   isPlaceholderJobId,
 } from "./detect.js";
@@ -36,6 +37,18 @@ describe("detectAts", () => {
     expect(d.provider).toBe("greenhouse");
     expect(d.jobId).toBe("8225986");
     expect(d.boardToken).toBeUndefined();
+    expect(
+      greenhouseListingNeedsBoardFetch(
+        { boardToken: d.boardToken },
+        { provider: "greenhouse", token: "elastic", jobId: d.jobId },
+      ),
+    ).toBe(true);
+    expect(
+      greenhouseListingNeedsBoardFetch(
+        { boardToken: "elastic" },
+        { provider: "greenhouse", token: "elastic", jobId: d.jobId },
+      ),
+    ).toBe(false);
   });
 
   it("parses ashby UUID jobs", () => {

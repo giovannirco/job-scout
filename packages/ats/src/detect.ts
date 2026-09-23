@@ -49,6 +49,15 @@ export function genericBoardLabel(token: string | undefined): boolean {
   return GENERIC_BOARD_LABELS.has((token || "").toLowerCase());
 }
 
+/** A careers vanity URL can carry a long page of nav and JSON while the board API has the JD. */
+export function greenhouseListingNeedsBoardFetch(
+  job: { boardToken?: string | null } | null | undefined,
+  board: { provider: string; token?: string | null; jobId?: string | null },
+): boolean {
+  if (board.provider !== "greenhouse" || !board.jobId || !board.token) return false;
+  return job?.boardToken !== board.token;
+}
+
 export function detectAts(url: string): DetectedAts {
   try {
     const u = new URL(url);
