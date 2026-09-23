@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countLabel, employmentLabel, jdChangedAt } from "./format.js";
+import { countLabel, employmentLabel, jdChangedAt, money } from "./format.js";
 
 describe("jdChangedAt", () => {
   it("ignores a change stamp that is the first snapshot", () => {
@@ -7,6 +7,13 @@ describe("jdChangedAt", () => {
     expect(jdChangedAt(at, at)).toBeNull();
     expect(jdChangedAt(at, "2026-09-23T18:00:00.400Z")).toBeNull();
     expect(jdChangedAt(at, "2026-09-23T19:30:00.000Z")).toBe("2026-09-23T19:30:00.000Z");
+  });
+});
+
+describe("money", () => {
+  it("puts the currency mark on both ends of a range", () => {
+    expect(money(140000, 180000, "USD")).toBe("$140k–$180k");
+    expect(money(150000, 150000, "USD")).toBe("$150k");
   });
 });
 
