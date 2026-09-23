@@ -74,6 +74,7 @@ const LIST_ROW = {
   watchEnabled: positions.watchEnabled,
   appliedAt: positions.appliedAt,
   firstSeenAt: positions.firstSeenAt,
+  postedAt: sql<string | null>`nullif(${positions.metadata}->'ats'->>'postedAt', '')`,
   lastChangedAt: positions.lastChangedAt,
   triagedAt: positions.triagedAt,
   triageProfileHash: sql<string | null>`${positions.triageJson}->>'profileHash'`,
@@ -202,7 +203,7 @@ export async function listPositions(q: ListPositionsQuery) {
   const where = conds.length ? and(...conds) : undefined;
   const { field, dir } = parseListSort(
     q.sort,
-    ["updated", "score", "company", "status", "first_seen", "last_changed", "title", "workplace", "geo", "location"],
+    ["updated", "score", "company", "status", "first_seen", "last_changed", "posted", "title", "workplace", "geo", "location"],
     "updated",
     "desc",
   );
@@ -218,6 +219,13 @@ export async function listPositions(q: ListPositionsQuery) {
             ? [d(positions.firstSeenAt), desc(positions.id)]
             : field === "last_changed"
               ? [d(positions.lastChangedAt), desc(positions.id)]
+            : field === "posted"
+              ? [
+                  dir === "asc"
+                    ? sql`nullif(${positions.metadata}->'ats'->>'postedAt', '')::timestamptz ASC NULLS LAST`
+                    : sql`nullif(${positions.metadata}->'ats'->>'postedAt', '')::timestamptz DESC NULLS LAST`,
+                  desc(positions.id),
+                ]
             : field === "title"
               ? [d(positions.title), desc(positions.id)]
               : field === "workplace"

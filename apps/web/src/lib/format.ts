@@ -128,6 +128,11 @@ export function questionStatusLabel(status: string | null | undefined): string {
   return status.replace(/_/g, " ");
 }
 
+/** Collapse the blank runs some boards leave between JD sections. */
+export function readableJd(text: string | null | undefined): string {
+  return (text || "").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
 export function titleCase(s: string | null | undefined): string {
   if (!s) return "";
   return s.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
