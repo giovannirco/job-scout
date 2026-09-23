@@ -197,7 +197,7 @@ function ProfileTab() {
   return (
     <div className="space-y-4 max-w-4xl">
       <p className="text-[12.5px] text-muted">
-        The <b className="text-fg font-medium">scout brief</b> is what triage reads. <b className="text-fg font-medium">Target roles</b> are the title gate: saving them rechecks listings from the last 7 days. Untouched scan filings whose titles no longer match are archived. A specialty word such as java is kept on its own, so Java Developer still matches, and it does not match JavaScript. Extra include or exclude terms stay under Gate.
+        The <b className="text-fg font-medium">scout brief</b> is what triage reads. <b className="text-fg font-medium">Target roles</b> are the title gate: saving them rechecks listings from the last 7 days. Untouched scan filings whose titles no longer match are archived. A specialty word such as java is kept on its own, so Java Developer still matches, and it does not match JavaScript. Engineer and developer are the same shape, so Software Engineer also matches Software Developer. Extra include or exclude terms stay under Gate.
       </p>
       <Panel title="Identity">
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">

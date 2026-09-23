@@ -3,6 +3,14 @@ import { gateListing } from "./gate.js";
 import { DEFAULT_GATE } from "./settings.js";
 
 describe("gateListing", () => {
+  it("treats engineer and developer as the same job shape", () => {
+    const gate = { ...DEFAULT_GATE, titleInclude: ["software engineer", "backend engineer"], titleExclude: ["manager"] };
+    expect(gateListing({ title: "Software Developer (Backend SaaS)", locationRaw: "Remote" }, gate).pass).toBe(true);
+    expect(gateListing({ title: "Senior Backend Developer", locationRaw: "Remote" }, gate).pass).toBe(true);
+    expect(gateListing({ title: "Senior Software Engineer", locationRaw: "Remote" }, gate).matchedInclude).toBe("software engineer");
+    expect(gateListing({ title: "Engineering Manager", locationRaw: "Remote" }, gate).pass).toBe(false);
+  });
+
   it("passes a remote platform role", () => {
     const v = gateListing({ title: "Senior Platform Engineer", locationRaw: "Remote - LATAM" }, DEFAULT_GATE);
     expect(v.pass).toBe(true);
