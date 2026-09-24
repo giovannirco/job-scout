@@ -620,11 +620,44 @@ function MaterialsTab({ p, noKey, onRun }: { p: PositionDetail; noKey: boolean; 
             {m.data.title ? <div className="font-display text-[15px] font-semibold mb-2">{m.data.title}</div> : null}
             <Markdown>{m.data.bodyMarkdown || "_empty_"}</Markdown>
             {m.data.notes ? <div className="text-[11.5px] text-muted mt-3 border-t border-border pt-2">{m.data.notes}</div> : null}
+            <MaterialEditor key={m.data.id} material={m.data} positionId={p.id} onSaved={setSel} />
           </div>
         ) : null}
       </Panel>
     </div>
   );
+}
+
+function MaterialEditor({ material, positionId, onSaved }: { material: Material; positionId: string; onSaved: (id: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(material.bodyMarkdown || "");
+  const [reviewed, setReviewed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const qc = useQueryClient();
+  async function save() {
+    setBusy(true);
+    try {
+      const result = await post<{ id: string }>(`/api/v1/positions/${positionId}/materials`, {
+        kind: material.kind, bodyMarkdown: draft, title: material.title || undefined,
+        notes: "Claims reviewed by the operator.",
+      });
+      await qc.invalidateQueries({ queryKey: ["position"] });
+      onSaved(result.id);
+      setEditing(false);
+      toast.success("Reviewed version saved");
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not save the revised material"); }
+    finally { setBusy(false); }
+  }
+  if (!["resume", "cover"].includes(material.kind)) return null;
+  return <div className="mt-4 border-t border-border pt-3 space-y-3">
+    {material.status === "pending" && <p className="text-sm text-warn">This draft needs review. Check its claims against your profile and the job description, then save a reviewed version.</p>}
+    {editing ? <>
+      <Textarea label="Material text (Markdown)" aria-label="Material text (Markdown)" rows={18} value={draft} disabled={busy} onChange={e => { setDraft(e.target.value); setReviewed(false); }} />
+      <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={reviewed} disabled={busy} onChange={e => setReviewed(e.target.checked)} />I checked the candidate and employer claims against their sources.</label>
+      <p className="text-xs text-muted">Saving makes this the current version. The previous draft stays in Versions. This does not submit an application or change the pipeline stage.</p>
+      <div className="flex gap-2"><Btn size="sm" disabled={busy || !reviewed || !draft.trim()} onClick={() => { void save(); }}>Save reviewed version</Btn><Btn size="sm" variant="outline" disabled={busy} onClick={() => { setEditing(false); setReviewed(false); setDraft(material.bodyMarkdown || ""); }}>Cancel</Btn></div>
+    </> : <Btn size="sm" variant="outline" onClick={() => setEditing(true)}>Review and edit</Btn>}
+  </div>;
 }
 
 /* ---------------- Company ---------------- */
