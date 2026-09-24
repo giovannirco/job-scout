@@ -7,6 +7,7 @@ if [ -z "$scanner" ]; then
 fi
 while read -r local_ref local_sha remote_ref remote_sha; do
   case "$local_sha" in 0000000000000000000000000000000000000000) continue ;; esac
+  case "$local_ref" in refs/tags/*) git verify-tag "$local_sha" ;; esac
   python3 scripts/check-public.py "$local_sha"
   "$scanner" git . --config .gitleaks.toml --log-opts="$local_sha" --redact --no-banner
  done

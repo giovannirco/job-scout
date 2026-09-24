@@ -64,6 +64,17 @@ class PublicSourceTest(unittest.TestCase):
             result = subprocess.run(['python3', str(script), '--index'], cwd=directory, capture_output=True, text=True)
             self.assertEqual(result.returncode, 1)
             self.assertIn('profile.json: private export', result.stderr)
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.json') as patterns:
+                patterns.write('["synthetic"]')
+                patterns.flush()
+                git('config', 'privacy.privatePatternsFile', patterns.name)
+                result = subprocess.run(['python3', str(script), '--index'], cwd=directory, capture_output=True, text=True)
+                self.assertIn('private-pattern match', result.stderr)
+                self.assertNotIn('synthetic', result.stderr)
+                git('config', '--unset', 'privacy.privatePatternsFile')
+            git('-c', 'tag.gpgsign=false', 'tag', '-a', 'unsigned-example', '-m', 'example')
+            result = subprocess.run(['python3', str(script), 'unsigned-example'], cwd=directory, capture_output=True, text=True)
+            self.assertIn('missing tag signature', result.stderr)
 
 
 if __name__ == '__main__':

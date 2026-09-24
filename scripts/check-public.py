@@ -93,6 +93,21 @@ def batch_objects(oids):
 
 def check(refs, index=False):
     failures = []
+    configured = subprocess.run(['git', 'config', '--get', 'privacy.privatePatternsFile'], capture_output=True, text=True)
+    private_patterns = []
+    if configured.returncode == 0:
+        pattern_file = pathlib.Path(configured.stdout.strip()).resolve()
+        root = pathlib.Path(git('rev-parse', '--show-toplevel').decode().strip()).resolve()
+        if pattern_file == root or root in pattern_file.parents:
+            raise ValueError('Private patterns must be stored outside the checkout')
+        private_patterns = json.loads(pattern_file.read_text())
+        if not isinstance(private_patterns, list) or any(not isinstance(value, str) or not value for value in private_patterns):
+            raise ValueError('Private patterns must be a nonempty-string array')
+    def inspect(path, data):
+        errors = content_errors(path, data)
+        if any(value.lower() in data.decode(errors='replace').lower() for value in private_patterns):
+            errors.append('private-pattern match')
+        return errors
     def report(label, errors):
         failures.extend(f'{label}: {error}' for error in errors)
     if index:
@@ -106,9 +121,19 @@ def check(refs, index=False):
             if mode == '160000': report(path, ['submodule requires a separate privacy review'])
             else: blobs.append((path, oid))
         objects = batch_objects(list(dict.fromkeys(oid for _, oid in blobs)))
-        for path, oid in blobs: report(path, content_errors(path, objects[oid][1]))
+        for path, oid in blobs: report(path, inspect(path, objects[oid][1]))
     else:
         # Use hashes resolved with --end-of-options; user-provided refs are not Git flags.
+        for ref in refs:
+            oid = git('rev-parse', '--verify', '--end-of-options', ref).decode().strip()
+            if git('cat-file', '-t', oid).strip() == b'tag':
+                raw = git('cat-file', 'tag', oid)
+                headers, _, message = raw.decode().partition('\n\n')
+                report(oid[:12], inspect('<tag message>', message.encode()))
+                if not re.search(r'^tagger .*<' + re.escape(OWNER) + r'> ', headers, re.M):
+                    report(oid[:12], ['tagger email must match the maintainer'])
+                if '-----BEGIN PGP SIGNATURE-----' not in message:
+                    report(oid[:12], ['missing tag signature'])
         heads = [git('rev-parse', '--verify', '--end-of-options', ref + '^{commit}').decode().strip() for ref in refs]
         oids = git('rev-list', '--objects', '--no-object-names', *heads).decode().splitlines()
         objects = batch_objects(oids)
@@ -119,7 +144,7 @@ def check(refs, index=False):
             seen.add(key)
             kind, data = objects[oid]
             if kind == 'blob':
-                report(prefix, path_errors(prefix) + content_errors(prefix, data))
+                report(prefix, path_errors(prefix) + inspect(prefix, data))
                 return
             offset = 0
             while offset < len(data):
@@ -134,6 +159,7 @@ def check(refs, index=False):
         for oid, (kind, data) in objects.items():
             if kind == 'commit':
                 report(oid[:12], commit_errors(data))
+                report(oid[:12], inspect('<commit message>', data.split(b'\n\n', 1)[1]))
                 walk(data.splitlines()[0].split()[1].decode())
     for failure in sorted(set(failures)):
         print(failure, file=sys.stderr)
