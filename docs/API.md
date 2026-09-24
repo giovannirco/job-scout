@@ -15,7 +15,7 @@ Codes: `UNAUTHORIZED` `NOT_FOUND` `VALIDATION_ERROR` `LLM_GATE` `INTERNAL`. Long
 curl -H "Authorization: Bearer dev-agent-token" http://localhost:8080/api/v1/today
 ```
 
-`API_TOKEN_SEED` is always valid; more tokens under `/settings/tokens`. The UI uses a session cookie from `POST /auth/login {password}`. `AUTH_MODE=dev` needs neither.
+A configured `API_TOKEN_SEED` is an admin credential; there is no built-in seed. Only admins can manage tokens under `/settings/tokens`. The UI uses a session cookie from `POST /auth/login {password}`. `AUTH_MODE=dev` needs neither.
 
 ## Routes
 
@@ -139,7 +139,7 @@ curl -H "Authorization: Bearer dev-agent-token" http://localhost:8080/api/v1/tod
 | GET | `/health` · `/ready` | probes; `health` carries `version` |
 | POST | `/auth/login` · GET `/auth/status` | session |
 | GET | `/clip?url=` | session-auth re-fetch intake (ATS URLs); redirects to `/positions/:slug` |
-| POST | `/clip` | form or JSON `{url,title,text}` snapshot; no re-fetch when `text` is present; redirects to `/positions/:slug` |
+| POST | `/clip` | form or JSON `{url,title,text}` snapshot; cross-site submissions require a same-origin confirmation; no re-fetch when `text` is present; redirects to `/positions/:slug` |
 | ALL | `/mcp` | MCP Streamable HTTP, see [MCP.md](./MCP.md) |
 
 ## Examples
@@ -164,3 +164,5 @@ curl -s -X POST $B/settings/autopilot/preset -H "$H" -H 'content-type: applicati
 T=$(curl -s -X POST $B/chat/threads -H "$H" -H 'content-type: application/json' -d '{"scope":"global"}' | jq -r .data.id)
 curl -N -X POST $B/chat/threads/$T/messages -H "$H" -H 'content-type: application/json' -d '{"text":"what should I decide today?"}'
 ```
+
+Authentication, scope requirements, trusted origins and deployment migration: [SECURITY.md](SECURITY.md).

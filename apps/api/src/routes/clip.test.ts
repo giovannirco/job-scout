@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as core from "@job-scout/core";
 import { createApp } from "../app.js";
+import { createSession } from "../auth.js";
 import { env } from "../env.js";
 
 const listing = "https://www.linkedin.com/jobs/view/12345";
@@ -63,7 +64,7 @@ describe("GET /clip", () => {
     env.authMode = "token";
     const intake = stubIntake();
     const res = await createApp().request(`/clip?url=${encodeURIComponent(listing)}`, {
-      headers: { Cookie: "js_session=ok" },
+      headers: { Cookie: `js_session=${createSession()}` },
     });
     expect(res.status).toBe(302);
     expect(intake).toHaveBeenCalledWith(listing);
@@ -146,5 +147,32 @@ describe("POST /clip", () => {
     });
     expect(res.status).toBe(401);
     expect(clip).not.toHaveBeenCalled();
+  });
+});
+
+describe("cross-site clip confirmation", () => {
+  afterEach(() => { env.authMode = "dev"; vi.restoreAllMocks(); });
+  it("stages an escaped bookmarklet preview without invoking intake, then accepts same-origin confirmation", async () => {
+    env.authMode = "token";
+    const intake = stubClip();
+    const payload = { url: listing, title: '<script>alert("xss")</script>', text: "The job description" };
+    const a = createApp();
+    const preview = await a.request("/clip", {
+      method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", origin: "https://www.linkedin.com" }, body: new URLSearchParams(payload),
+    });
+    expect(preview.status).toBe(200);
+    const html = await preview.text();
+    expect(html).toContain("Save job clip"); expect(html).not.toContain("<script>");
+    expect(preview.headers.get("content-security-policy")).toContain("frame-ancestors 'none'");
+    expect(intake).not.toHaveBeenCalled();
+    const saved = await a.request("/clip", {
+      method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", origin: env.allowedOrigins[0], cookie: `js_session=${createSession()}` }, body: new URLSearchParams(payload),
+    });
+    expect(saved.status).toBe(302); expect(intake).toHaveBeenCalledTimes(1);
+  });
+  it("does not import cross-site GET clips until confirmed", async () => {
+    const intake = stubIntake();
+    const response = await createApp().request(`/clip?url=${encodeURIComponent(listing)}`, { headers: { "sec-fetch-site": "cross-site" } });
+    expect(response.status).toBe(200); expect(intake).not.toHaveBeenCalled();
   });
 });

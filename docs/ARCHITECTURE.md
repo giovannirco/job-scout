@@ -69,9 +69,9 @@ Both api and worker import `@job-scout/core`; there is no HTTP between them, the
 
 ## Auth
 
-- **Session** — `POST /api/v1/auth/login` with `AUTH_PASSWORD` (or the token seed) sets a cookie. `AUTH_MODE=dev` skips it.
-- **Bearer** — `API_TOKEN_SEED` is an always-valid admin token; further tokens are minted under Settings › System and stored hashed in `api_tokens` with scopes (`agent`, `mcp`, `admin`).
-- **`AUTH_MODE=cf_access`** — trusts the Cloudflare Access email header.
+- **Session** — `POST /api/v1/auth/login` with `AUTH_PASSWORD` sets a signed, expiring cookie. `AUTH_MODE=dev` skips it.
+- **Bearer** — A configured `API_TOKEN_SEED` is an admin token (no default exists); further tokens are minted under Settings › System and stored hashed in `api_tokens` with scopes (`agent`, `mcp`, `admin`).
+- **`AUTH_MODE=cf_access`** — verifies the Cloudflare Access JWT against the configured issuer and application audience; an email header alone is rejected. See [SECURITY.md](SECURITY.md).
 
 MCP uses the same Bearer tokens.
 

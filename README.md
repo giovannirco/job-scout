@@ -52,7 +52,7 @@ The same company, role, and requisition collapse to one pipeline row. A country 
 
 Pay written as `$143,800.00 to $231,900.00` is read. A top amount that got glued to the next number (`$179,300,152`) is cut back to the band. A `$500` stipend is not a salary. Titles are trimmed. Search matches the title, the company, the location, and a team stored on the listing (`metadata.ats.departments`).
 
-**Sources.** Discovery scans Greenhouse, Ashby, Lever, and BambooHR company boards. Bitso is the BambooHR board `bitso` (`https://bitso.bamboohr.com/careers`); the old Greenhouse token is not scanned. Market list scans are the Remote OK public JSON feed (`https://remoteok.com/api`), the We Work Remotely DevOps/Sysadmin RSS (`https://weworkremotely.com/categories/remote-devops-sysadmin-jobs.rss`), and Remotive software-dev JSON (`https://remotive.com/api/remote-jobs?category=software-dev`), title-filtered with `isCraftMatch`. Remote OK `sys admin` / `infosec` tags keep only when the title is craft. Other market indexes stay manual watches. A Settings bookmarklet POSTs the current tab (`url`, `title`, `body.innerText`) so LinkedIn/Indeed JDs survive login walls — stay on the listing; it does not log in or apply for you.
+**Sources.** Discovery scans Greenhouse, Ashby, Lever, and BambooHR company boards. Bitso is the BambooHR board `bitso` (`https://bitso.bamboohr.com/careers`); the old Greenhouse token is not scanned. Market list scans are the Remote OK public JSON feed (`https://remoteok.com/api`), the We Work Remotely DevOps/Sysadmin RSS (`https://weworkremotely.com/categories/remote-devops-sysadmin-jobs.rss`), and Remotive software-dev JSON (`https://remotive.com/api/remote-jobs?category=software-dev`), title-filtered with `isCraftMatch`. Remote OK `sys admin` / `infosec` tags keep only when the title is craft. Other market indexes stay manual watches. A Settings bookmarklet POSTs the current tab (`url`, `title`, `body.innerText`) to a confirmation page so LinkedIn/Indeed JDs survive login walls — confirm the clip, and stay on the listing; it does not log in or apply for you.
 
 A `noise_rebase` revision is this app rewriting stored text. The JD tab labels it **rewritten here** and groups those snapshots apart from employer edits. When the board description is cut off mid-sentence, the JD tab says so and does not invent the rest.
 
@@ -103,7 +103,7 @@ pnpm dev                     # API + UI (Vite) + embedded worker on http://local
 pnpm test                    # vitest on PGlite
 ```
 
-Point it at a gateway with `OPENAI_BASE_URL` / `OPENAI_API_KEY`, then pick models under Settings › AI. Default agent/MCP token: `dev-agent-token` (`API_TOKEN_SEED`).
+Point it at a gateway with `OPENAI_BASE_URL` / `OPENAI_API_KEY`, then pick models under Settings › AI. Set a random `API_TOKEN_SEED` for agent/MCP access; there is no default token. See [security and private runtime deployment](docs/SECURITY.md).
 
 Same stack in Docker. Postgres is included. The model gateway is not: set `OPENAI_API_KEY` in `.env`, and set `COMPOSE_OPENAI_BASE_URL` if the gateway is not on the host at port 8317.
 

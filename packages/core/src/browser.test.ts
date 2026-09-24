@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const STEEL_BASE = "http://steel.example:3000";
 process.env.STEEL_BASE_URL = STEEL_BASE;
+process.env.BROWSER_EGRESS_ISOLATED = "1";
 process.env.BROWSER_MCP_URL = "http://playwright.example:8931/mcp";
 
 const { renderUrl, browserStatus, steelScrapeUrl, steelHealthUrl } = await import("./browser.js");
@@ -103,5 +104,25 @@ describe("helm isolation", () => {
     expect(steelLine).not.toMatch(/steel\.browser\.svc/);
     expect(steelLine).not.toMatch(/\/v1\/sessions/);
     expect(mcpLine).not.toMatch(/playwright-mcp\.browser\.svc/);
+  });
+});
+
+describe("browser egress assertion", () => {
+  it("disables scraping and chat browser availability until isolation is asserted", async () => {
+    const { coreEnv } = await import("./env.js");
+    const { browserConfigured } = await import("./browser.js");
+    const original = coreEnv.browserEgressIsolated;
+    try {
+      coreEnv.browserEgressIsolated = false;
+      const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
+      expect(browserConfigured()).toBe(false);
+      expect(await renderUrl("https://jobs.example.com/role")).toBeNull();
+      expect(fetch).not.toHaveBeenCalled();
+    } finally { coreEnv.browserEgressIsolated = original; }
+  });
+  it("does not forward direct metadata/private URLs to the browser service", async () => {
+    const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
+    await expect(renderUrl("http://169.254.169.254/latest/meta-data/")).rejects.toThrow(/public/);
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

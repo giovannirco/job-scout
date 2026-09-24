@@ -18,3 +18,7 @@ docs
 screenshots
 .playwright-mcp
 deploy/helm
+
+private
+backups
+**/*.sql.gz
