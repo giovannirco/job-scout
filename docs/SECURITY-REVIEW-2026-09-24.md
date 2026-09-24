@@ -110,3 +110,9 @@ Tests use temporary synthetic PGlite databases, generated RSA keys, fake DNS ans
 ### Dependency audit
 
 `pnpm audit --prod` reported three moderate advisories on Hono 4.13.1. The patch raises the minimum to 4.13.9 and updates the lockfile; the subsequent audit reports zero known production vulnerabilities. The upstream reports are [SSG traversal](https://github.com/honojs/hono/security/advisories/GHSA-gqvv-2mrq-wpjv), [dot-notation body expansion](https://github.com/honojs/hono/security/advisories/GHSA-g6gw-c38x-mqfc), and [fragment/query interpretation](https://github.com/honojs/hono/security/advisories/GHSA-crvj-82cr-hjcx). The first two concern features not enabled here. Query parsing is used, but this review did not demonstrate a deployment-level proxy/cache exploit; the dependency advisories are tracked separately from the seven confirmed application findings above.
+
+### Combined merge validation
+
+The security PR is stacked on functional PR #114 so its diff stays limited to security and its CI includes the baseline bug fixes. On the combined branch, all 496 tests passed across 58 files, typecheck/build passed, and lint passed with 322 advisory warnings. PostgreSQL 16 repair tests also passed with the explicit local PGSSL=0 setting. Production dependency audit reports zero known vulnerabilities. This supersedes the independent-baseline suite result above for the proposed merge result.
+
+The production Docker image also built successfully. A disposable, network-disabled container passed readiness, valid-token login/session checks, anonymous/forged-cookie rejection and untrusted-origin rejection. The image contained none of the checked `.env`, `.data`, `private/` or `backups/` paths. Only synthetic credentials/data were used; no external integrations ran.
