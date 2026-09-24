@@ -44,7 +44,8 @@ describe("core on pglite", () => {
     const { listBoards } = await import("./radar.js");
     const s = await getSettings({ fresh: true });
     expect(s.gate.titleInclude).toEqual(["platform engineer", "sre", "devops engineer"]);
-    expect((await getProfile()).scoutBrief).toContain("Hard DQ");
+    // Public installs begin without an operator-specific brief.
+    expect((await getProfile()).scoutBrief).toBe("");
     expect((await listBoards({})).length).toBeGreaterThan(10);
     const { updateSettings } = await import("./settings.js");
     const { bootstrap } = await import("./bootstrap.js");
@@ -602,6 +603,18 @@ describe("core on pglite", () => {
     )[0];
     expect(again?.answer).toBe("Alex");
     expect(again?.status).toBe("answered");
+    const { listQuestions, harvestFromJob } = await import("./questions.js");
+    await harvestQuestions(position.id, [prompts[0]!]);
+    expect((await listQuestions(position.id)).map(q => q.question)).toEqual(["Name"]);
+    await harvestFromJob(position.id, { ...job(), questionPrompts: [], formHarvestError: "unavailable" });
+    expect(await listQuestions(position.id)).toHaveLength(1);
+    await harvestFromJob(position.id, { ...job(), questionPrompts: [] });
+    expect(await listQuestions(position.id)).toHaveLength(0);
+    const { getPositionDetail } = await import("./positions.js");
+    expect((await getPositionDetail(position.id))?.questions.open).toBe(0);
+    await harvestQuestions(position.id, prompts);
+    expect(await listQuestions(position.id)).toHaveLength(2);
+    expect((await listQuestions(position.id)).find(q => q.question === "Name")?.answer).toBe("Alex");
     const parsed = parseApplicationQuestions(
       `<form><label>Name*</label><label>Email*</label><label>What is your experience with bitcoin and lightning?*</label><label>Autofill from resume</label></form>`,
     );

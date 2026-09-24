@@ -4,6 +4,7 @@ import { PGlite } from "@electric-sql/pglite";
 import pg from "pg";
 import path from "node:path";
 import fs from "node:fs";
+import { currentDb } from "./db-context.js";
 import * as schema from "./schema.js";
 import { log as rootLog } from "@job-scout/shared";
 const log = rootLog.child({ scope: "db" });
@@ -11,6 +12,7 @@ const log = rootLog.child({ scope: "db" });
 export type Db = ReturnType<typeof drizzlePglite<typeof schema>> | ReturnType<typeof drizzlePg<typeof schema>>;
 
 let _db: Db | null = null;
+let opening: Promise<Db> | null = null;
 let _pglite: PGlite | null = null;
 let _pool: pg.Pool | null = null;
 
@@ -26,8 +28,15 @@ export function getDriver(): "pg" | "pglite" {
 }
 
 export async function getDb(): Promise<Db> {
+  const scoped = currentDb();
+  if (scoped) return scoped;
   if (_db) return _db;
 
+  if (!opening) opening = openDb().finally(() => { opening = null; });
+  return opening;
+}
+
+async function openDb(): Promise<Db> {
   const url = process.env.DATABASE_URL;
   if (url && !url.startsWith("pglite:")) {
     // CNPG / internal cluster certs are not public CAs — never verify-full by default.

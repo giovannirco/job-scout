@@ -6,7 +6,7 @@ export type GroupRow = {
   id: string; title: string; company: string; craftFamily: string | null; contentHash: string | null;
   primaryUrl: string | null; externalIdentity: string | null; status: string; listingStatus: string | null;
   geoClass: string | null; locationRaw: string | null; firstSeenAt: Date | null; appliedAt: Date | null;
-  salaryMin: number | null; salaryMax: number | null; salaryCurrency: string | null;
+  salaryMin: number | null; salaryMax: number | null; salaryCurrency: string | null; salaryPeriod: string | null;
   metadata: Record<string, unknown> | null;
 };
 export const terminalCareerStatus = (status: unknown) => /^(skip|discarded|rejected|withdrawn|closed)$/i.test(String(status || "").trim());
@@ -23,7 +23,7 @@ export async function groupingRows(): Promise<GroupRow[]> {
     status: positions.status, listingStatus: positions.listingStatus, geoClass: positions.geoClass,
     firstSeenAt: positions.firstSeenAt, appliedAt: positions.appliedAt,
     metadata: positions.metadata,
-    salaryMin: positions.salaryMin, salaryMax: positions.salaryMax, salaryCurrency: positions.salaryCurrency,
+    salaryMin: positions.salaryMin, salaryMax: positions.salaryMax, salaryCurrency: positions.salaryCurrency, salaryPeriod: positions.salaryPeriod,
     locationRaw: sql<string | null>`(select location_raw from jd_revisions where position_id = ${positions.id} order by revision desc limit 1)`,
   }).from(positions).innerJoin(companies, eq(positions.companyId, companies.id));
 }
@@ -71,32 +71,33 @@ export function groupRows(rows: GroupRow[], families = false): GroupRow[][] {
   return [...buckets.values()].map(bucket => bucket.sort(rank));
 }
 
-/** Lowest to highest posted band when every known salary in the family uses one currency. */
-export function familySalaryBand(group: Array<Pick<GroupRow, "salaryMin" | "salaryMax" | "salaryCurrency">>): {
-  salaryMin: number; salaryMax: number; salaryCurrency: string; familySalarySpan: true;
+/** Lowest to highest posted band when every known salary in the family uses one currency and pay period. */
+export function familySalaryBand(group: Array<Pick<GroupRow, "salaryMin" | "salaryMax" | "salaryCurrency" | "salaryPeriod">>): {
+  salaryMin: number; salaryMax: number; salaryCurrency: string; salaryPeriod: string; familySalarySpan: true;
 } | null {
   const known = group.filter((r): r is typeof r & { salaryMin: number; salaryCurrency: string } => r.salaryMin != null && Boolean(r.salaryCurrency));
   if (known.length < 2) return null;
   const currency = known[0].salaryCurrency;
-  if (known.some((r) => r.salaryCurrency !== currency)) return null;
+  const period = known[0].salaryPeriod;
+  if (!period || known.some((r) => r.salaryCurrency !== currency || r.salaryPeriod !== period)) return null;
   const salaryMin = Math.min(...known.map((r) => r.salaryMin));
   const salaryMax = Math.max(...known.map((r) => r.salaryMax ?? r.salaryMin));
   if (salaryMax < salaryMin) return null;
-  return { salaryMin, salaryMax, salaryCurrency: currency, familySalarySpan: true };
+  return { salaryMin, salaryMax, salaryCurrency: currency, salaryPeriod: period, familySalarySpan: true };
 }
 
-export type FamilySalaryBand = { salaryMin: number; salaryMax: number; salaryCurrency: string };
+export type FamilySalaryBand = { salaryMin: number; salaryMax: number; salaryCurrency: string; salaryPeriod: string | null };
 
-/** One band per currency when a collapsed family posted more than one. */
-export function familySalaryBands(group: Array<Pick<GroupRow, "salaryMin" | "salaryMax" | "salaryCurrency">>): FamilySalaryBand[] | null {
+/** One band per currency and pay period when a family posted different units. */
+export function familySalaryBands(group: Array<Pick<GroupRow, "salaryMin" | "salaryMax" | "salaryCurrency" | "salaryPeriod">>): FamilySalaryBand[] | null {
   const known = group.filter((r): r is typeof r & { salaryMin: number; salaryCurrency: string } => r.salaryMin != null && Boolean(r.salaryCurrency));
-  const currencies = [...new Set(known.map((r) => r.salaryCurrency))];
-  if (currencies.length < 2) return null;
-  return currencies.map((currency) => {
-    const rows = known.filter((r) => r.salaryCurrency === currency);
-    const salaryMin = Math.min(...rows.map((r) => r.salaryMin));
-    const salaryMax = Math.max(...rows.map((r) => r.salaryMax ?? r.salaryMin));
-    return { salaryMin, salaryMax, salaryCurrency: currency };
+  const units = [...new Set(known.map(r => JSON.stringify([r.salaryCurrency, r.salaryPeriod])))];
+  if (units.length < 2) return null;
+  return units.map(unit => {
+    const rows = known.filter(r => JSON.stringify([r.salaryCurrency, r.salaryPeriod]) === unit);
+    const salaryMin = Math.min(...rows.map(r => r.salaryMin));
+    const salaryMax = Math.max(...rows.map(r => r.salaryMax ?? r.salaryMin));
+    return { salaryMin, salaryMax, salaryCurrency: rows[0].salaryCurrency, salaryPeriod: rows[0].salaryPeriod };
   });
 }
 

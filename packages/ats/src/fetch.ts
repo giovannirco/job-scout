@@ -102,17 +102,19 @@ function postedAmount(value: unknown): string | number | undefined {
 /** Schema.org MonetaryAmount, including a QuantitativeValue object. Never stringifies the object. */
 export function salaryFromBaseSalary(base: unknown): string | undefined {
   if (!base || typeof base !== "object") return undefined;
-  const row = base as { currency?: unknown; value?: unknown; minValue?: unknown; maxValue?: unknown };
+  const row = base as { currency?: unknown; value?: unknown; minValue?: unknown; maxValue?: unknown; unitText?: unknown };
   const nested = row.value && typeof row.value === "object"
-    ? (row.value as { value?: unknown; minValue?: unknown; maxValue?: unknown; currency?: unknown })
+    ? (row.value as { value?: unknown; minValue?: unknown; maxValue?: unknown; currency?: unknown; unitText?: unknown })
     : null;
   const min = postedAmount(nested?.minValue ?? nested?.value ?? row.minValue ?? (nested ? undefined : row.value));
   const max = postedAmount(nested?.maxValue ?? row.maxValue);
   if (min == null && max == null) return undefined;
   const nestedCurrency = nested && typeof nested.currency === "string" ? nested.currency.trim() : "";
   const currency = typeof row.currency === "string" && row.currency.trim() ? row.currency.trim() : nestedCurrency || "USD";
-  if (min != null && max != null && String(min) !== String(max)) return `${currency} ${min}-${max}`;
-  return `${currency} ${min ?? max}`;
+  const unit = String(nested?.unitText ?? row.unitText ?? "").toUpperCase();
+  const suffix = unit === "HOUR" ? " per hour" : unit === "MONTH" ? " per month" : unit && unit !== "YEAR" ? ` per ${unit.toLowerCase()}` : "";
+  if (min != null && max != null && String(min) !== String(max)) return `${currency} ${min}-${max}${suffix}`;
+  return `${currency} ${min ?? max}${suffix}`;
 }
 
 function extractJsonLdJob(html: string): Partial<AtsJob> | null {

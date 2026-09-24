@@ -53,6 +53,7 @@ export async function harvestQuestions(positionId: string, prompts: QuestionProm
       continue;
     }
     const prevMeta = { ...((prev.metadata || {}) as Record<string, unknown>) };
+    delete prevMeta.droppedAt;
     if (p.options?.length) prevMeta.options = p.options;
     else delete prevMeta.options;
     const set: Record<string, unknown> = { sortOrder: i, required: p.required, inputType: p.inputType, metadata: prevMeta, updatedAt: new Date() };
@@ -64,7 +65,7 @@ export async function harvestQuestions(positionId: string, prompts: QuestionProm
   }
   for (const row of existing) {
     if (incoming.has(row.question.toLowerCase())) continue;
-    if (row.status !== "open" || row.answer) {
+    if (!(row.metadata as Record<string, unknown> | null)?.droppedAt) {
       await db
         .update(applicationQuestions)
         .set({ metadata: { ...(row.metadata || {}), droppedAt: new Date().toISOString() }, updatedAt: new Date() })
@@ -80,7 +81,8 @@ export async function listQuestions(positionId: string, q: { sort?: string } = {
   const col =
     field === "question" ? applicationQuestions.question : field === "status" ? applicationQuestions.status : applicationQuestions.sortOrder;
   const order = dir === "asc" ? asc(col) : desc(col);
-  return db.select().from(applicationQuestions).where(eq(applicationQuestions.positionId, positionId)).orderBy(order, applicationQuestions.id);
+  const rows = await db.select().from(applicationQuestions).where(eq(applicationQuestions.positionId, positionId)).orderBy(order, applicationQuestions.id);
+  return rows.filter(row => !(row.metadata as Record<string, unknown> | null)?.droppedAt);
 }
 
 /** Re-read Greenhouse forms already on file. Does not write a new JD revision. */
@@ -109,13 +111,14 @@ export async function repairGreenhouseForms(): Promise<{ checked: number; update
 
 export async function harvestFromJob(positionId: string, job: AtsJob): Promise<{ upserted: number }> {
   const prompts = promptsFromJob(job);
-  const upserted = prompts.length ? (await harvestQuestions(positionId, prompts)).upserted : 0;
+  const successful = !job.formHarvestError && (job.questionPrompts !== undefined || job.questions !== undefined);
+  const upserted = successful ? (await harvestQuestions(positionId, prompts)).upserted : 0;
   const db = await getDb();
   const pos = (await db.select({ metadata: positions.metadata }).from(positions).where(eq(positions.id, positionId)).limit(1))[0];
   const prev = (pos?.metadata || {}) as Record<string, unknown>;
   const forms = { ...((prev.forms as Record<string, unknown>) || {}) };
   if (job.formHarvestError) forms.harvestError = job.formHarvestError;
-  else if (upserted > 0) delete forms.harvestError;
+  else if (successful) delete forms.harvestError;
   forms.harvestedAt = new Date().toISOString();
   await db.update(positions).set({ metadata: { ...prev, forms }, updatedAt: new Date() }).where(eq(positions.id, positionId));
   return { upserted };

@@ -2,7 +2,7 @@ import { and, desc, eq, gte, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { boardDeltas, boardSnapshots, boardSources, companies, discoveryFeed, getDb, id, jdRevisions, positions } from "@job-scout/db";
 import { detectAts, externalIdentityFromDetect, fetchGreenhouseJob, greenhouseBoardToken, greenhouseListingNeedsBoardFetch, listBoard, regionsDisagree, type AtsJob, type BoardJobSummary } from "@job-scout/ats";
 import { fetchJob as fetchJobFromUrl } from "./fetch-job.js";
-import { applyProfileToGate, classifyListing, cleanJobTitle, craftFamily, gateListing, geoClass, homeMarket, isNoiseJobTitle, listingCompany, missesHomeMarket, parseClipListing, unresolvedCompany, type GateConfig, type GateVerdict } from "@job-scout/shared";
+import { applyProfileToGate, canonicalExternalIdentity, normalizePostingUrl, classifyListing, cleanJobTitle, craftFamily, gateListing, geoClass, homeMarket, isNoiseJobTitle, listingCompany, missesHomeMarket, parseClipListing, unresolvedCompany, type GateConfig, type GateVerdict } from "@job-scout/shared";
 import { enqueueJob } from "./jobs.js";
 import { llmConfigured } from "./llm.js";
 import { archivePosition, trimStoredTitles, upsertFromJob } from "./positions.js";
@@ -761,25 +761,22 @@ async function greenhouseTokenFor(url: string, companyName?: string): Promise<st
   return greenhouseBoardToken(boards, { companyName, url });
 }
 
-async function openScanFiling(url: string): Promise<{ id: string } | undefined> {
+async function openScanFiling(url: string, job: AtsJob): Promise<{ id: string } | undefined> {
   const db = await getDb();
-  const byUrl = (
-    await db.select({ id: positions.id, status: positions.status }).from(positions).where(eq(positions.primaryUrl, url)).limit(1)
-  )[0];
-  if (byUrl?.status === "triaged") return byUrl;
-  const jobId = detectAts(url).jobId;
-  if (!jobId) return undefined;
-  const byJob = (
-    await db.select({ id: positions.id, status: positions.status }).from(positions).where(eq(positions.atsJobId, jobId)).limit(1)
-  )[0];
-  return byJob?.status === "triaged" ? byJob : undefined;
+  const identity = canonicalExternalIdentity(job.externalIdentity || externalIdentityFromDetect(detectAts(url)));
+  const rows = await db.select({ id: positions.id, url: positions.primaryUrl, identity: positions.externalIdentity })
+    .from(positions).where(eq(positions.status, "triaged"));
+  // Numeric ATS ids are scoped to provider and board; another employer's id is not evidence.
+  return rows.find(row => normalizePostingUrl(row.url) === normalizePostingUrl(url)
+    || Boolean(identity && canonicalExternalIdentity(row.identity) === identity));
 }
 
 /** Filings saved from a careers page with no location get the board job, then the gate. */
-export async function refetchBlankGreenhouseFilings(): Promise<{ checked: number; updated: number; withdrawn: number; failed: number }> {
+export async function refetchBlankGreenhouseFilings(): Promise<{ checked: number; updated: number; withdrawn: number; failed: number; failedIds: string[] }> {
   const db = await getDb();
   const rows = await db
     .select({
+      id: positions.id,
       url: positions.primaryUrl,
       company: companies.name,
       provider: positions.atsProvider,
@@ -792,6 +789,7 @@ export async function refetchBlankGreenhouseFilings(): Promise<{ checked: number
   let updated = 0;
   let withdrawn = 0;
   let failed = 0;
+  const failedIds: string[] = [];
   for (const row of blank) {
     try {
       const result = await intakeUrl(row.url!, { companyName: row.company, source: "scan:discovery" });
@@ -799,18 +797,19 @@ export async function refetchBlankGreenhouseFilings(): Promise<{ checked: number
       else if (result.position) updated++;
     } catch (e) {
       failed++;
+      failedIds.push(row.id);
       log.warn("intake.blank_greenhouse_failed", { url: row.url, err: e instanceof Error ? e.message : String(e) });
     }
   }
-  if (blank.length && failed === blank.length) throw new Error("greenhouse location refetch failed");
-  return { checked: blank.length, updated, withdrawn, failed };
+  return { checked: blank.length, updated, withdrawn, failed, failedIds };
 }
 
 /** A title that names EU while the stored place says Americas needs the office, not the stale location. */
-export async function refetchDisagreeingRegions(): Promise<{ checked: number; updated: number; withdrawn: number; failed: number }> {
+export async function refetchDisagreeingRegions(): Promise<{ checked: number; updated: number; withdrawn: number; failed: number; failedIds: string[] }> {
   const db = await getDb();
   const rows = await db
     .select({
+      id: positions.id,
       url: positions.primaryUrl,
       company: companies.name,
       title: positions.title,
@@ -824,6 +823,7 @@ export async function refetchDisagreeingRegions(): Promise<{ checked: number; up
   let updated = 0;
   let withdrawn = 0;
   let failed = 0;
+  const failedIds: string[] = [];
   for (const row of disagree) {
     try {
       const result = await intakeUrl(row.url!, { companyName: row.company, source: "scan:discovery" });
@@ -831,11 +831,11 @@ export async function refetchDisagreeingRegions(): Promise<{ checked: number; up
       else if (result.position) updated++;
     } catch (e) {
       failed++;
+      failedIds.push(row.id);
       log.warn("intake.region_disagree_failed", { url: row.url, err: e instanceof Error ? e.message : String(e) });
     }
   }
-  if (disagree.length && failed === disagree.length) throw new Error("region refetch failed");
-  return { checked: disagree.length, updated, withdrawn, failed };
+  return { checked: disagree.length, updated, withdrawn, failed, failedIds };
 }
 
 /** A US city list that also says remote was stored as an unknown geo. Recompute those chips. */
@@ -877,11 +877,12 @@ export async function reclassifyUsPlaceLists(): Promise<{ positions: number; dis
 }
 
 /** N/A and HQ hide the office. Refetch those filings and tidy cut-off titles. */
-export async function refetchJunkPlaceFilings(): Promise<{ titled: number; checked: number; updated: number; withdrawn: number; failed: number }> {
+export async function refetchJunkPlaceFilings(): Promise<{ titled: number; checked: number; updated: number; withdrawn: number; failed: number; failedIds: string[] }> {
   const titled = (await trimStoredTitles()).updated;
   const db = await getDb();
   const rows = await db
     .select({
+      id: positions.id,
       url: positions.primaryUrl,
       company: companies.name,
       provider: positions.atsProvider,
@@ -894,6 +895,7 @@ export async function refetchJunkPlaceFilings(): Promise<{ titled: number; check
   let updated = 0;
   let withdrawn = 0;
   let failed = 0;
+  const failedIds: string[] = [];
   for (const row of junk) {
     try {
       const result = await intakeUrl(row.url!, { companyName: row.company, source: "scan:discovery" });
@@ -901,11 +903,11 @@ export async function refetchJunkPlaceFilings(): Promise<{ titled: number; check
       else if (result.position) updated++;
     } catch (e) {
       failed++;
+      failedIds.push(row.id);
       log.warn("intake.junk_place_failed", { url: row.url, err: e instanceof Error ? e.message : String(e) });
     }
   }
-  if (junk.length && failed === junk.length) throw new Error("junk place refetch failed");
-  return { titled, checked: junk.length, updated, withdrawn, failed };
+  return { titled, checked: junk.length, updated, withdrawn, failed, failedIds };
 }
 
 /** Manual intake: URL -> position (status triaged) -> triage job. */
@@ -917,7 +919,7 @@ export async function intakeUrl(url: string, opts: { companyName?: string; statu
     if (!verdict.pass) {
       const db = await getDb();
       await db.update(discoveryFeed).set({ lane: "filtered", gateReason: verdict.reason }).where(eq(discoveryFeed.url, url));
-      const existing = await openScanFiling(url);
+      const existing = await openScanFiling(url, job);
       if (existing) {
         const { position } = await upsertFromJob(job, {
           source: opts.source || "scan:discovery",
@@ -933,7 +935,8 @@ export async function intakeUrl(url: string, opts: { companyName?: string; statu
     source: opts.source || "manual",
     companyName: opts.companyName,
     status: opts.status || "triaged",
-    reviveArchived: true,
+    // Only an operator can reopen a filing; discovery refreshes preserve decisions.
+    reviveArchived: !(opts.source || "").startsWith("scan:"),
   });
   const { triageJobId } = await followUpIntake(position, { created, revived });
   return { position, created, revived, triageJobId };

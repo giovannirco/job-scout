@@ -19,7 +19,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "eslint apps packages scripts",
-    "lint:strict": "pnpm lint --max-warnings 0"
+    "lint:strict": "pnpm lint --max-warnings 0",
+    "db:repair": "tsx scripts/repair-data.ts"
   },
   "workspaces": [
     "apps/*",

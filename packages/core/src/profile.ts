@@ -18,13 +18,7 @@ export function profileFingerprint(p: Profile): string {
 export async function getProfile(): Promise<Profile> {
   const db = await getDb();
   const row = (await db.select().from(profiles).limit(1))[0];
-  if (row) {
-    if (isStarterScoutBrief(row.scoutBrief)) {
-      await db.update(profiles).set({ scoutBrief: "", updatedAt: new Date() }).where(eq(profiles.id, row.id));
-      return { ...row, scoutBrief: "" };
-    }
-    return row;
-  }
+  if (row) return row;
   const pid = id("prof");
   await db.insert(profiles).values({
     id: pid,
@@ -107,7 +101,6 @@ export async function syncGateFromTargetRoles(roles: string[]): Promise<{
   regate: Awaited<ReturnType<typeof regateRecentDiscovery>>;
 } | null> {
   const titleInclude = titleIncludesFromRoles(roles);
-  if (!titleInclude.length) return null;
   await updateSettings({ gate: { titleInclude } });
   const regate = await regateRecentDiscovery();
   return { titleInclude, regate };

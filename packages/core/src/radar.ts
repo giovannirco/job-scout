@@ -28,10 +28,6 @@ export async function listDiscovery(q: {
       conds.push(or(ilike(discoveryFeed.title, like), ilike(discoveryFeed.company, like), ilike(discoveryFeed.locationRaw, like))!);
     }
   }
-  if (q.cursor) {
-    const d = new Date(q.cursor);
-    if (!Number.isNaN(d.getTime())) conds.push(sql`${discoveryFeed.observedAt} < ${d}`);
-  }
   const where = conds.length ? and(...conds) : undefined;
   const { field, dir } = parseListSort(q.sort, ["observed", "posted", "title", "company", "location", "lane"], "observed", "desc");
   const ranked = db
@@ -82,10 +78,20 @@ export async function listDiscovery(q: {
                   desc(ranked.id),
                 ]
               : [d(ranked.observedAt), desc(ranked.id)];
+  const pageConditions: SQL[] = [sql`${ranked.rn} = 1`];
+  if (q.cursor) {
+    if (field !== "observed" || dir !== "desc") throw new Error("cursor requires sort=observed_desc; use page for other sorts");
+    const [stamp, id] = q.cursor.split("|");
+    const date = new Date(stamp);
+    if (Number.isNaN(date.getTime())) throw new Error("invalid discovery cursor");
+    pageConditions.push(id
+      ? sql`(${ranked.observedAt}, ${ranked.id}) < (${date}, ${id})`
+      : sql`${ranked.observedAt} < ${date}`);
+  }
   const rows = await db
     .select()
     .from(ranked)
-    .where(sql`${ranked.rn} = 1`)
+    .where(and(...pageConditions))
     .orderBy(...order)
     .limit(pageSize)
     .offset(q.cursor ? 0 : (page - 1) * pageSize);
@@ -101,7 +107,7 @@ export async function listDiscovery(q: {
     page,
     pageSize,
     total,
-    nextCursor: rows.length === pageSize && last ? last.observedAt.toISOString() : null,
+    nextCursor: field === "observed" && dir === "desc" && rows.length === pageSize && last ? `${last.observedAt.toISOString()}|${last.id}` : null,
   };
 }
 

@@ -46,14 +46,17 @@ export function extractSalaryRaw(text: string | null | undefined): string | unde
       min *= 1000;
       max *= 1000;
     }
-    if (min < 20000 || max < min || max > 2_000_000) continue;
+    const tail = src.slice(m.index + m[0].length, m.index + m[0].length + 40);
+    const unit = tail.match(/^\s*(?:(?:USD|EUR|GBP|CAD)\s*)?(\/\s*(?:hr|hour|mo|month|yr|year)\b|per\s+(?:hour|month|year|day|week)\b|hourly|monthly|annually)/i)?.[1];
+    if (min <= 0 || (!unit && min < 20000) || max < min || max > 2_000_000) continue;
     const window = src.slice(m.index, m.index + m[0].length + 12);
     const mark = `${m[1] || ""} ${m[3] || ""} ${window}`;
+    if (!/USD|EUR|GBP|CAD|£|€|\$/.test(mark)) continue;
     const currency = /\bCAD\b|C\$/i.test(mark) ? "CAD"
       : /€|EUR/i.test(mark) ? "EUR"
       : /£|GBP/i.test(mark) ? "GBP"
       : "USD";
-    return `${currency} ${Math.round(min)}-${Math.round(max)}`;
+    return `${currency} ${Math.round(min)}-${Math.round(max)}${unit ? ` ${unit}` : ""}`;
   }
   return undefined;
 }
@@ -74,19 +77,20 @@ export function parseSalary(raw: string | null | undefined): SalaryParse {
 
   let period: SalaryParse["period"] = "year";
   if (/\/\s*mo|per\s*month|monthly|\/mo\b/i.test(lower)) period = "month";
-  else if (/\/\s*hr|per\s*hour|hourly|\/hr\b/i.test(lower)) period = "hour";
+  else if (/\/\s*(?:hr|hour)\b|per\s*hour|hourly/i.test(lower)) period = "hour";
+  else if (/per\s*(?:day|week)|\/\s*(?:day|week)\b/i.test(lower)) period = null;
 
   // Strip thousands separators for numeric parse, keep original as raw
   const normalized = text.replace(/,/g, "");
 
   // $129–304k / $129k-$304k / 129-304k / $200000 – $250000
   const kRange = normalized.match(
-    /(?:(?:USD|BRL|EUR|GBP|US\$|R\$|\$)\s*)?(\d+(?:\.\d+)?)\s*[kK]?\s*[-–—to]+\s*(?:(?:USD|BRL|EUR|GBP|US\$|R\$|\$)\s*)?(\d+(?:\.\d+)?)\s*[kK]?/,
+    /(?:(?:USD|BRL|EUR|GBP|CAD|US\$|R\$|C\$|£|€|\$)\s*)?(\d+(?:\.\d+)?)\s*[kK]?\s*[-–—to]+\s*(?:(?:USD|BRL|EUR|GBP|CAD|US\$|R\$|C\$|£|€|\$)\s*)?(\d+(?:\.\d+)?)\s*[kK]?/,
   );
   if (kRange) {
     let min = parseFloat(kRange[1]);
     let max = parseFloat(kRange[2]);
-    const hasK = /[kK]/.test(normalized) || (min < 1000 && max < 1000 && max > 10);
+    const hasK = /\d\s*[kK]\b/.test(kRange[0]);
     if (hasK && max < 10000) {
       min *= 1000;
       max *= 1000;
@@ -103,11 +107,11 @@ export function parseSalary(raw: string | null | undefined): SalaryParse {
 
   // single value $200k or 200000
   const single = normalized.match(
-    /(?:(?:USD|BRL|EUR|GBP|US\$|R\$|\$)\s*)?(\d+(?:\.\d+)?)\s*([kK])?/,
+    /(?:(?:USD|BRL|EUR|GBP|CAD|US\$|R\$|C\$|£|€|\$)\s*)?(\d+(?:\.\d+)?)\s*([kK])?/,
   );
   if (single) {
     let v = parseFloat(single[1]);
-    if (single[2] || (v < 1000 && /[kK]/.test(normalized))) v *= 1000;
+    if (single[2]) v *= 1000;
     if (!currency) currency = "USD";
     return {
       min: Math.round(v),

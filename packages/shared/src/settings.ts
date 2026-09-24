@@ -236,6 +236,7 @@ export const Settings = z.object({
   chat: ChatConfig,
   notifications: NotificationsConfigSchema,
   listingFactsBackfillAt: z.string().nullable().optional(),
+  repairVersions: z.record(z.string(), z.string()).default({}),
   listingFactsBackfillVersion: z.string().nullable().optional(),
   /** One-shot repair for discovery promotions stored as source "manual" before scan:discovery. */
   misstampWithdrawVersion: z.string().nullable().optional(),
@@ -303,6 +304,7 @@ export const DEFAULT_GATE: GateConfig = {
 };
 
 export const DEFAULT_SETTINGS: Settings = {
+  repairVersions: {},
   llm: {
     fallbackModel: DEFAULT_LLM_FALLBACK_MODEL,
     operations: {
@@ -348,6 +350,7 @@ export function resolveSettings(stored: unknown): Settings {
     chat: { ...DEFAULT_SETTINGS.chat, ...(s.chat as object | undefined) },
     notifications: mergeNotifications(s.notifications),
     listingFactsBackfillAt: typeof s.listingFactsBackfillAt === "string" ? s.listingFactsBackfillAt : null,
+    repairVersions: s.repairVersions || {},
     listingFactsBackfillVersion: typeof s.listingFactsBackfillVersion === "string" ? s.listingFactsBackfillVersion : null,
     misstampWithdrawVersion: typeof s.misstampWithdrawVersion === "string" ? s.misstampWithdrawVersion : null,
     officeGateVersion: typeof s.officeGateVersion === "string" ? s.officeGateVersion : null,

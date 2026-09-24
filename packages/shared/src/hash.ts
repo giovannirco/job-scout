@@ -165,12 +165,6 @@ export function isSnapshotCompletionDiff(d: FieldDiff): boolean {
     if (!before || before === after) return true;
     const bulletHeavy = ((d.before || "").match(/•/g) || []).length >= 4;
     if (bulletHeavy && before.length < 80) return true;
-    const [shorter, longer] = before.length <= after.length ? [before, after] : [after, before];
-    const at = shorter ? longer.indexOf(shorter) : -1;
-    if (at >= 0) {
-      const extra = `${longer.slice(0, at)} ${longer.slice(at + shorter.length)}`.trim();
-      if (extra.length > 0 && extra.length < 80) return true;
-    }
   }
   return false;
 }
@@ -236,13 +230,8 @@ export function classifyMateriality(
     if (isFormattingOnlyTextChange(before, after)) {
       return { material: false, change_kind: "noise_rebase" };
     }
-    const a = stripMarkupForCompare(before);
-    const b = stripMarkupForCompare(after);
-    const ratio =
-      Math.abs(a.length - b.length) / Math.max(a.length, b.length, 1);
-    if (ratio < 0.03 && levenshteinish(a, b) < 40) {
-      return { material: false, change_kind: "noise_rebase" };
-    }
+    // A short addition can change eligibility ("US residents only") or pay.
+    // Only known formatting/snapshot repairs are noise, not arbitrary small edits.
     return { material: true, change_kind: "content" };
   }
 
@@ -251,15 +240,6 @@ export function classifyMateriality(
     material: anyMaterial,
     change_kind: anyMaterial ? "content" : "noise_rebase",
   };
-}
-
-function levenshteinish(a: string, b: string): number {
-  const n = Math.min(a.length, b.length, 2000);
-  let diff = Math.abs(a.length - b.length);
-  for (let i = 0; i < n; i++) {
-    if (a[i] !== b[i]) diff++;
-  }
-  return diff;
 }
 
 const DIFF_FIELD_LABEL: Record<string, string> = {

@@ -171,7 +171,7 @@ function PositionRow({ p, muted, onOpen }: { p: CompanyDetail["positions"][numbe
         {departmentLabel(p.departments) ? <span className="truncate block text-[11px] text-faint">{departmentLabel(p.departments)}</span> : null}
         {p.locationRaw || p.salaryMin != null || p.salaryMax != null ? (
           <span className="truncate block text-[11px] text-faint">
-            {[p.locationRaw, money(p.salaryMin, p.salaryMax, p.salaryCurrency)].filter(Boolean).join(" · ")}
+            {[p.locationRaw, money(p.salaryMin, p.salaryMax, p.salaryCurrency, p.salaryPeriod)].filter(Boolean).join(" · ")}
           </span>
         ) : null}
       </Td>

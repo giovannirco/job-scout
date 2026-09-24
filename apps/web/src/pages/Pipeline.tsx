@@ -288,10 +288,10 @@ function PositionsTable({ rows, home, sort }: { rows: PositionRow[]; home?: stri
             <Td>
               <GeoChip geo={r.geoClass} location={r.locationRaw} home={home} />
             </Td>
-            <Td mono title={r.salaryBands?.length ? "Posted in more than one currency" : r.familySalarySpan ? "Lowest to highest posted band across the related locations" : undefined}>
+            <Td mono title={r.salaryBands?.length ? "Posted in different currencies or pay periods" : r.familySalarySpan ? "Lowest to highest posted band across the related locations" : undefined}>
               {r.salaryBands?.length
-                ? r.salaryBands.map((band) => money(band.salaryMin, band.salaryMax, band.salaryCurrency)).filter(Boolean).join(" · ")
-                : money(r.salaryMin, r.salaryMax, r.salaryCurrency) || <span className="text-faint">—</span>}
+                ? r.salaryBands.map((band) => money(band.salaryMin, band.salaryMax, band.salaryCurrency, band.salaryPeriod)).filter(Boolean).join(" · ")
+                : money(r.salaryMin, r.salaryMax, r.salaryCurrency, r.salaryPeriod) || <span className="text-faint">—</span>}
             </Td>
             <Td>
               <div className="flex items-center gap-1.5">
@@ -361,7 +361,7 @@ function Board({ rows }: { rows: PositionRow[] }) {
                       <div className="text-[12.5px] leading-snug line-clamp-2">{r.title}</div>
                       {departmentLabel(r.departments) ? <div className="text-[11px] text-faint truncate mt-0.5">{departmentLabel(r.departments)}</div> : null}
                       {r.locationRaw ? <div className="text-[11px] text-muted truncate mt-1">{r.locationRaw}</div> : null}
-                      {money(r.salaryMin, r.salaryMax, r.salaryCurrency) ? <div className="text-[11px] font-mono text-fg truncate mt-1">{money(r.salaryMin, r.salaryMax, r.salaryCurrency)}</div> : null}
+                      {money(r.salaryMin, r.salaryMax, r.salaryCurrency, r.salaryPeriod) ? <div className="text-[11px] font-mono text-fg truncate mt-1">{money(r.salaryMin, r.salaryMax, r.salaryCurrency, r.salaryPeriod)}</div> : null}
                       {r.postedAt || r.firstSeenAt ? (
                         <div className="text-[10.5px] font-mono text-faint tabular mt-1">
                           {r.postedAt ? `posted ${ago(r.postedAt)}` : ""}

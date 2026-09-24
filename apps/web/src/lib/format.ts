@@ -44,16 +44,17 @@ export function dateTime(iso: string | null | undefined): string {
   return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-export function money(min: number | null, max: number | null, cur: string | null): string {
+export function money(min: number | null, max: number | null, cur: string | null, period?: string | null): string {
   if (min == null && max == null) return "";
+  const suffix = period === "hour" ? "/hr" : period === "month" ? "/mo" : period === "year" ? "/yr" : "";
   const c = cur || "USD";
   const f = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(n));
   const sym = c === "USD" ? "$" : c === "EUR" ? "€" : c === "GBP" ? "£" : c === "BRL" ? "R$" : `${c} `;
   if (min != null && max != null && min !== max) {
     const right = sym.endsWith(" ") ? f(max) : `${sym}${f(max)}`;
-    return `${sym}${f(min)}–${right}`;
+    return `${sym}${f(min)}–${right}${suffix}`;
   }
-  return `${sym}${f((min ?? max) as number)}`;
+  return `${sym}${f((min ?? max) as number)}${suffix}`;
 }
 
 export function score(n: number | null | undefined): string {

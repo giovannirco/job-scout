@@ -101,6 +101,7 @@ export async function getCompany(idOrSlug: string) {
       salaryMin: positions.salaryMin,
       salaryMax: positions.salaryMax,
       salaryCurrency: positions.salaryCurrency,
+      salaryPeriod: positions.salaryPeriod,
       locationRaw: sql<string | null>`(select jr.location_raw from jd_revisions jr where jr.position_id = "positions"."id" order by jr.revision desc limit 1)`,
       firstSeenAt: positions.firstSeenAt,
       postedAt: sql<string | null>`nullif(${positions.metadata}->'ats'->>'postedAt', '')`,

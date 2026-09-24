@@ -154,3 +154,7 @@ Prometheus metrics on `:9464/metrics` from both `api` and `worker` (`job_scout_*
 ## Docs
 
 [ARCHITECTURE](./docs/ARCHITECTURE.md) · [AI](./docs/AI.md) · [DATA-MODEL](./docs/DATA-MODEL.md) · [API](./docs/API.md) · [MCP](./docs/MCP.md) · [PRODUCT](./docs/PRODUCT.md) · [OBSERVABILITY](./docs/OBSERVABILITY.md)
+
+## Upgrading existing data
+
+Startup no longer runs historical data repairs. Use the [restored-database rehearsal and explicit repair command](docs/UPGRADING.md) before applying repairs. Keep personal data and deployment secrets in private runtime storage.
