@@ -13,8 +13,9 @@ import { afterEvaluate } from "./autopilot.js";
 import { getCompany } from "./companies.js";
 import { gateOperation, getLlmClient, logged } from "./llm.js";
 import { currentJdText, getPosition } from "./positions.js";
-import { briefOf, getProfile, profileFingerprint } from "./profile.js";
+import { briefOf, getProfile, profileFingerprint, triageBriefOf } from "./profile.js";
 import { addEvent } from "./timeline.js";
+import { verificationFor } from "./decisions.js";
 
 export async function getEvaluation(positionId: string, kind: EvaluationKind) {
   const db = await getDb();
@@ -25,12 +26,12 @@ export async function getEvaluation(positionId: string, kind: EvaluationKind) {
       .where(and(eq(evaluations.positionId, positionId), eq(evaluations.kind, kind)))
       .orderBy(desc(evaluations.createdAt))
       .limit(1)
-  )[0] ?? null;
+  ).at(0) ?? null;
 }
 
 export async function getEvaluationById(evalId: string) {
   const db = await getDb();
-  return (await db.select().from(evaluations).where(eq(evaluations.id, evalId)).limit(1))[0] ?? null;
+  return (await db.select().from(evaluations).where(eq(evaluations.id, evalId)).limit(1)).at(0) ?? null;
 }
 
 export function nextStatusAfterEvaluate(status: PositionStatus): PositionStatus {
@@ -65,6 +66,7 @@ export async function runEvaluate(positionId: string, opts: { auto?: boolean } =
     messages,
   );
   const db = await getDb();
+  const verification = await verificationFor({ recipe: "evaluation_check", positionId: pos.id, candidateEvidence: triageBriefOf(profile), listing: { title: pos.title, description: jdText, company: pos.company.name, companyOverview: pos.company.overview }, draft: res.markdown });
   const evalId = id("ev");
   const profileHash = profileFingerprint(profile);
   const profileChanged = profileFingerprint(await getProfile()) !== profileHash;
@@ -83,7 +85,7 @@ export async function runEvaluate(positionId: string, opts: { auto?: boolean } =
       kind: "evaluate",
       model: res.model,
       markdown: res.markdown,
-      json: { ...res.data, profileHash, staleAtCompletion: stale, sourcePositionUpdatedAt: pos.updatedAt.toISOString() },
+      json: { ...res.data, profileHash, staleAtCompletion: stale, sourcePositionUpdatedAt: pos.updatedAt.toISOString(), ...(verification ? { jev: verification } : {}) },
       tokensIn: res.tokensIn,
       tokensOut: res.tokensOut,
       latencyMs: res.latencyMs,
@@ -104,7 +106,8 @@ export async function runEvaluate(positionId: string, opts: { auto?: boolean } =
     });
     return { status, updatedAt: updatedAt.toISOString(), stale };
   });
-  const auto = completion.stale ? { autopilotSkipped: "evaluation_superseded" } : await afterEvaluate({
+  if (verification?.hold) await addEvent({ positionId: pos.id, kind: "note", title: "Evaluation needs a claims review", body: verification.error || "Jev could not confirm the draft against its sources. Follow-up automation is on hold.", metadata: { decisionRunId: verification.runId, evaluationId: evalId } });
+  const auto = completion.stale ? { autopilotSkipped: "evaluation_superseded" } : verification?.hold ? { autopilotSkipped: "jev_review_required" } : await afterEvaluate({
     positionId: pos.id,
     companyId: pos.companyId,
     evaluationId: evalId,

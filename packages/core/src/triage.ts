@@ -9,8 +9,10 @@ import { getSettings } from "./settings.js";
 import { addEvent } from "./timeline.js";
 import { log } from "@job-scout/shared";
 import { ingestQuality } from "./metrics.js";
+import { sameJevConfig, tryDecision } from "./decisions.js";
+import { fastTriageOutput } from "./fast-triage.js";
 
-/** Run LLM triage for one position and persist score/verdict/json. */
+/** Score one position and record the result. */
 export async function runTriage(positionId: string, opts: { force?: boolean; refreshOnly?: boolean } = {}) {
   const pos = await getPosition(positionId);
   if (!pos) throw new Error("position not found");
@@ -20,7 +22,7 @@ export async function runTriage(positionId: string, opts: { force?: boolean; ref
   if (pos.triagedAt && pos.triageJson?.profileHash === profileFingerprint(profile) && !opts.force) return { skipped: true as const, reason: "already triaged", verdict: pos.triageVerdict };
 
   const settings = await getSettings();
-  const cfg = await gateOperation("triage", settings);
+  if (!settings.llm.operations.triage?.enabled) await gateOperation("triage", settings);
   const jdText = await currentJdText(pos.id);
   const ats = ((pos.metadata || {}) as { ats?: { workplaceType?: string | null } }).ats;
 
@@ -38,18 +40,28 @@ export async function runTriage(positionId: string, opts: { force?: boolean; ref
     marginalThreshold: settings.triage.marginalThreshold,
   });
 
-  const res = await logged("triage", cfg.model, pos.id, () =>
-    getLlmClient().chatJson({
-      model: cfg.model,
-      fallbackModel: cfg.fallbackModel,
+  const decision = settings.jev.enabled && settings.jev.triage !== "off" ? await tryDecision({
+    recipe: "triage", positionId: pos.id, mode: settings.jev.triage,
+    state: { candidateEvidence: triageBriefOf(profile), listing: { title: pos.title, company: pos.company.name, location: pos.geoNotes || await locationOf(pos.id) || pos.remoteClass, salary: pos.salaryRaw, employmentType: pos.employmentType, description: jdText } },
+  }) : null;
+  const fast = settings.jev.triage === "apply" && sameJevConfig(settings.jev, (await getSettings({ fresh: true })).jev)
+    ? fastTriageOutput(decision?.run ?? null, { salaryRaw: pos.salaryRaw, jdText, passThreshold: settings.triage.passThreshold }) : null;
+  const runNormal = async () => {
+    const cfg = await gateOperation("triage");
+    return logged("triage", cfg.model, pos.id, () =>
+      getLlmClient().chatJson({
+        model: cfg.model,
+        fallbackModel: cfg.fallbackModel,
+        messages,
+        schema: TriageOutput,
+        schemaName: "triage",
+        temperature: cfg.temperature ?? 0.1,
+        maxTokens: 900,
+      }),
       messages,
-      schema: TriageOutput,
-      schemaName: "triage",
-      temperature: cfg.temperature ?? 0.1,
-      maxTokens: 900,
-    }),
-    messages,
-  );
+    );
+  };
+  const res = fast && decision?.run?.result ? { data: fast, model: decision.run.result.model, tokensIn: decision.run.result.inputTokens, tokensOut: decision.run.result.outputTokens } : await runNormal();
   const out = res.data;
   const score = Math.round(out.score * 10) / 10;
   if (score === 0) {
@@ -62,7 +74,7 @@ export async function runTriage(positionId: string, opts: { force?: boolean; ref
   const set: Record<string, unknown> = {
     triageScore: score,
     triageVerdict: verdict,
-    triageJson: { ...out, verdict, model: res.model, at: now.toISOString(), profileHash: profileFingerprint(profile) },
+    triageJson: { ...out, verdict, model: res.model, at: now.toISOString(), profileHash: profileFingerprint(profile), ...(decision ? { jev: { runId: decision.run?.id, used: Boolean(fast), summary: decision.run?.summary, error: decision.error || decision.run?.error } } : {}) },
     triagedAt: now,
     triageModel: res.model,
     updatedAt: now,
@@ -76,7 +88,16 @@ export async function runTriage(positionId: string, opts: { force?: boolean; ref
     set.status = "archived";
     set.archiveReason = `triage marginal ${score.toFixed(1)}`;
   }
-  await db.update(positions).set(set).where(eq(positions.id, pos.id));
+  const profileChanged = profileFingerprint(await getProfile()) !== profileFingerprint(profile);
+  if (profileChanged && fast) return { skipped: true as const, reason: "profile_changed", verdict: pos.triageVerdict };
+  if (profileChanged) { delete set.status; delete set.archiveReason; }
+  const applied = await db.transaction(async tx => {
+    const current = (await tx.select().from(positions).where(eq(positions.id, pos.id)).for("update"))[0];
+    if (!current || current.updatedAt.getTime() !== pos.updatedAt.getTime() || current.contentHash !== pos.contentHash || current.status !== pos.status || current.listingStatus !== pos.listingStatus) return false;
+    await tx.update(positions).set(set).where(eq(positions.id, pos.id));
+    return true;
+  });
+  if (!applied) return { skipped: true as const, reason: "position_changed", verdict: pos.triageVerdict };
   await addEvent({
     positionId: pos.id,
     kind: "triage",
@@ -84,14 +105,14 @@ export async function runTriage(positionId: string, opts: { force?: boolean; ref
     body: out.oneLiner,
     metadata: { model: res.model, tokensIn: res.tokensIn, tokensOut: res.tokensOut },
   });
-  const auto = opts.refreshOnly ? {} : await afterTriage({
+  const auto = opts.refreshOnly || profileChanged ? {} : await afterTriage({
     positionId: pos.id,
     companyId: pos.companyId,
     score,
     verdict,
     status: (set.status as typeof pos.status | undefined) ?? pos.status,
   });
-  if (verdict === "pass" && !opts.refreshOnly) {
+  if (verdict === "pass" && !opts.refreshOnly && !profileChanged) {
     const { emitNotify } = await import("./notify.js");
     await emitNotify({
       event: "triage_pass",

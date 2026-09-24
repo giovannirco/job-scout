@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { DEFAULT_NOTIFICATIONS, type NotificationsConfig } from "./notify.js";
+import { DEFAULT_JEV, JevConfig } from "./decisions.js";
 
 /**
  * Operator settings — a single jsonb row. Every knob the UI exposes lives here
@@ -212,6 +213,7 @@ export const ChatConfig = z.object({
 export type ChatConfig = z.infer<typeof ChatConfig>;
 
 export const Settings = z.object({
+  jev: JevConfig.prefault({}),
   llm: z.object({
     operations: z.record(z.string(), LlmOperationConfig).default({}),
     fallbackModel: z.string().default(DEFAULT_LLM_FALLBACK_MODEL),
@@ -304,6 +306,7 @@ export const DEFAULT_GATE: GateConfig = {
 };
 
 export const DEFAULT_SETTINGS: Settings = {
+  jev: DEFAULT_JEV,
   repairVersions: {},
   llm: {
     fallbackModel: DEFAULT_LLM_FALLBACK_MODEL,
@@ -334,6 +337,7 @@ export const DEFAULT_SETTINGS: Settings = {
 export function resolveSettings(stored: unknown): Settings {
   const s = (stored && typeof stored === "object" ? stored : {}) as Record<string, unknown>;
   const merged = {
+    jev: s.jev ?? DEFAULT_JEV,
     llm: {
       ...DEFAULT_SETTINGS.llm,
       ...(s.llm as object | undefined),

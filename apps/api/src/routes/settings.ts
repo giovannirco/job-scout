@@ -39,8 +39,10 @@ import {
 import { applyAutopilotPreset, AUTOPILOT_PRESET_VALUES, LLM_OPERATION_IDS } from "@job-scout/shared";
 import { body, fail, ok } from "../envelope.js";
 import { env } from "../env.js";
+import { decisionRoutes } from "./decisions.js";
 
 export const settingsRoutes = new Hono();
+settingsRoutes.route("/jev", decisionRoutes);
 
 settingsRoutes.get("/", async (c) => ok(c, await getSettings({ fresh: true })));
 settingsRoutes.get("/notifications", async (c) => {

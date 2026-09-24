@@ -1,3 +1,4 @@
+import { JevPosition } from "@/components/Jev";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { Archive, Check, Eye, EyeOff, ExternalLink, FileText, MessageSquareText, RefreshCw, Sparkles, Trash2 } from "lucide-react";
@@ -202,6 +203,7 @@ export function PositionPage() {
       {tab === "forms" ? <FormsTab p={p} noKey={noKey} onDraft={() => runAction("form_answers")} /> : null}
       {tab === "company" ? <CompanyTab p={p} hasResearch={hasResearch} noKey={noKey} onRun={runAction} /> : null}
       {tab === "history" ? <HistoryTab p={p} /> : null}
+      {["brief", "evaluation", "materials"].includes(tab) ? <JevPosition positionId={p.id} /> : null}
     </Page>
   );
 }

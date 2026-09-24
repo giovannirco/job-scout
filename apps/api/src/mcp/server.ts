@@ -40,6 +40,9 @@ import {
   triageBriefOf,
   mcpCalls,
   mcpDuration,
+  jevStatus,
+  recentDecisions,
+  previewDecision,
 } from "@job-scout/core";
 import { log as rootLog } from "@job-scout/shared";
 import { env } from "../env.js";
@@ -671,6 +674,12 @@ export function createJobScoutMcpServer() {
     },
   );
 
+  server.registerTool("jev_status", { title: "Jev settings and usage", description: "Read decision settings, credential availability and today's usage. Does not call a model.", inputSchema: {}, annotations: { readOnlyHint: true } }, async () => text(await jevStatus()));
+  server.registerTool("jev_history", { title: "Jev decision history", description: "Read recent decision summaries and feedback for a position. Does not call a model.", inputSchema: { positionId: z.string().optional(), limit: z.number().int().min(1).max(20).default(5) }, annotations: { readOnlyHint: true } }, async a => text((await recentDecisions(a.positionId)).slice(0, a.limit).map(({ result, ...run }) => ({ ...run, usage: result ? { inputTokens: result.inputTokens, cost: result.cost, latencyMs: result.latencyMs } : null }))));
+  server.registerTool("jev_preview", { title: "Preview a Jev decision", description: "Run a job-fit, ranking, or draft check using saved Jev settings. Sends job/profile evidence and, for draft checks, the draft to OpenRouter. Consumes the Jev request budget and records a result; leaves positions and approvals unchanged.", inputSchema: { positionId: z.string(), recipe: z.enum(["triage", "ranking", "evaluation_check", "materials_check"]), fresh: z.boolean().default(false) }, annotations: { readOnlyHint: false, destructiveHint: false } }, async a => {
+    try { const run = await previewDecision(a.recipe, a.positionId, a.fresh); return text(run, run.status !== "ok"); }
+    catch { return text({ error: "Jev could not run this preview. Check the saved settings, request budget and available source material." }, true); }
+  });
   return server;
 }
 

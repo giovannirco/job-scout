@@ -20,3 +20,4 @@ export * from "./profile-gate.js";
 export * from "./scout-brief.js";
 export * from "./search.js";
 export * from "./job-recovery.js";
+export * from "./decisions.js";

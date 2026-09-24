@@ -11,6 +11,7 @@ import { defaultPipelinePreset, pipelineSortFallback, pipelineSortOptions } from
 import { familyLocationLabel } from "./pipeline-location";
 import { ago, departmentLabel, jdChangedAt, money } from "@/lib/format";
 import { archiveReasonLabel } from "@/lib/gate-reason";
+import { JevQueue } from "@/components/Jev";
 import type { PipelineSearch } from "@/router";
 import { Btn, Card, Dot, Empty, Loading, Monogram, Page, PageHeader, Pager, Seg, SortHead, Table, Td, Th, Tr, cn, ErrorNote } from "@/ui/kit";
 
@@ -148,6 +149,7 @@ export function PipelinePage() {
           ) : null}
         </div>
       </PageHeader>
+      <JevQueue enabledOnly />
 
       {!presetReady || list.isLoading ? (
         <Loading rows={8} />

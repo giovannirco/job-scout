@@ -8,6 +8,7 @@ import { useChatScope, useTheme, type ThemePref } from "@/frame/store";
 import { api, del, patch, post, qs, useApi, type ApiToken, type AutopilotConfig, type AutopilotState, type Job, type LlmStatus, type ModelsCatalog, type NotificationsConfig, type NotifyChannel, type Profile, type Settings, type SystemInfo } from "@/lib/api";
 import { ago, compact, dateTime } from "@/lib/format";
 import { discoveryQueuedMessage } from "@/lib/discovery-toast";
+import { JevSettings } from "@/components/Jev";
 import type { SettingsSearch } from "@/router";
 import { Btn, Budget, Card, Chip, Dot, Empty, IconBtn, Input, Loading, Page, Panel, Seg, Select, Switch, Table, Td, Textarea, Th, Tr, cn } from "@/ui/kit";
 
@@ -412,6 +413,7 @@ function AiTab() {
 
   return (
     <div className="space-y-4">
+      <JevSettings />
       {!s.configured ? <Panel title="Connect a model provider">
         <p className="text-[13px] text-muted">Set OPENAI_BASE_URL and OPENAI_API_KEY in your local .env file or server secrets, then restart the API and worker. Select a model for each operation below, save, and use Test to verify it. Set daily limits before enabling automatic work.</p>
       </Panel> : null}

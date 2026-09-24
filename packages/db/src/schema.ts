@@ -9,6 +9,7 @@ import {
   uniqueIndex,
   index,
 } from "drizzle-orm/pg-core";
+import type { DecisionRecipe, DecisionResult, DecisionSummary } from "@job-scout/shared";
 
 /**
  * job-scout schema.
@@ -538,6 +539,21 @@ export const llmRuns = pgTable(
   ],
 );
 
+export const decisionRuns = pgTable("decision_runs", {
+  id: text("id").primaryKey(),
+  recipe: text("recipe").$type<DecisionRecipe>().notNull(),
+  positionId: text("position_id").references(() => positions.id, { onDelete: "set null" }),
+  mode: text("mode").notNull(),
+  status: text("status").notNull(),
+  model: text("model").notNull(),
+  inputHash: text("input_hash").notNull(),
+  result: jsonb("result").$type<DecisionResult>(),
+  summary: jsonb("summary").$type<DecisionSummary>(),
+  error: text("error"),
+  feedback: text("feedback").$type<"agree" | "disagree">(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [index("decision_runs_created_idx").on(t.createdAt), index("decision_runs_input_idx").on(t.inputHash, t.createdAt), index("decision_runs_position_idx").on(t.positionId)]);
+
 /** Single-row operator settings (id = "default"). Shape in @job-scout/shared Settings. */
 export const settings = pgTable("settings", {
   id: text("id").primaryKey(),
@@ -658,6 +674,7 @@ export const schema = {
   applicationQuestions,
   evaluations,
   llmRuns,
+  decisionRuns,
   settings,
   approvals,
   chatThreads,

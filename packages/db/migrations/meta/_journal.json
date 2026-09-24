@@ -43,6 +43,13 @@
       "when": 1789990000000,
       "tag": "0005_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790290316999,
+      "tag": "0006_jev_decisions",
+      "breakpoints": true
     }
   ]
 }

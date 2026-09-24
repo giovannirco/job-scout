@@ -85,4 +85,4 @@ Application tests live beside the source in `*.test.ts` files. Database repair l
 
 ## Documentation
 
-[Product](docs/PRODUCT.md) · [Architecture](docs/ARCHITECTURE.md) · [AI](docs/AI.md) · [Data model](docs/DATA-MODEL.md) · [API](docs/API.md) · [MCP](docs/MCP.md) · [Monitoring](docs/OBSERVABILITY.md) · [Security](docs/SECURITY.md) · [Contributing](docs/PUBLIC-CONTRIBUTING.md)
+[Product](docs/PRODUCT.md) · [Architecture](docs/ARCHITECTURE.md) · [AI](docs/AI.md) · [Jev](docs/JEV.md) · [Data model](docs/DATA-MODEL.md) · [API](docs/API.md) · [MCP](docs/MCP.md) · [Monitoring](docs/OBSERVABILITY.md) · [Security](docs/SECURITY.md) · [Contributing](docs/PUBLIC-CONTRIBUTING.md)

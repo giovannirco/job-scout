@@ -15,6 +15,7 @@ export async function runRetention() {
   const db = await getDb();
   const r = (await getSettings()).retention;
   const out = {
+    decisionRuns: count(await db.execute(sql`delete from decision_runs where created_at < now() - (${String(r.llmRunsDays)} || ' days')::interval`)),
     jobs: count(
       await db.execute(
         sql`delete from jobs where status in ('succeeded','failed','cancelled') and created_at < now() - (${String(r.jobsDays)} || ' days')::interval`,
