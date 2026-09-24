@@ -106,3 +106,5 @@ curl -sS -X POST http://localhost:8080/mcp \
 grok -p --yolo --max-turns 6 \
   "Use job-scout MCP only: call server_info then list_positions status=hot pageSize=5. Summarize."
 ```
+
+`refresh_stale_triage` previews the top stale PASS decision candidates by default (`limit` 1–25). Set `dryRun=false` to enqueue score-only refreshes without moving stages, running autopilot or sending notifications. `run_llm` with `operation=triage` now reruns stale or unknown-profile scores without requiring `force`; unchanged current-profile scores remain cached.

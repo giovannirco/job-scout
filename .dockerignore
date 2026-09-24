@@ -22,3 +22,11 @@ deploy/helm
 private
 backups
 **/*.sql.gz
+
+**/*.dump
+**/*.backup
+**/*.sqlite
+**/*.sqlite3
+**/*.db
+**/bench-cases*.json
+scripts/bench-models.ts

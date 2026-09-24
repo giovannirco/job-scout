@@ -35,6 +35,7 @@ import {
   runInterviewBrief,
   reconcileCareerOps,
   llmConfigured,
+  refreshStaleTriage,
 } from "@job-scout/core";
 import type { EvaluationKind } from "@job-scout/db";
 import { body, fail, ok, queryMap } from "../envelope.js";
@@ -44,6 +45,13 @@ export const positionsRoutes = new Hono();
 positionsRoutes.get("/", async (c) => {
   const r = await listPositions(queryMap(c));
   return ok(c, r.items, { page: r.page, pageSize: r.pageSize, total: r.total, nextCursor: r.nextCursor });
+});
+
+positionsRoutes.post("/refresh-stale-triage", async (c) => {
+  try { return ok(c, await refreshStaleTriage(await body(c))); }
+  catch (e) {
+    return fail(c, e instanceof LlmGateError ? "LLM_GATE" : "VALIDATION_ERROR", e instanceof Error ? e.message : String(e));
+  }
 });
 
 positionsRoutes.post("/reconcile-career-ops", async (c) => {

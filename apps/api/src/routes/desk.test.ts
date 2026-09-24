@@ -66,6 +66,17 @@ describe("desk API on pglite", () => {
     return (await res.json()) as Envelope<T>;
   }
 
+  it("previews stale-score refreshes by default and validates the batch limit", async () => {
+    const before = await json<{ selected: number; enqueued: number; dryRun: boolean }>(await app.request("/api/v1/positions/refresh-stale-triage", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+    }));
+    expect(before.data).toMatchObject({ selected: 0, enqueued: 0, dryRun: true });
+    const invalid = await app.request("/api/v1/positions/refresh-stale-triage", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ limit: 1000, dryRun: false }),
+    });
+    expect(invalid.status).toBe(400);
+  });
+
   it("people CRUD is scoped to the position company", async () => {
     const created = await app.request(`/api/v1/positions/${acmeId}/people`, {
       method: "POST",

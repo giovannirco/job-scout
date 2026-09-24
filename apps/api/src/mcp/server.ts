@@ -26,6 +26,8 @@ import {
   runJdReview,
   runMaterials,
   runTriage,
+  refreshStaleTriage,
+  RefreshStaleTriageInput,
   runListingClassify,
   stampCareerOps,
   upsertFromJob,
@@ -386,6 +388,12 @@ export function createJobScoutMcpServer() {
   );
 
   // ---- newer tools --------------------------------------------------------
+
+  server.registerTool(
+    "refresh_stale_triage",
+    { title: "Refresh stale decision scores", description: "Preview up to 25 stale PASS decision candidates. Set dryRun=false to queue score-only refreshes using the current profile; preserves pipeline stages and sends no notifications.", inputSchema: RefreshStaleTriageInput.shape },
+    async (a) => { try { return text(await refreshStaleTriage(a)); } catch (e) { return errText(e); } },
+  );
 
   server.registerTool(
     "run_llm",

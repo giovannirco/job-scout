@@ -50,7 +50,7 @@ export async function processJob(job: JobRow): Promise<Record<string, unknown>> 
       return { positionId: r.position.id, created: r.created, triageJobId: r.triageJobId };
     }
     case "triage":
-      return (await runTriage(String(p.positionId), { force: Boolean(p.force) })) as unknown as Record<string, unknown>;
+      return (await runTriage(String(p.positionId), { force: Boolean(p.force), refreshOnly: Boolean(p.refreshOnly) })) as unknown as Record<string, unknown>;
     case "evaluate":
       return await runEvaluate(String(p.positionId), { auto: Boolean(p.auto) });
     case "materials":

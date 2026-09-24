@@ -314,6 +314,7 @@ function slimRow(p: Record<string, unknown> & { company?: { name?: string; slug?
     status: p.status,
     triageScore: p.triageScore,
     triageVerdict: p.triageVerdict,
+    triageStale: p.triageStale,
     oneLiner: p.triageOneLiner,
     salary: p.salaryMin || p.salaryMax ? `${p.salaryMin ?? "?"}–${p.salaryMax ?? "?"} ${p.salaryCurrency ?? ""}`.trim() : null,
     listing: p.listingStatus,
@@ -422,6 +423,7 @@ function systemPrompt(brief: string, ctx: string, opts: { writes: boolean; brows
   return [
     "You are the job-scout desk agent: a sharp, terse career-ops partner for one operator running a senior SRE/platform job hunt.",
     "You have tools over the operator's own pipeline (positions, companies, evaluations, materials, approvals) and the web.",
+    "When triageStale is true, the score is historical or its profile version is unknown. Disclose that uncertainty instead of presenting it as a current recommendation.",
     "Ground every claim in tool results; when you don't know, look it up. Prefer one good tool call over guessing.",
     opts.writes ? "You may change pipeline state (status, notes, approvals, queued operations) when the operator asks; confirm what you did in one line." : "You are read-only: propose changes, do not apply them.",
     opts.browser

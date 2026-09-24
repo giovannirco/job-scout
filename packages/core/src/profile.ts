@@ -9,10 +9,21 @@ export type Profile = typeof profiles.$inferSelect;
 
 /** Scores depend on these inputs; contact-only edits do not invalidate them. */
 export function profileFingerprint(p: Profile): string {
-  return createHash("sha256").update(JSON.stringify([
-    briefOf(p), p.identityMarkdown, p.masterResumeMarkdown, p.targetRoles,
-    p.cashFloorUsd, p.northStar,
-  ])).digest("hex").slice(0, 20);
+  return createHash("sha256").update(triageBriefOf(p)).digest("hex").slice(0, 20);
+}
+
+/** Effective triage input: editable structured facts take precedence over older prose. */
+export function triageBriefOf(p: Profile): string {
+  return [
+    "Use the current profile facts below when they conflict with older prose. Unknown facts remain unknown.",
+    `Target roles: ${(p.targetRoles || []).join(", ") || "not stated"}`,
+    `Home location: ${p.location || "not stated"}`,
+    `Cash floor (USD/year): ${p.cashFloorUsd > 0 ? p.cashFloorUsd : "not stated"}`,
+    `Career direction: ${p.northStar || "not stated"}`,
+    "## Scout brief", briefOf(p),
+    "## Candidate background", p.identityMarkdown || "",
+    "## Resume evidence", p.masterResumeMarkdown || "",
+  ].filter(Boolean).join("\n");
 }
 
 export async function getProfile(): Promise<Profile> {

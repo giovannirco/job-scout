@@ -95,3 +95,9 @@ win evaluate and research; avoid anything that rate-limits under bursts for tria
 ## Cost and frequency
 
 Nothing is on a model timer. Board scans and watch checks run on CronJobs (every 30 min / every 2 h) and cost nothing; the gate typically rejects > 90 % of listings; triage is called once per new listing that passes (a few hundred per day at the current board list) and evaluate/research only where the policy says so. Today › Machine and Settings › AI › Recent calls show the numbers; the `chat` operation shows up there like any other.
+
+## Refreshing old decision scores
+
+Triage now combines the current location, target roles, cash floor and career direction with the scout brief, identity and master resume. The stored fingerprint covers that effective input. Contact-only changes do not invalidate scores. Scores made before this prompt change need one refresh; missing historical fingerprints also count as stale.
+
+Today marks old scores and provides **Refresh stale scores** for up to 25 PASS candidates in the decision queue. This action only recalculates triage: pipeline stages remain unchanged, and it does not trigger autopilot or notifications. Caps and model settings still apply. Refreshes are queued, so the warning disappears after the worker completes them. Chat includes the same freshness flag in its tool results.

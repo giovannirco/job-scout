@@ -4,21 +4,23 @@ import { buildTriageMessages, TriageOutput, verdictFor } from "@job-scout/llm";
 import { afterTriage } from "./autopilot.js";
 import { gateOperation, getLlmClient, logged } from "./llm.js";
 import { currentJdText, getPosition } from "./positions.js";
-import { briefOf, getProfile, profileFingerprint } from "./profile.js";
+import { triageBriefOf, getProfile, profileFingerprint } from "./profile.js";
 import { getSettings } from "./settings.js";
 import { addEvent } from "./timeline.js";
 import { log } from "@job-scout/shared";
 import { ingestQuality } from "./metrics.js";
 
 /** Run LLM triage for one position and persist score/verdict/json. */
-export async function runTriage(positionId: string, opts: { force?: boolean } = {}) {
+export async function runTriage(positionId: string, opts: { force?: boolean; refreshOnly?: boolean } = {}) {
   const pos = await getPosition(positionId);
   if (!pos) throw new Error("position not found");
-  if (pos.triagedAt && !opts.force) return { skipped: true as const, reason: "already triaged", verdict: pos.triageVerdict };
+  if (opts.refreshOnly && (!["triaged", "review"].includes(pos.status) || pos.listingStatus === "closed"))
+    return { skipped: true as const, reason: "position_no_longer_eligible", verdict: pos.triageVerdict };
+  const profile = await getProfile();
+  if (pos.triagedAt && pos.triageJson?.profileHash === profileFingerprint(profile) && !opts.force) return { skipped: true as const, reason: "already triaged", verdict: pos.triageVerdict };
 
   const settings = await getSettings();
   const cfg = await gateOperation("triage", settings);
-  const profile = await getProfile();
   const jdText = await currentJdText(pos.id);
   const ats = ((pos.metadata || {}) as { ats?: { workplaceType?: string | null } }).ats;
 
@@ -30,7 +32,7 @@ export async function runTriage(positionId: string, opts: { force?: boolean } = 
     salaryRaw: pos.salaryRaw,
     employmentType: pos.employmentType,
     jdText,
-    brief: briefOf(profile),
+    brief: triageBriefOf(profile),
     jdMaxChars: settings.triage.jdMaxChars,
     passThreshold: settings.triage.passThreshold,
     marginalThreshold: settings.triage.marginalThreshold,
@@ -66,11 +68,11 @@ export async function runTriage(positionId: string, opts: { force?: boolean } = 
     updatedAt: now,
   };
   // Only auto-archive fails that the operator has not touched.
-  if (verdict === "fail" && pos.status === "triaged") {
+  if (!opts.refreshOnly && verdict === "fail" && pos.status === "triaged") {
     set.status = "archived";
     set.archiveReason = `triage fail ${score.toFixed(1)}: ${out.hardDq[0] || out.oneLiner}`.slice(0, 300);
   }
-  if (verdict === "marginal" && pos.status === "triaged" && !settings.triage.keepMarginal) {
+  if (!opts.refreshOnly && verdict === "marginal" && pos.status === "triaged" && !settings.triage.keepMarginal) {
     set.status = "archived";
     set.archiveReason = `triage marginal ${score.toFixed(1)}`;
   }
@@ -82,14 +84,14 @@ export async function runTriage(positionId: string, opts: { force?: boolean } = 
     body: out.oneLiner,
     metadata: { model: res.model, tokensIn: res.tokensIn, tokensOut: res.tokensOut },
   });
-  const auto = await afterTriage({
+  const auto = opts.refreshOnly ? {} : await afterTriage({
     positionId: pos.id,
     companyId: pos.companyId,
     score,
     verdict,
     status: (set.status as typeof pos.status | undefined) ?? pos.status,
   });
-  if (verdict === "pass") {
+  if (verdict === "pass" && !opts.refreshOnly) {
     const { emitNotify } = await import("./notify.js");
     await emitNotify({
       event: "triage_pass",

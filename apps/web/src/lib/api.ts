@@ -389,6 +389,7 @@ export type TodaySlim = {
   title: string;
   status: PipelineStatus;
   triageScore: number | null;
+  triageStale?: boolean;
   triageVerdict: Verdict | null;
   triageOneLiner: string | null;
   listingStatus: string | null;

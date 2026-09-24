@@ -25,3 +25,11 @@ loop/LAST-NOTIFY.txt
 /private/
 /backups/
 *.sql.gz
+
+# Database exports and private benchmark cases
+*.dump
+*.backup
+*.sqlite
+*.sqlite3
+*.db
+bench-cases*.json

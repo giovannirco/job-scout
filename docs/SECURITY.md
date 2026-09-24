@@ -1,6 +1,6 @@
 # Security and private runtime data
 
-The public repository and image contain application code and generic defaults. Keep your profile, applications, notes, resumes, transcripts, service credentials, and database backups in runtime storage or a private deployment repository. Do not copy a private checkout into the public build context. The public repository is not a place to store real Helm Secret values.
+Public source and runtime images are intended to contain application code and generic defaults only. Keep your profile, applications, notes, resumes, transcripts, service credentials, and database backups in runtime storage or a private deployment repository. Do not copy a private checkout into the public build context. The public repository is not a place to store real Helm Secret values.
 
 ## Authentication migration
 
@@ -39,3 +39,9 @@ PostgreSQL connections verify the server certificate and hostname by default, in
 5. Verify login, private API rejection without credentials, DB readiness and worker operation in staging before switching traffic. No deployment or private-data migration is performed by this security patch.
 
 The WAHA webhook requires a separately configured `WAHA_WEBHOOK_KEY` in `X-Api-Key`, fails closed when unset, and filters configured chat/session/from-me events. Keep that key distinct from the WAHA service key and API seed.
+
+## Source and deployment boundary
+
+Public source supplies the application, schema, generic chart and public career-board catalog. Private runtime storage holds profiles, job-search state and generated documents. A private deployment repository supplies installation-specific values and secret references. A private legacy source repository is not automatically overlaid onto the public application; the deployed image digest and deployment manifests determine what runs. Never build a public image from a private source checkout.
+
+Deleting sensitive text from the current tree does not remove it from previous commits, tags, pull-request diffs, clones or previously built image layers. Audit those separately when responding to an exposure. Keep benchmark case files and reports private; see [BENCHMARKS.md](BENCHMARKS.md).
