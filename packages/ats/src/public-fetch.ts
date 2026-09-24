@@ -1,5 +1,6 @@
 import { lookup } from "node:dns";
 import { isIP, BlockList } from "node:net";
+// Keep the installed dispatcher on Undici 7: Node 22 native fetch uses its legacy handler interface.
 import { Agent } from "undici";
 
 const blocked = new BlockList();
