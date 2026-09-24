@@ -1,6 +1,6 @@
 image:
   repository: job-scout
-  tag: "local"
+  tag: "2.9.5"
   pullPolicy: IfNotPresent
 
 nameOverride: job-scout

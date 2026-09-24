@@ -77,6 +77,18 @@ export function createLlmClient(opts: LlmClientOptions) {
   const doFetch = opts.fetchImpl ?? fetch;
   const defaultTimeout = opts.timeoutMs ?? 120_000;
 
+  function requestSignal(outer: AbortSignal | null | undefined, timeoutMs: number) {
+    outer?.throwIfAborted();
+    const ctrl = new AbortController();
+    const abort = () => ctrl.abort(outer?.reason);
+    outer?.addEventListener("abort", abort, { once: true });
+    const timer = setTimeout(() => ctrl.abort(new Error(`llm timeout after ${timeoutMs}ms`)), timeoutMs);
+    return { signal: ctrl.signal, dispose: () => {
+      clearTimeout(timer);
+      outer?.removeEventListener("abort", abort);
+    } };
+  }
+
   function headers(): Record<string, string> {
     return {
       "Content-Type": "application/json",
@@ -86,12 +98,9 @@ export function createLlmClient(opts: LlmClientOptions) {
   }
 
   async function request<T>(path: string, init: RequestInit, timeoutMs: number): Promise<T> {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(new Error(`llm timeout after ${timeoutMs}ms`)), timeoutMs);
-    const outer = init.signal;
-    if (outer) outer.addEventListener("abort", () => ctrl.abort(outer.reason), { once: true });
+    const lifetime = requestSignal(init.signal, timeoutMs);
     try {
-      const res = await doFetch(`${base}${path}`, { ...init, headers: { ...headers(), ...(init.headers as object) }, signal: ctrl.signal });
+      const res = await doFetch(`${base}${path}`, { ...init, headers: { ...headers(), ...(init.headers as object) }, signal: lifetime.signal });
       const text = await res.text();
       if (!res.ok) {
         throw new LlmError(`llm ${res.status} on ${path}: ${text.slice(0, 500)}`, res.status, text);
@@ -102,7 +111,7 @@ export function createLlmClient(opts: LlmClientOptions) {
         throw new LlmError(`llm returned non-JSON on ${path}: ${text.slice(0, 300)}`, res.status, text);
       }
     } finally {
-      clearTimeout(timer);
+      lifetime.dispose();
     }
   }
 
@@ -159,6 +168,7 @@ export function createLlmClient(opts: LlmClientOptions) {
       }
       const choice = json.choices?.[0];
       const content = extractContent(choice?.message?.content);
+      if (!content.trim()) throw new LlmError("llm returned an empty completion", null, JSON.stringify(json));
       return {
         content,
         model: json.model || model,
@@ -289,16 +299,14 @@ export function createLlmClient(opts: LlmClientOptions) {
       body.tools = o.tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.parameters } }));
       body.tool_choice = "auto";
     }
-    const ctrl = new AbortController();
     const timeoutMs = o.timeoutMs ?? defaultTimeout;
-    const timer = setTimeout(() => ctrl.abort(new Error(`llm timeout after ${timeoutMs}ms`)), timeoutMs);
-    if (o.signal) o.signal.addEventListener("abort", () => ctrl.abort(o.signal?.reason), { once: true });
+    const lifetime = requestSignal(o.signal, timeoutMs);
     try {
       const res = await doFetch(`${base}/chat/completions`, {
         method: "POST",
         headers: { ...headers(), Accept: "text/event-stream" },
         body: JSON.stringify(body),
-        signal: ctrl.signal,
+        signal: lifetime.signal,
       });
       if (!res.ok || !res.body) {
         const text = await res.text();
@@ -358,6 +366,7 @@ export function createLlmClient(opts: LlmClientOptions) {
         }
       }
       if (buf.trim()) handle(buf.trim());
+      if (!finishReason) throw new LlmError("llm stream ended without a finish reason");
       const toolCalls = [...calls.entries()]
         .sort((a, b) => a[0] - b[0])
         .map(([, c], i) => ({
@@ -368,7 +377,7 @@ export function createLlmClient(opts: LlmClientOptions) {
         }));
       return { content, toolCalls, model, finishReason, tokensIn, tokensOut, latencyMs: Date.now() - t0 };
     } finally {
-      clearTimeout(timer);
+      lifetime.dispose();
     }
     };
     return withQuotaFallback(o.model, o.fallbackModel, run);

@@ -67,3 +67,23 @@ describe("authentication configuration", () => {
     expect(() => readApiEnv({ AUTH_MODE: "cf_access", CF_ACCESS_ISSUER: "https://team.cloudflareaccess.com" })).toThrow(/AUDIENCE/);
   });
 });
+
+describe("browser requests without Origin", () => {
+  it("rejects an attacker-controlled host after DNS rebinding in dev mode", async () => {
+    env.authMode = "dev";
+    for (const headers of [new Headers(), new Headers({ "sec-fetch-site": "same-origin" })]) {
+      const response = await app().request("http://rebinding.attacker.example/api/v1/settings/profile", { headers });
+      expect(response.status).toBe(403);
+      expect(await response.text()).not.toContain('"private"');
+    }
+    expect((await app().request("http://127.0.0.1/api/v1/settings/profile")).status).toBe(200);
+    env.allowedOrigins = ["https://desk.example.com"];
+    expect((await app().request("https://desk.example.com/api/v1/settings/profile")).status).toBe(200);
+  });
+  it("does not confuse a sibling site's no-Origin request with same-origin permission", async () => {
+    env.authMode = "token";
+    const cookie = `js_session=${createSession()}`;
+    expect((await app().request("/api/v1/settings/profile", { headers: { cookie, "sec-fetch-site": "same-site" } })).status).toBe(403);
+    expect((await app().request("/api/v1/settings/profile", { headers: { cookie, "sec-fetch-site": "same-origin" } })).status).toBe(200);
+  });
+});

@@ -28,3 +28,24 @@ describe("public network fetch boundary", () => {
     await expect(publicFetch("https://jobs.example.com/role")).rejects.toThrow(/Too many/);
   });
 });
+
+describe("manual redirect Fetch semantics", () => {
+  it.each([301, 302, 303])("turns a POST %s redirect into a GET without replaying its body", async (status) => {
+    const fetch = vi.fn().mockResolvedValueOnce(new Response(null, { status, headers: { location: "/result" } })).mockResolvedValueOnce(new Response("result"));
+    vi.stubGlobal("fetch", fetch);
+    await publicFetch("https://jobs.ashbyhq.com/api/non-user-graphql", { method: "POST", headers: { "content-type": "application/json", "content-length": "2" }, body: "{}" });
+    expect(fetch.mock.calls[1][1].method).toBe("GET");
+    expect(fetch.mock.calls[1][1].body).toBeUndefined();
+    const headers = new Headers(fetch.mock.calls[1][1].headers);
+    expect(headers.has("content-type")).toBe(false); expect(headers.has("content-length")).toBe(false);
+  });
+  it("preserves 307 request bodies but removes credentials when the origin changes", async () => {
+    const fetch = vi.fn().mockResolvedValueOnce(new Response(null, { status: 307, headers: { location: "https://other.example/endpoint" } })).mockResolvedValueOnce(new Response("result"));
+    vi.stubGlobal("fetch", fetch);
+    await publicFetch("https://jobs.example/endpoint", { method: "POST", headers: { authorization: "Bearer test-only", cookie: "session=test-only", host: "jobs.example", "content-type": "application/json" }, body: "{}" });
+    expect(fetch.mock.calls[1][1]).toMatchObject({ method: "POST", body: "{}" });
+    const headers = new Headers(fetch.mock.calls[1][1].headers);
+    expect(headers.has("authorization")).toBe(false); expect(headers.has("cookie")).toBe(false); expect(headers.has("host")).toBe(false);
+    expect(headers.get("content-type")).toBe("application/json");
+  });
+});

@@ -12,7 +12,7 @@ Existing `js_session=ok` cookies are invalid. Sign in again after upgrading. Pas
 
 Bearer `agent` and `admin` scopes access the REST API; `mcp`, `agent`, and `admin` access MCP. Only an admin credential/session can list, mint or revoke API tokens. These are service scopes, not per-record permissions: agent/MCP access still exposes the operator's job and career data. Treat such tokens as privileged credentials.
 
-Set `PUBLIC_BASE_URL` to the actual browser URL. `CORS_ORIGINS` accepts comma-separated additional trusted origins. Browser requests from other origins are rejected, including in dev mode; server-to-server bearer clients do not need an Origin header. Do not add job-board sites to this list. Bookmarklets submit to an escaped confirmation page; a same-origin “Save job clip” action then imports the content using your session.
+Set `PUBLIC_BASE_URL` to the actual browser URL. `CORS_ORIGINS` accepts comma-separated additional trusted origins. Browser requests from other origins are rejected, including in dev mode; server-to-server bearer clients do not need an Origin header. Dev mode also restricts request hostnames to configured origins and loopback names to prevent DNS rebinding; health/readiness remain usable by internal probes. Cross-origin sibling sites are not treated as trusted same-origin callers. Do not add job-board sites to this list. Bookmarklets submit to an escaped confirmation page; a same-origin “Save job clip” action then imports the content using your session.
 
 Use proxy-level request limits for Internet-facing login endpoints and protect `/metrics` at the network layer. Health/readiness endpoints intentionally remain public and contain no profile data or raw database errors.
 
@@ -22,7 +22,7 @@ ATS HTTP requests and the chat `web_fetch` HTTP fallback only connect to public 
 
 Steel and Playwright execute navigation, scripts, redirects and subresource fetches outside the application's HTTP client. Before enabling either, isolate the dedicated browser service's egress: deny loopback/private/link-local/metadata/cluster destinations for both IPv4 and IPv6, permit necessary DNS only, and route web traffic through a proxy that applies the same destination policy. A Kubernetes NetworkPolicy alone does not constrain a browser process's own loopback; enforce that in the browser container/proxy as well. Do not give the browser shared human sessions, cluster tokens, or unrelated credentials.
 
-After that isolation is enforced, set `BROWSER_EGRESS_ISOLATED=1` alongside `STEEL_BASE_URL` and optionally `BROWSER_MCP_URL`. Both scrape rendering and interactive chat browser tools remain disabled without this explicit assertion. This flag does not install network controls. Plain HTTP job ingestion continues to work without a browser.
+After that isolation is enforced, set `BROWSER_EGRESS_ISOLATED=1` alongside `STEEL_BASE_URL` and optionally `BROWSER_MCP_URL`. Both scrape rendering and interactive chat browser tools remain disabled without this explicit assertion. This flag does not install network controls. Chat only exposes browser navigation/read/lifecycle tools, even when local desk writes are enabled; script evaluation, clicks, form filling, typing, and keypress submission are not authorized. Navigation accepts public HTTP(S) URLs only. Third-party page scripts still run inside the isolated browser; this is not a JavaScript sandbox. Plain HTTP job ingestion continues to work without a browser.
 
 ## PostgreSQL TLS
 

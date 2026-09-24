@@ -52,8 +52,9 @@ const dispatcher = new Agent({ connect: { lookup(hostname, options, callback) {
 /** Follow a bounded redirect chain with the same network policy at every hop. */
 export async function publicFetch(input: string, init: RequestInit = {}): Promise<Response> {
   let url = assertPublicUrl(input);
+  let requestInit: RequestInit = { ...init };
   for (let redirects = 0; redirects <= 5; redirects++) {
-    const response = await fetch(url.href, { ...init, redirect: "manual", dispatcher } as RequestInit);
+    const response = await fetch(url.href, { ...requestInit, redirect: "manual", dispatcher } as RequestInit);
     if (![301, 302, 303, 307, 308].includes(response.status)) return response;
     const location = response.headers.get("location");
     if (!location) return response;
@@ -61,6 +62,17 @@ export async function publicFetch(input: string, init: RequestInit = {}): Promis
     if (redirects === 5) throw new Error("Too many ATS redirects");
     const next = assertPublicUrl(new URL(location, url));
     if (url.protocol === "https:" && next.protocol !== "https:") throw new Error("ATS redirect cannot downgrade HTTPS");
+    const headers = new Headers(requestInit.headers);
+    if (next.origin !== url.origin) {
+      for (const header of ["authorization", "proxy-authorization", "cookie", "host"]) headers.delete(header);
+    }
+    const method = (requestInit.method || "GET").toUpperCase();
+    if ((response.status === 303 && method !== "GET" && method !== "HEAD") || ([301, 302].includes(response.status) && method === "POST")) {
+      for (const header of ["content-type", "content-length", "content-encoding", "content-language", "content-location"]) headers.delete(header);
+      requestInit = { ...requestInit, method: "GET", body: undefined, headers };
+    } else {
+      requestInit = { ...requestInit, headers };
+    }
     url = next;
   }
   throw new Error("Too many ATS redirects");

@@ -88,3 +88,60 @@ describe("quota fallback on chat", () => {
     ).rejects.toBeInstanceOf(LlmError);
   });
 });
+
+describe("request lifetime and incomplete responses", () => {
+  for (const method of ["chat", "chatStream"] as const) {
+    it(`${method} does not send an already cancelled request`, async () => {
+      let requests = 0;
+      const client = createLlmClient({ baseUrl: "http://gw/v1", apiKey: "k", fetchImpl: (async () => {
+        requests++;
+        return jsonRes(200, {});
+      }) as typeof fetch });
+      const ctrl = new AbortController();
+      const reason = new Error("operator cancelled");
+      ctrl.abort(reason);
+      await expect(client[method]({ model: "m", messages: [], signal: ctrl.signal })).rejects.toBe(reason);
+      expect(requests).toBe(0);
+    });
+  }
+
+  it("releases caller abort listeners after successful and failed requests", async () => {
+    const { getEventListeners } = await import("node:events");
+    const ctrl = new AbortController();
+    let success = true;
+    const client = createLlmClient({ baseUrl: "http://gw/v1", apiKey: "k", fetchImpl: (async () =>
+      success ? jsonRes(200, { choices: [{ message: { content: "ok" } }] }) : jsonRes(500, {})) as typeof fetch });
+    await client.chat({ model: "m", messages: [], signal: ctrl.signal });
+    expect(getEventListeners(ctrl.signal, "abort")).toHaveLength(0);
+    success = false;
+    await expect(client.chat({ model: "m", messages: [], signal: ctrl.signal })).rejects.toBeInstanceOf(LlmError);
+    expect(getEventListeners(ctrl.signal, "abort")).toHaveLength(0);
+  });
+
+  it("rejects an empty successful provider response", async () => {
+    const client = createLlmClient({ baseUrl: "http://gw/v1", apiKey: "k", fetchImpl: (async () => jsonRes(200, { choices: [] })) as typeof fetch });
+    await expect(client.chat({ model: "m", messages: [] })).rejects.toThrow("empty completion");
+  });
+
+  it("does not accept or fallback after a truncated stream with partial output", async () => {
+    let requests = 0;
+    const deltas: string[] = [];
+    const client = createLlmClient({ baseUrl: "http://gw/v1", apiKey: "k", fetchImpl: (async () => {
+      requests++;
+      return new Response('data: {"choices":[{"delta":{"content":"partial"}}]}\n\n');
+    }) as typeof fetch });
+    await expect(client.chatStream({ model: "m", fallbackModel: "backup", messages: [], onDelta: d => deltas.push(d) })).rejects.toThrow("without a finish reason");
+    expect(deltas).toEqual(["partial"]);
+    expect(requests).toBe(1);
+  });
+
+  it("accepts a completed stream and releases its caller listener", async () => {
+    const { getEventListeners } = await import("node:events");
+    const ctrl = new AbortController();
+    const client = createLlmClient({ baseUrl: "http://gw/v1", apiKey: "k", fetchImpl: (async () =>
+      new Response('data: {"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n')) as typeof fetch });
+    const result = await client.chatStream({ model: "m", messages: [], signal: ctrl.signal });
+    expect(result.content).toBe("ok");
+    expect(getEventListeners(ctrl.signal, "abort")).toHaveLength(0);
+  });
+});

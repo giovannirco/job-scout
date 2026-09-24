@@ -17,8 +17,12 @@ Preview runs the actual repair helpers in one transaction, captures per-step row
 
 Reports are created exclusively with mode 0600, never overwrite existing files, and may contain personal data. Keep reports and CLI logs private and out of issues/PRs. The report can be large because it records actual row changes. The runner snapshots tables between steps and favors auditability over speed; allow enough memory/time for a large restored database.
 
-Some repairs read live ATS pages. Preview rolls back database writes and queued work, but cannot undo network reads or freeze the employer's response between preview and apply. It does not run model calls or dispatch queued notifications itself. Apply is atomic, not selective; restoring a backup is the rollback path after a successful commit. Existing legacy markers are intentionally superseded by independent repairVersions so partially completed older repairs are not silently accepted.
+Some repairs read live ATS pages. Preview rolls back database writes and queued work, but cannot undo network reads or freeze the employer's response between preview and apply. It does not run model calls or dispatch queued notifications itself. Apply is atomic across the selected steps; restoring a backup is the rollback path after a successful commit. Existing legacy markers are intentionally superseded by independent repairVersions so partially completed older repairs are not silently accepted.
 
 The destructive identical-JD merge/archive repair was removed. Distinct ATS identities remain distinct postings, while queue grouping can still combine related links for display. Already lost identity/link history cannot be reconstructed from identical text; compare a pre-upgrade backup and re-ingest the original URLs after review.
 
 The companion security change documents authentication, certificate verification and browser isolation in SECURITY.md. Supply runtime secrets through the chart's existingSecret; do not put real values in public Helm values.
+
+## Selecting independent repairs
+
+`pnpm db:repair --list` prints the available names without running them. Use `--steps titles,entities,salary-object` with either `--preview` or `--apply` to review a bounded subset. Selected steps retain their canonical order; unknown or empty names are rejected before database writes. Only selected steps receive completion markers, and all selected steps still commit or roll back together. Use identical selections for preview and apply. This lets local corrections proceed independently when a remote ATS record is unavailable; inspect dependencies and the report before selecting a subset.

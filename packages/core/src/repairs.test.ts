@@ -95,3 +95,12 @@ describe("explicit data repairs", () => {
     expect((await db.select().from(positions).where(eq(positions.id, b.position.id)))[0]?.status).toBe("triaged");
   });
 });
+
+it("selects explicit repairs in canonical order and rejects unknown or empty names", async () => {
+  const { selectRepairSteps } = await import("./repairs.js");
+  const plan: RepairStep[] = ["local", "remote", "labels"].map(name => ({ name, version: "1", run: async () => null }));
+  expect(selectRepairSteps(plan, ["labels", "local", "labels"]).map(s => s.name)).toEqual(["local", "labels"]);
+  expect(() => selectRepairSteps(plan, ["loacl"])).toThrow("Unknown");
+  expect(() => selectRepairSteps(plan, [])).toThrow("empty");
+  expect(() => selectRepairSteps(plan, ["local", ""])).toThrow("empty");
+});

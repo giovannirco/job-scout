@@ -1,3 +1,4 @@
+import { assertPublicUrl } from "@job-scout/ats";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { chatThreads, getDb, id, POSITION_STATUSES, type ChatMessageRow, type ChatScope, type PositionStatus } from "@job-scout/db";
 import type { AgentMessage, AgentToolCall, ToolSpec } from "@job-scout/llm";
@@ -361,27 +362,13 @@ async function connectBrowserMcp(): Promise<McpClientLike | null> {
   }
 }
 
-/** Keep the agent's tool surface small: navigation, reading, interaction. */
-const BROWSER_TOOL_ALLOW = new Set([
-  "browser_navigate",
-  "browser_navigate_back",
-  "browser_snapshot",
-  "browser_click",
-  "browser_type",
-  "browser_fill_form",
-  "browser_press_key",
-  "browser_select_option",
-  "browser_hover",
-  "browser_wait_for",
-  "browser_tabs",
-  "browser_take_screenshot",
-  "browser_evaluate",
-  "browser_close",
+/** Browser access is for reading. Desk write permission never authorizes external submissions. */
+const BROWSER_READ_TOOLS = new Set([
+  "browser_navigate", "browser_navigate_back", "browser_snapshot",
+  "browser_take_screenshot", "browser_wait_for", "browser_close",
 ]);
-
-const BROWSER_READ_TOOLS = new Set(["browser_navigate", "browser_navigate_back", "browser_snapshot", "browser_take_screenshot", "browser_hover", "browser_wait_for"]);
-export function browserToolAllowed(name: string, writes: boolean): boolean {
-  return BROWSER_TOOL_ALLOW.has(name) && (writes || BROWSER_READ_TOOLS.has(name));
+export function browserToolAllowed(name: string, _writes: boolean): boolean {
+  return BROWSER_READ_TOOLS.has(name);
 }
 
 // ---------------------------------------------------------------------------
@@ -609,6 +596,10 @@ export async function execTool(call: AgentToolCall, local: LocalTool[], mcp: Mcp
       const out = await tool.run(call.args, ctx);
       text = typeof out === "string" ? out : JSON.stringify(out ?? null);
     } else if (mcp && allowedBrowser.has(call.name) && browserToolAllowed(call.name, ctx.writes)) {
+      if (call.name === "browser_navigate") {
+        if (typeof call.args.url !== "string") throw new Error("Browser navigation requires an HTTP(S) URL");
+        assertPublicUrl(call.args.url);
+      }
       const r = await mcp.callTool({ name: call.name, arguments: call.args });
       ok = !r.isError;
       text = mcpContentToText(r.content);

@@ -170,9 +170,9 @@ describe("cross-site clip confirmation", () => {
     });
     expect(saved.status).toBe(302); expect(intake).toHaveBeenCalledTimes(1);
   });
-  it("does not import cross-site GET clips until confirmed", async () => {
+  it.each(["cross-site", "same-site"])("does not import %s GET clips until confirmed", async (site) => {
     const intake = stubIntake();
-    const response = await createApp().request(`/clip?url=${encodeURIComponent(listing)}`, { headers: { "sec-fetch-site": "cross-site" } });
+    const response = await createApp().request(`/clip?url=${encodeURIComponent(listing)}`, { headers: { "sec-fetch-site": site } });
     expect(response.status).toBe(200); expect(intake).not.toHaveBeenCalled();
   });
 });

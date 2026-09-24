@@ -5,6 +5,14 @@ import * as schema from "@job-scout/db";
 import { getSettings, invalidateSettingsCache, updateSettings } from "./settings.js";
 
 export type RepairStep = { name: string; version: string; run: () => Promise<unknown> };
+
+/** Select explicitly named steps in canonical order, rejecting typos before any writes. */
+export function selectRepairSteps(plan: RepairStep[], names: string[]): RepairStep[] {
+  if (!names.length || names.some(name => !plan.some(step => step.name === name))) {
+    throw new Error(`Unknown or empty repair selection; available steps: ${plan.map(step => step.name).join(", ")}`);
+  }
+  return plan.filter(step => names.includes(step.name));
+}
 export type RowChange = { table: string; id: string; operation: "insert" | "update" | "delete"; before: Record<string, unknown> | null; after: Record<string, unknown> | null };
 export type RepairReport = {
   mode: "preview" | "apply";

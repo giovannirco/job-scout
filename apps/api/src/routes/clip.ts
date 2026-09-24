@@ -45,7 +45,7 @@ export async function handleClip(c: Context) {
 /** Cross-site bookmarklets stage an escaped preview; only a same-origin confirmation writes. */
 export async function clipPreview(c: Context, next: import("hono").Next) {
   const origin = c.req.header("origin");
-  const crossSite = c.req.header("sec-fetch-site") === "cross-site";
+  const crossSite = ["cross-site", "same-site"].includes(c.req.header("sec-fetch-site") || "");
   if ((!origin || allowedOrigin(origin)) && !crossSite) return next();
   if (!["GET", "POST"].includes(c.req.method)) return fail(c, "FORBIDDEN", "Origin is not allowed");
   const payload = await readClipPayload(c);

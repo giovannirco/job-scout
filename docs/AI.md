@@ -69,13 +69,13 @@ Guarantees:
 
 Each user message runs a tool-calling loop (`ChatConfig.maxSteps`, default 12) over `chatStream`, emitting SSE events: `delta`, `tool_call`, `tool_result`, `message`, `done`, `error`.
 
-Local tools: `search_positions`, `get_position`, `get_evaluation`, `get_materials`, `get_company`, `search_companies`, `today`, `list_approvals`, `resolve_approval`, `set_position_status`, `add_note`, `run_operation`, `intake_url`, `list_processes`, `web_fetch`. `writeTools=false` hides the mutating ones. With `browserTools=true` and `BROWSER_MCP_URL` set, the Playwright MCP tools (`browser_navigate`, `browser_snapshot`, `browser_click`, …) are proxied in, so the agent can open the actual job page and read it.
+Local tools: `search_positions`, `get_position`, `get_evaluation`, `get_materials`, `get_company`, `search_companies`, `today`, `list_approvals`, `resolve_approval`, `set_position_status`, `add_note`, `run_operation`, `intake_url`, `list_processes`, `web_fetch`. `writeTools=false` hides the mutating ones. With `browserTools=true`, a configured browser, and `BROWSER_EGRESS_ISOLATED=1`, selected Playwright MCP navigation/read/lifecycle tools are available so the agent can open a public HTTP(S) job page and read it. Desk write permission never enables browser scripts, clicks, typing, form filling, or other external submission actions.
 
 WhatsApp **job-scout chat** (`packages/core/src/whatsapp-inbox.ts`) is the same agent on Settings › Notifications `chat.model` (default **grok-4.6**), with writes on, over a durable global thread titled `WhatsApp · job-scout chat`. It can inspect process and intake a JD URL. It never applies. Inbound is a ClusterIP webhook, not the dock SSE.
 
 ## Browser plane
 
-Optional. Point `STEEL_BASE_URL` at a [Steel Browser](https://github.com/steel-dev/steel-browser) reserved for job-scout, and `BROWSER_MCP_URL` at a [Playwright MCP](https://github.com/microsoft/playwright-mcp) attached to that same browser. Chrome's DevTools socket only accepts `localhost`, so the MCP process has to sit next to that browser. Leave both variables empty to skip the browser.
+Optional. Point `STEEL_BASE_URL` at a [Steel Browser](https://github.com/steel-dev/steel-browser) reserved for job-scout, and `BROWSER_MCP_URL` at a [Playwright MCP](https://github.com/microsoft/playwright-mcp) attached to that same browser. Chrome's DevTools socket only accepts `localhost`, so the MCP process has to sit next to that browser. Leave both variables empty to skip the browser. Set `BROWSER_EGRESS_ISOLATED=1` only after applying the external egress controls described in [SECURITY.md](SECURITY.md).
 
 | env | used by | for |
 |--|--|--|
