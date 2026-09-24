@@ -30,3 +30,18 @@ backups
 **/*.db
 **/bench-cases*.json
 scripts/bench-models.ts
+
+# Development privacy checks and local documents
+.githooks
+__pycache__
+*.pyc
+*.pdf
+*.docx
+*.pem
+*.key
+profile.json
+resume.json
+transcript*.json
+values-prod.yaml
+runtime.json
+prod-runtime.json

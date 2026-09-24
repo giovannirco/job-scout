@@ -1,0 +1,7 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Historical API documentation uses this literal development placeholder"
+regexTarget = "secret"
+regexes = ['''^dev-agent-token$''']

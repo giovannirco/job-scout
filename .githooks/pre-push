@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+scanner=$(git config --get privacy.gitleaksPath || command -v gitleaks || true)
+if [ -z "$scanner" ]; then
+  echo 'Install Gitleaks before publishing; see docs/PUBLIC-CONTRIBUTING.md.' >&2
+  exit 1
+fi
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$local_sha" in 0000000000000000000000000000000000000000) continue ;; esac
+  python3 scripts/check-public.py "$local_sha"
+  "$scanner" git . --config .gitleaks.toml --log-opts="$local_sha" --redact --no-banner
+ done

@@ -33,3 +33,17 @@ loop/LAST-NOTIFY.txt
 *.sqlite3
 *.db
 bench-cases*.json
+
+# Local audit and personal document artifacts
+__pycache__/
+*.pyc
+*.pdf
+*.docx
+*.pem
+*.key
+profile.json
+resume.json
+transcript*.json
+values-prod.yaml
+runtime.json
+prod-runtime.json

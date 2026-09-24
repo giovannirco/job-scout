@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+python3 - "$1" <<'PY'
+import pathlib, re, sys
+if re.search(r'^co-authored-by\s*:', pathlib.Path(sys.argv[1]).read_text(), re.I | re.M):
+    sys.exit('Co-author trailers are disabled for this repository.')
+PY
