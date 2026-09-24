@@ -85,7 +85,7 @@ sequenceDiagram
   participant Worker
   participant WAHA as a WAHA server
   participant API
-  participant Agent as desk agent grok-4.6
+  participant Agent as chat agent
   Funnel->>Policy: event
   Policy->>Outbox: enqueue (quiet hours delay alerts)
   Worker->>Outbox: flush due
@@ -95,7 +95,7 @@ sequenceDiagram
   Agent->>WAHA: reply sendText
 ```
 
-Policy: `packages/shared/src/notify.ts`. Sender: `packages/core/src/waha.ts`. Outbox: `packages/core/src/notify.ts` (`flushNotify` claims a pending row via `provider_ref` before `sendText` so the API and worker cannot double-send). Inbox: `packages/core/src/whatsapp-inbox.ts` (`handleWahaWebhookEvent`). The session already has a another app webhook; job-scout **appends** a second webhook and does not replace the list.
+Policy: `packages/shared/src/notify.ts`. Sender: `packages/core/src/waha.ts`. Outbox: `packages/core/src/notify.ts` (`flushNotify` claims a pending row via `provider_ref` before `sendText` so the API and worker cannot double-send). Inbox: `packages/core/src/whatsapp-inbox.ts` (`handleWahaWebhookEvent`). When configuring WAHA, preserve any other webhooks already attached to the session.
 
 ## Failure behaviour
 
