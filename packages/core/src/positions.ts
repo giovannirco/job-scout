@@ -69,6 +69,7 @@ const LIST_ROW = {
   salaryMin: positions.salaryMin,
   salaryMax: positions.salaryMax,
   salaryCurrency: positions.salaryCurrency,
+  salaryPeriod: positions.salaryPeriod,
   locationRaw: sql<string | null>`(select jr.location_raw from jd_revisions jr where jr.position_id = ${positions.id} order by jr.revision desc limit 1)`,
   listingStatus: positions.listingStatus,
   watchEnabled: positions.watchEnabled,
@@ -246,14 +247,14 @@ export async function listPositions(q: ListPositionsQuery) {
                       ]
                     : [d(positions.updatedAt), desc(positions.id)];
 
-  const queried = await db
+  const query = db
     .select(LIST_ROW)
     .from(positions)
     .innerJoin(companies, eq(positions.companyId, companies.id))
     .where(where)
     .orderBy(...order)
-    .limit(homeOnly ? 2000 : pageSize)
-    .offset(homeOnly || q.cursor ? 0 : (page - 1) * pageSize);
+    .$dynamic();
+  const queried = await (homeOnly ? query : query.limit(pageSize).offset(q.cursor ? 0 : (page - 1) * pageSize));
 
   let listed = queried;
   let total = 0;
@@ -261,7 +262,7 @@ export async function listPositions(q: ListPositionsQuery) {
     const home = profile.location || "";
     const matched = homeMarket(home) ? queried.filter((row) => listedAtHome(row.geoClass, row.locationRaw, home)) : [];
     total = matched.length;
-    const start = (page - 1) * pageSize;
+    const start = q.cursor ? 0 : (page - 1) * pageSize;
     listed = matched.slice(start, start + pageSize);
   } else {
     total = (
@@ -350,7 +351,7 @@ export async function getPositionDetail(idOrSlug: string) {
     db
       .select({ status: applicationQuestions.status, answer: applicationQuestions.answer })
       .from(applicationQuestions)
-      .where(eq(applicationQuestions.positionId, pos.id)),
+      .where(and(eq(applicationQuestions.positionId, pos.id), sql`${applicationQuestions.metadata}->>'droppedAt' is null`)),
   ]);
   const current = revs[0]
     ? (
@@ -745,17 +746,11 @@ export async function decodeStoredJdEntities(): Promise<{ updated: number }> {
     if (!rev?.descriptionText) continue;
     const next = decodeHtmlEntities(rev.descriptionText);
     if (next === rev.descriptionText) continue;
-    await db.update(jdRevisions).set({ descriptionText: next }).where(eq(jdRevisions.id, rev.id));
+    const hash = contentHash({ title: rev.title, descriptionText: next, salaryRaw: rev.salaryRaw, locationRaw: rev.locationRaw });
+    await db.update(jdRevisions).set({ descriptionText: next, contentHash: hash }).where(eq(jdRevisions.id, rev.id));
     await db
       .update(positions)
-      .set({
-        contentHash: contentHash({
-          title: rev.title,
-          descriptionText: next,
-          salaryRaw: rev.salaryRaw,
-          locationRaw: rev.locationRaw,
-        }),
-      })
+      .set({ contentHash: hash })
       .where(eq(positions.id, positionId));
     updated++;
   }
@@ -802,40 +797,6 @@ export async function repairSnapshotChangeTimes(): Promise<{ updated: number }> 
   return { updated };
 }
 
-/** Same company and the same JD text is one posting, even when the board minted several ids. */
-export async function collapseIdenticalFilings(): Promise<{ archived: number }> {
-  const db = await getDb();
-  const rows = await db
-    .select({
-      id: positions.id,
-      companyId: positions.companyId,
-      contentHash: positions.contentHash,
-      firstSeenAt: positions.firstSeenAt,
-    })
-    .from(positions)
-    .where(eq(positions.status, "triaged"));
-  const groups = new Map<string, typeof rows>();
-  for (const row of rows) {
-    if (!row.contentHash) continue;
-    const key = `${row.companyId}|${row.contentHash}`;
-    const list = groups.get(key) || [];
-    list.push(row);
-    groups.set(key, list);
-  }
-  let archived = 0;
-  for (const list of groups.values()) {
-    if (list.length < 2) continue;
-    list.sort((a, b) => (a.firstSeenAt?.getTime() || 0) - (b.firstSeenAt?.getTime() || 0) || a.id.localeCompare(b.id));
-    const keep = list[0];
-    for (const extra of list.slice(1)) {
-      await archivePosition(extra.id, "duplicate of the same posting", "scan");
-      await db.update(discoveryFeed).set({ positionId: keep.id }).where(eq(discoveryFeed.positionId, extra.id));
-      archived++;
-    }
-  }
-  return { archived };
-}
-
 /** Drop "changed" when every later revision only completed a bad first snapshot. */
 export async function clearRepairedChangedBadges(): Promise<{ cleared: number }> {
   const db = await getDb();
@@ -855,7 +816,7 @@ export async function clearRepairedChangedBadges(): Promise<{ cleared: number }>
 }
 
 /** Replace `USD [object Object]–150000` with the range the posting actually named. */
-export async function repairObjectSalaries(): Promise<{ checked: number; updated: number; failed: number }> {
+export async function repairObjectSalaries(): Promise<{ checked: number; updated: number; failed: number; failedIds: string[] }> {
   const db = await getDb();
   const rows = await db
     .select({ id: positions.id, url: positions.primaryUrl, title: positions.title })
@@ -868,9 +829,11 @@ export async function repairObjectSalaries(): Promise<{ checked: number; updated
     )`);
   let updated = 0;
   let failed = 0;
+  const failedIds: string[] = [];
   for (const row of rows) {
     if (!row.url) {
       failed++;
+      failedIds.push(row.id);
       continue;
     }
     try {
@@ -878,11 +841,13 @@ export async function repairObjectSalaries(): Promise<{ checked: number; updated
       const salaryRaw = (job.salaryRaw || "").trim();
       if (!salaryRaw || /\[object Object\]/.test(salaryRaw)) {
         failed++;
+      failedIds.push(row.id);
         continue;
       }
       const salary = parseSalary(salaryRaw);
       if (salary.min == null) {
         failed++;
+      failedIds.push(row.id);
         continue;
       }
       const prev = (
@@ -915,11 +880,11 @@ export async function repairObjectSalaries(): Promise<{ checked: number; updated
       updated++;
     } catch (e) {
       failed++;
+      failedIds.push(row.id);
       log.warn("salary.object_repair_failed", { url: row.url, err: e instanceof Error ? e.message : String(e) });
     }
   }
-  if (rows.length && failed === rows.length) throw new Error("object salary refetch failed");
-  return { checked: rows.length, updated, failed };
+  return { checked: rows.length, updated, failed, failedIds };
 }
 
 /** Create-or-update a position from an ATS job. New positions start as `triaged` (untriaged until the LLM runs). */
@@ -997,17 +962,8 @@ export async function upsertFromJob(
   }
 
   const hash = contentHash({ title: job.title, descriptionText: job.descriptionText, salaryRaw: job.salaryRaw, locationRaw: job.locationRaw });
-  const sameJd = (
-    await db
-      .select({ id: positions.id })
-      .from(positions)
-      .where(and(eq(positions.companyId, company.id), eq(positions.contentHash, hash), sql`${positions.status} <> 'archived'`))
-      .limit(1)
-  )[0];
-  if (sameJd) {
-    const position = (await getPosition(sameJd.id))!;
-    return { position, created: false, revived: false };
-  }
+  // Posting identity comes from the ATS id or canonical URL, never JD text.
+  // Identical descriptions are grouped for display without discarding their links.
 
   const posId = id("pos");
   const posSlug = `${slugify(`${company.slug}-${job.title}`).slice(0, 70)}-${posId.slice(-4)}`;

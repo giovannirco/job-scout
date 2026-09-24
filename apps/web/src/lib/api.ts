@@ -51,6 +51,7 @@ export type PositionRow = {
   salaryMin: number | null;
   salaryMax: number | null;
   salaryCurrency: string | null;
+  salaryPeriod: string | null;
   locationRaw: string | null;
   listingStatus: string | null;
   watchEnabled: boolean;
@@ -65,7 +66,7 @@ export type PositionRow = {
   duplicateCount?: number;
   siblingCount?: number;
   familySalarySpan?: boolean;
-  salaryBands?: Array<{ salaryMin: number; salaryMax: number; salaryCurrency: string }>;
+  salaryBands?: Array<{ salaryMin: number; salaryMax: number; salaryCurrency: string; salaryPeriod: string | null }>;
   archiveReason?: string | null;
   locations?: string[];
   siblings?: Array<{ id: string; title: string; status: string; location: string | null; url: string | null }>;
@@ -485,7 +486,7 @@ export type CompanyDetail = {
   industryTags: string[] | null;
   overview: string | null;
   metadata: Record<string, unknown>;
-  positions: { id: string; slug: string; title: string; status: PipelineStatus; triageScore: number | null; triageVerdict: Verdict | null; listingStatus: string | null; primaryUrl: string | null; salaryMin: number | null; salaryMax: number | null; salaryCurrency: string | null; locationRaw: string | null; firstSeenAt: string | null; postedAt: string | null; departments: string[] | null; updatedAt: string }[];
+  positions: { id: string; slug: string; title: string; status: PipelineStatus; triageScore: number | null; triageVerdict: Verdict | null; listingStatus: string | null; primaryUrl: string | null; salaryMin: number | null; salaryMax: number | null; salaryCurrency: string | null; salaryPeriod: string | null; locationRaw: string | null; firstSeenAt: string | null; postedAt: string | null; departments: string[] | null; updatedAt: string }[];
   research: Evaluation | null;
   boards: Board[];
 };

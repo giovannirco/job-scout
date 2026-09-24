@@ -52,7 +52,7 @@ Schema: `packages/db/src/schema.ts` (drizzle). Migrations: `packages/db/migratio
 | `approvals` | autopilot inbox: `kind`, `status`, position/company, title/body, `payload` (e.g. `toStatus`, `materialIds`, `reason`), resolved by/at |
 | `chat_threads` | `scope`, position/company, model, `messages` JSON (user / assistant with tool calls / tool results, tokens). WhatsApp desk chat uses one global thread titled `WhatsApp · job-scout chat` |
 | `notification_outbox` | WhatsApp sends: `channel`, `event`, `chat_id`, `body`, `status` (`pending` `sent` `failed` `cancelled`), unique `dedupe_key`, `scheduled_for` (quiet hours), `provider_ref` |
-| `profiles` | you: identity, master resume, resume surfaces (`ai` / `sre` / `platform`), scout brief. A new profile stores an empty brief. A stored brief that still says “fill this in under settings” is cleared and is not sent to the model |
+| `profiles` | you: identity, master resume, resume surfaces (`ai` / `sre` / `platform`), scout brief. A new profile stores an empty brief. A stored starter brief is preserved in the database but is not sent to the model |
 | `api_tokens` | hashed Bearer tokens with scopes |
 
 ## `positions`

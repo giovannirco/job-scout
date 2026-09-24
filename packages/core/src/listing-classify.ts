@@ -28,8 +28,9 @@ const ListingClassifyOutput = z.object({
 async function classificationFingerprint(pos: NonNullable<Awaited<ReturnType<typeof getPosition>>>, model: string) {
   const db = await getDb();
   const rev = (await db.select().from(jdRevisions).where(eq(jdRevisions.positionId, pos.id)).orderBy(desc(jdRevisions.revision)).limit(1))[0];
+  const ats = pos.metadata?.ats as { workplaceType?: string; isRemote?: boolean } | undefined;
   return createHash("sha256").update(JSON.stringify({ version: 1, model, title: pos.title, company: pos.company.name,
-    location: rev?.locationRaw, ats: pos.metadata?.ats, jd: (await currentJdText(pos.id)).slice(0, 8000) })).digest("hex");
+    location: rev?.locationRaw, ats: { workplaceType: ats?.workplaceType, isRemote: ats?.isRemote }, jd: (await currentJdText(pos.id)).slice(0, 8000) })).digest("hex");
 }
 
 function classificationInactive(pos: NonNullable<Awaited<ReturnType<typeof getPosition>>>) {
@@ -223,7 +224,7 @@ export async function backfillListingFacts(opts: { force?: boolean } = {}) {
         workplace: facts.workplace,
         geoClass: facts.geoClass,
         remoteClass: facts.remoteClass,
-        ...(fillSalary ? { salaryMin: salary.min, salaryMax: salary.max, salaryCurrency: salary.currency, salaryRaw: salary.raw } : {}),
+        ...(fillSalary ? { salaryMin: salary.min, salaryMax: salary.max, salaryCurrency: salary.currency, salaryPeriod: salary.period, salaryRaw: salary.raw } : {}),
         updatedAt: new Date(),
       })
       .where(and(eq(positions.id, row.id), sql`${positions.status} <> 'archived'`));

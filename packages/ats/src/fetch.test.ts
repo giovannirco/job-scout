@@ -311,6 +311,10 @@ describe("fetchAshbyJob", () => {
 });
 
 describe("salaryFromBaseSalary", () => {
+  it("preserves hourly and monthly units", () => {
+    expect(salaryFromBaseSalary({ currency: "USD", value: { minValue: 50, maxValue: 70, unitText: "HOUR" } })).toBe("USD 50-70 per hour");
+    expect(salaryFromBaseSalary({ currency: "USD", value: { value: 5000, unitText: "MONTH" } })).toBe("USD 5000 per month");
+  });
   it("reads a QuantitativeValue instead of stringifying it", () => {
     expect(salaryFromBaseSalary({
       "@type": "MonetaryAmount",

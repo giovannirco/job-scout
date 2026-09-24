@@ -62,6 +62,20 @@ describe("parseSalary", () => {
     expect(s.currency).toBe("USD");
   });
 
+  it("does not multiply hourly or monthly amounts without a k suffix", () => {
+    expect(parseSalary("$50–70/hr")).toMatchObject({ min: 50, max: 70, period: "hour" });
+    expect(parseSalary("CAD 50 to CAD 70 per hour")).toMatchObject({ min: 50, max: 70, currency: "CAD", period: "hour" });
+    expect(parseSalary("$800–900/mo")).toMatchObject({ min: 800, max: 900, period: "month" });
+  });
+
+  it("preserves posted units during extraction and ignores unrelated numeric ranges", () => {
+    expect(parseSalary(extractSalaryRaw("Pay: $50-70 per hour"))).toMatchObject({ min: 50, max: 70, period: "hour" });
+    expect(parseSalary(extractSalaryRaw("Pay: $4000-5000 per month"))).toMatchObject({ min: 4000, max: 5000, period: "month" });
+    expect(parseSalary("USD 500 per week").period).toBeNull();
+    expect(parseSalary("USD 50 per week").min).toBe(50);
+    expect(extractSalaryRaw("We serve 20000-50000 requests per second")).toBeUndefined();
+  });
+
   it("returns nulls when unknown", () => {
     const s = parseSalary("");
     expect(s.min).toBeNull();

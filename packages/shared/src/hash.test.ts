@@ -214,3 +214,11 @@ describe("clean-rev compare default (F-29 / UX-8)", () => {
     expect(defaultCleanRevCompare([{ revision: 1, material: true }])).toBeNull();
   });
 });
+
+
+describe("material eligibility edits", () => {
+  it.each([" US residents only.", " No visa sponsorship.", " Salary reduced to $80k."])("keeps a short addition material: %s", addition => {
+    const before = "Build and maintain software systems. ".repeat(50);
+    expect(classifyMateriality([{ path: "description_text", before, after: before + addition }])).toEqual({ material: true, change_kind: "content" });
+  });
+});

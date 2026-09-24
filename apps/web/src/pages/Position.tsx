@@ -103,7 +103,7 @@ export function PositionPage() {
   const hasEval = p.evaluations.some((e) => e.kind === "evaluate");
   const hasJdReview = p.evaluations.some((e) => e.kind === "jd_review");
   const hasResearch = p.evaluations.some((e) => e.kind === "company_research");
-  const comp = money(p.salaryMin, p.salaryMax, p.salaryCurrency) || p.salaryRaw;
+  const comp = money(p.salaryMin, p.salaryMax, p.salaryCurrency, p.salaryPeriod) || p.salaryRaw;
   const loc = sourceLocation(p);
 
   return (
@@ -281,7 +281,7 @@ function BriefTab({ p, noKey, home, onTriage }: { p: PositionDetail; noKey: bool
     void qc.invalidateQueries({ queryKey: ["position", p.id] });
     toast.success("Saved");
   }
-  const comp = money(p.salaryMin, p.salaryMax, p.salaryCurrency) || p.salaryRaw;
+  const comp = money(p.salaryMin, p.salaryMax, p.salaryCurrency, p.salaryPeriod) || p.salaryRaw;
   const latestEval = p.evaluations.find((e) => e.kind === "evaluate");
   const ej = (latestEval?.json || null) as null | { score?: number; verdict?: string; headline?: string };
   const loc = sourceLocation(p);

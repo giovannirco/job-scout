@@ -70,6 +70,10 @@ describe("live-audit regressions on isolated PGlite", () => {
     const { position } = await upsertFromJob(j);
     await runListingClassify(position.id);
     expect(llm).toHaveBeenCalledTimes(1);
+    // Polling updates fetchedAt; that bookkeeping must not invalidate model input.
+    const db = await getDb();
+    const beforePoll = (await getPosition(position.id))!;
+    await db.update(positions).set({ metadata: { ...beforePoll.metadata, ats: { ...(beforePoll.metadata?.ats as object), fetchedAt: "2000-01-01T00:00:00Z" } } }).where(eq(positions.id, position.id));
     await applySnapshot({ positionId: position.id, job: j });
     expect((await getPosition(position.id))?.geoClass).toBe("hard_geo");
     expect(await runListingClassify(position.id)).toMatchObject({ skipped: true, reason: "unchanged_input" });
@@ -83,7 +87,7 @@ describe("live-audit regressions on isolated PGlite", () => {
     expect(llm).toHaveBeenCalledTimes(2);
   });
 
-  it("applies publication age during board scans and accounts for junk rejections", async () => {
+  it("keeps old postings still listed on a live board and rejects junk titles", async () => {
     await updateSettings({ gate: { titleInclude: ["engineer"], titleExclude: [], maxPostingAgeDays: 14, allowUnknownGeo: true } });
     const db = await getDb();
     await db.insert(boardSources).values({ id: "brd_age", company: "Age test", provider: "ashby", token: "age-test" });
@@ -91,9 +95,9 @@ describe("live-audit regressions on isolated PGlite", () => {
       { id: "old", title: "Platform Engineer", publishedAt: "2020-01-01", jobUrl: "https://jobs.ashbyhq.com/age-test/old" },
       { id: "junk", title: "", jobUrl: "https://jobs.ashbyhq.com/age-test/junk" },
     ] }), { status: 200 })));
-    expect(await scanBoard("brd_age")).toMatchObject({ total: 2, seen: 2, passed: 0, filtered: 2, created: 0 });
+    expect(await scanBoard("brd_age")).toMatchObject({ total: 2, seen: 2, passed: 1, filtered: 1, created: 1 });
     const feed = await db.select().from(discoveryFeed).where(eq(discoveryFeed.boardSourceId, "brd_age"));
-    expect(feed.find(r => r.title === "Platform Engineer")).toMatchObject({ lane: "filtered", postedAt: new Date("2020-01-01") });
+    expect(feed.find(r => r.title === "Platform Engineer")).toMatchObject({ lane: "passed", postedAt: new Date("2020-01-01") });
     expect(feed.find(r => r.title === "")?.gateReason).toBe("junk_title");
     await scanBoard("brd_age");
     expect((await db.select().from(discoveryFeed).where(eq(discoveryFeed.boardSourceId, "brd_age")))).toHaveLength(2);

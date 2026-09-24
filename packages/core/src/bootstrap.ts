@@ -1,291 +1,75 @@
-import { and, eq, isNull, ne, or, sql } from "drizzle-orm";
-import { boardSources, closeDb, getDb, id, runMigrations } from "@job-scout/db";
-
-export async function closeDbSafe() {
-  try {
-    await closeDb();
-  } catch {
-    /* ignore */
-  }
-}
+import { and, eq, isNull, ne, or } from "drizzle-orm";
+import { boardSources, closeDb, getDb, id, profiles, runMigrations } from "@job-scout/db";
 import { FULL_CATALOG } from "@job-scout/shared";
 import { getProfile, alignStarterGateWithRoles } from "./profile.js";
 import { getSettings } from "./settings.js";
-import { log as rootLog } from "@job-scout/shared";
-const log = rootLog.child({ scope: "bootstrap" });
 
-/** Migrate + seed profile/settings and sync the board catalog (insert-missing + promote list_api). */
+export async function closeDbSafe() {
+  try { await closeDb(); } catch { /* shutdown best effort */ }
+}
+
+/** Startup migrates the schema and seeds new installs. Existing data repairs are explicit. */
 export async function bootstrap(opts: { seedBoards?: boolean } = {}) {
   await runMigrations();
+  const db = await getDb();
+  const existing = (await db.select({ id: profiles.id }).from(profiles).limit(1)).at(0);
   await getProfile();
   await getSettings({ fresh: true });
-  const aligned = await alignStarterGateWithRoles();
-  if (aligned) log.info("bootstrap.gate.from-roles", { titleInclude: aligned });
-  if (process.env.PGLITE_DATA_DIR && process.env.NODE_ENV !== "production") {
-    /* tests skip deploy backfill */
-  } else {
-    const { repairPositionData } = await import("./data-repair.js");
-    await repairPositionData({ dryRun: false })
-      .then(r => log.info("bootstrap.position-repair", { count: r.count }))
-      .catch(e => log.error("bootstrap.position-repair.failed", { err: e }));
-    const { backfillListingFacts } = await import("./listing-classify.js");
-    await backfillListingFacts()
-      .then((r) => log.info("bootstrap.listing-facts", r))
-      .catch((e) => log.error("bootstrap.listing-facts.failed", { err: e }));
-    const { getSettings, updateSettings } = await import("./settings.js");
-    const { repairMisstampedDiscoveryFilings } = await import("./scan.js");
-    const stored = await getSettings({ fresh: true });
-    if (stored.misstampWithdrawVersion !== "1") {
-      await repairMisstampedDiscoveryFilings()
-        .then(async (r) => {
-          await updateSettings({ misstampWithdrawVersion: "1" });
-          log.info("bootstrap.misstamp-withdraw", r);
-        })
-        .catch((e) => log.error("bootstrap.misstamp-withdraw.failed", { err: e }));
-    }
-    if (stored.officeGateVersion !== "1") {
-      const { repairOfficeDiscoveryFilings } = await import("./scan.js");
-      await repairOfficeDiscoveryFilings()
-        .then(async (r) => {
-          await updateSettings({ officeGateVersion: "1" });
-          log.info("bootstrap.office-gate", r);
-        })
-        .catch((e) => log.error("bootstrap.office-gate.failed", { err: e }));
-    }
-    if (stored.gateLaneVersion !== "1") {
-      const { syncGateArchiveLanes } = await import("./scan.js");
-      await syncGateArchiveLanes()
-        .then(async (r) => {
-          await updateSettings({ gateLaneVersion: "1" });
-          if (r.updated) log.info("bootstrap.gate-lanes", r);
-        })
-        .catch((e) => log.error("bootstrap.gate-lanes.failed", { err: e }));
-    }
-    if (stored.homeGateVersion !== "1") {
-      const { repairHomeMarketFilings } = await import("./scan.js");
-      await repairHomeMarketFilings()
-        .then(async (r) => {
-          await updateSettings({ homeGateVersion: "1" });
-          if (r.withdrawn) log.info("bootstrap.home-gate", r);
-        })
-        .catch((e) => log.error("bootstrap.home-gate.failed", { err: e }));
-    }
-    if (stored.profileGateVersion !== "1") {
-      const { repairProfileGateFilings } = await import("./scan.js");
-      const { trimStoredTitles } = await import("./positions.js");
-      await repairProfileGateFilings()
-        .then(async (r) => {
-          await updateSettings({ profileGateVersion: "1" });
-          if (r.withdrawn || r.regated) log.info("bootstrap.profile-gate", r);
-        })
-        .catch((e) => log.error("bootstrap.profile-gate.failed", { err: e }));
-      await trimStoredTitles()
-        .then((r) => { if (r.updated) log.info("bootstrap.titles", r); })
-        .catch((e) => log.error("bootstrap.titles.failed", { err: e }));
-    }
-    if (stored.placeSplitVersion !== "6") {
-      const { repairProfileGateFilings } = await import("./scan.js");
-      await repairProfileGateFilings()
-        .then(async (r) => {
-          await updateSettings({ placeSplitVersion: "6" });
-          if (r.withdrawn || r.regated) log.info("bootstrap.place-split", r);
-        })
-        .catch((e) => log.error("bootstrap.place-split.failed", { err: e }));
-    }
-    if (stored.blankGreenhouseVersion !== "1") {
-      const { refetchBlankGreenhouseFilings } = await import("./scan.js");
-      await refetchBlankGreenhouseFilings()
-        .then(async (r) => {
-          await updateSettings({ blankGreenhouseVersion: "1" });
-          if (r.checked) log.info("bootstrap.blank-greenhouse", r);
-        })
-        .catch((e) => log.error("bootstrap.blank-greenhouse.failed", { err: e }));
-    }
-    if (stored.rolePhraseVersion !== "1") {
-      const { regateRecentDiscovery } = await import("./scan.js");
-      await regateRecentDiscovery()
-        .then(async (r) => {
-          await updateSettings({ rolePhraseVersion: "1" });
-          log.info("bootstrap.role-phrase", r);
-        })
-        .catch((e) => log.error("bootstrap.role-phrase.failed", { err: e }));
-    }
-    if (stored.titleHyphenVersion !== "1") {
-      const { trimStoredTitles } = await import("./positions.js");
-      await trimStoredTitles()
-        .then(async (r) => {
-          await updateSettings({ titleHyphenVersion: "1" });
-          if (r.updated) log.info("bootstrap.title-hyphen", r);
-        })
-        .catch((e) => log.error("bootstrap.title-hyphen.failed", { err: e }));
-    }
-    if (stored.junkPlaceVersion !== "1") {
-      const { refetchJunkPlaceFilings } = await import("./scan.js");
-      await refetchJunkPlaceFilings()
-        .then(async (r) => {
-          await updateSettings({ junkPlaceVersion: "1" });
-          if (r.checked || r.titled) log.info("bootstrap.junk-place", r);
-        })
-        .catch((e) => log.error("bootstrap.junk-place.failed", { err: e }));
-    }
-    if (stored.craftGateVersion !== "4") {
-      const { repairProfileGateFilings } = await import("./scan.js");
-      await repairProfileGateFilings()
-        .then(async (r) => {
-          await updateSettings({ craftGateVersion: "4" });
-          if (r.withdrawn || r.regated) log.info("bootstrap.craft-gate", r);
-        })
-        .catch((e) => log.error("bootstrap.craft-gate.failed", { err: e }));
-    }
-    if (stored.archivedDiscoveryVersion !== "1") {
-      const { filterPassedDiscoveryForArchived } = await import("./scan.js");
-      await filterPassedDiscoveryForArchived()
-        .then(async (r) => {
-          await updateSettings({ archivedDiscoveryVersion: "1" });
-          if (r.updated) log.info("bootstrap.archived-discovery", r);
-        })
-        .catch((e) => log.error("bootstrap.archived-discovery.failed", { err: e }));
-    }
-    if (stored.usPlaceGeoVersion !== "2") {
-      const { reclassifyUsPlaceLists } = await import("./scan.js");
-      await reclassifyUsPlaceLists()
-        .then(async (r) => {
-          await updateSettings({ usPlaceGeoVersion: "2" });
-          if (r.positions || r.discovery) log.info("bootstrap.us-place-geo", r);
-        })
-        .catch((e) => log.error("bootstrap.us-place-geo.failed", { err: e }));
-    }
-    if (stored.salaryObjectVersion !== "1") {
-      const { repairObjectSalaries } = await import("./positions.js");
-      await repairObjectSalaries()
-        .then(async (r) => {
-          await updateSettings({ salaryObjectVersion: "1" });
-          if (r.checked) log.info("bootstrap.salary-object", r);
-        })
-        .catch((e) => log.error("bootstrap.salary-object.failed", { err: e }));
-    }
-    if (stored.regionOfficeVersion !== "1") {
-      const { refetchDisagreeingRegions } = await import("./scan.js");
-      await refetchDisagreeingRegions()
-        .then(async (r) => {
-          await updateSettings({ regionOfficeVersion: "1" });
-          if (r.checked) log.info("bootstrap.region-office", r);
-        })
-        .catch((e) => log.error("bootstrap.region-office.failed", { err: e }));
-    }
-    if (stored.labelVersion !== "1") {
-      const { refreshListingLabels } = await import("./scan.js");
-      await refreshListingLabels()
-        .then(async (r) => {
-          await updateSettings({ labelVersion: "1" });
-          if (r.craft || r.company) log.info("bootstrap.labels", r);
-        })
-        .catch((e) => log.error("bootstrap.labels.failed", { err: e }));
-    }
-    if (stored.officeListVersion !== "4") {
-      const { expandStoredOfficeLocations } = await import("./positions.js");
-      await expandStoredOfficeLocations()
-        .then(async (r) => {
-          await updateSettings({ officeListVersion: "4" });
-          if (r.updated) log.info("bootstrap.offices", r);
-        })
-        .catch((e) => log.error("bootstrap.offices.failed", { err: e }));
-    }
-    if (stored.entityDecodeVersion !== "1") {
-      const { decodeStoredJdEntities } = await import("./positions.js");
-      await decodeStoredJdEntities()
-        .then(async (r) => {
-          await updateSettings({ entityDecodeVersion: "1" });
-          if (r.updated) log.info("bootstrap.entities", r);
-        })
-        .catch((e) => log.error("bootstrap.entities.failed", { err: e }));
-    }
+  if (!existing) {
+    await alignStarterGateWithRoles();
+    if (opts.seedBoards !== false) await syncBoardCatalog();
   }
+}
+
+/** Called on a fresh installation or by the audited upgrade runner. */
+export async function syncBoardCatalog() {
   const db = await getDb();
-  if (opts.seedBoards !== false) {
-    const remoteOk = (
-      await db
-        .select({ id: boardSources.id })
-        .from(boardSources)
-        .where(and(eq(boardSources.provider, "remoteok"), eq(boardSources.token, "remoteok")))
-        .limit(1)
-    )[0];
-    if (remoteOk) {
-      await db
-        .delete(boardSources)
-        .where(and(eq(boardSources.provider, "market"), eq(boardSources.token, "remoteok")));
-    } else {
-      await db
-        .update(boardSources)
-        .set({
-          provider: "remoteok",
-          capability: "list_api",
-          enabled: true,
-          sourceKind: "market",
-        })
-        .where(and(eq(boardSources.provider, "market"), eq(boardSources.token, "remoteok")));
-    }
-    for (const e of FULL_CATALOG) {
-      await db
-        .insert(boardSources)
-        .values({
-          id: id("bs"),
-          company: e.company,
-          provider: e.provider,
-          token: e.token,
-          careersUrl: e.careersUrl,
-          enabled: e.capability === "list_api",
-          sourceKind: e.sourceKind,
-          tags: e.tags,
-          notes: e.notes ?? null,
-          capability: e.capability,
-        })
-        .onConflictDoNothing();
-    }
-    for (const e of FULL_CATALOG.filter((x) => x.capability === "list_api")) {
-      await db
-        .update(boardSources)
-        .set({
-          capability: "list_api",
-          enabled: true,
-          sourceKind: e.sourceKind,
-          tags: e.tags,
-          notes: e.notes ?? null,
-          careersUrl: e.careersUrl,
-        })
-        .where(
-          and(
-            eq(boardSources.provider, e.provider),
-            eq(boardSources.token, e.token),
-            or(isNull(boardSources.capability), ne(boardSources.capability, "list_api"))!,
-          ),
-        );
-    }
-    // Verified ATS migrations (#18). Runs after the catalog sync so a catalog row
-    // re-inserted under the old token is corrected in the same boot.
-    const { reconcileBoardSources } = await import("./board-reconcile.js");
-    await reconcileBoardSources({ dryRun: false })
-      .then((r) => { if (r.count || r.conflicts.length) log.info("bootstrap.boards.reconciled", { migrated: r.migrated.length, demoted: r.demoted.length, conflicts: r.conflicts.length }); })
-      .catch((e) => log.error("bootstrap.boards.reconcile.failed", { err: e }));
-    const n = (await db.select({ c: sql<number>`count(*)::int` }).from(boardSources))[0]?.c ?? 0;
-    log.info("bootstrap.boards.synced", { catalog: FULL_CATALOG.length, boards: n });
-    const { settleExpectedQueueFailures } = await import("./jobs.js");
-    await settleExpectedQueueFailures()
-      .then((r) => { if (r.cleared) log.info("bootstrap.queue", r); })
-      .catch((e) => log.error("bootstrap.queue.failed", { err: e }));
-    const { collapseIdenticalFilings, repairSnapshotChangeTimes, clearRepairedChangedBadges } = await import("./positions.js");
-    await collapseIdenticalFilings()
-      .then((r) => { if (r.archived) log.info("bootstrap.duplicates", r); })
-      .catch((e) => log.error("bootstrap.duplicates.failed", { err: e }));
-    await repairSnapshotChangeTimes()
-      .then((r) => { if (r.updated) log.info("bootstrap.change-times", r); })
-      .catch((e) => log.error("bootstrap.change-times.failed", { err: e }));
-    await clearRepairedChangedBadges()
-      .then((r) => { if (r.cleared) log.info("bootstrap.changed-badges", r); })
-      .catch((e) => log.error("bootstrap.changed-badges.failed", { err: e }));
-    const { alignCompanyCareersFromBoards } = await import("./companies.js");
-    await alignCompanyCareersFromBoards()
-      .then((r) => { if (r.updated) log.info("bootstrap.company-careers", r); })
-      .catch((e) => log.error("bootstrap.company-careers.failed", { err: e }));
+  const oldRemoteOk = and(eq(boardSources.provider, "market"), eq(boardSources.token, "remoteok"));
+  const currentRemoteOk = (await db.select({ id: boardSources.id }).from(boardSources)
+    .where(and(eq(boardSources.provider, "remoteok"), eq(boardSources.token, "remoteok"))).limit(1)).at(0);
+  if (currentRemoteOk) {
+    // Keep the legacy source and its history; stop scheduling the duplicate.
+    await db.update(boardSources).set({ enabled: false, capability: "manual_watch" }).where(oldRemoteOk);
+  } else {
+    await db.update(boardSources).set({ provider: "remoteok", capability: "list_api", enabled: true, sourceKind: "market" }).where(oldRemoteOk);
   }
+  for (const e of FULL_CATALOG) {
+    await db
+      .insert(boardSources)
+      .values({
+        id: id("bs"),
+        company: e.company,
+        provider: e.provider,
+        token: e.token,
+        careersUrl: e.careersUrl,
+        enabled: e.capability === "list_api",
+        sourceKind: e.sourceKind,
+        tags: e.tags,
+        notes: e.notes ?? null,
+        capability: e.capability,
+      })
+      .onConflictDoNothing();
+  }
+  for (const e of FULL_CATALOG.filter((x) => x.capability === "list_api")) {
+    await db
+      .update(boardSources)
+      .set({
+        capability: "list_api",
+        enabled: true,
+        sourceKind: e.sourceKind,
+        tags: e.tags,
+        notes: e.notes ?? null,
+        careersUrl: e.careersUrl,
+      })
+      .where(
+        and(
+          eq(boardSources.provider, e.provider),
+          eq(boardSources.token, e.token),
+          or(isNull(boardSources.capability), ne(boardSources.capability, "list_api"))!,
+        ),
+      );
+  }
+
+  const { reconcileBoardSources } = await import("./board-reconcile.js");
+  return reconcileBoardSources({ dryRun: false });
 }
