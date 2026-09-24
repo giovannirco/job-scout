@@ -2,6 +2,8 @@
 
 This release includes the public regression and security reviews, plus a second adversarial pass after those changes merged. See [the post-merge security report](POST-MERGE-SECURITY-REVIEW-2.9.5.md) for reproduced findings and fixes.
 
+The chat endpoint drains queued SSE writes before closing, preserving the final message and completion events. A regression test reproduced lost events before the fix.
+
 Additional changes reject cancelled AI requests before sending them, remove cancellation listeners after requests, reject empty completions, and report streams that end without a finish reason as failures. Explicit repairs now support `--list` and `--steps` so operators can preview and apply independent corrections without rerunning unavailable remote sources. Selected repairs remain atomic and versioned.
 
 ## Rehearsal

@@ -60,9 +60,23 @@ chatRoutes.post("/threads/:id/messages", async (c) => {
 
   return streamSSE(c, async (stream) => {
     let seq = 0;
-    const send = (event: string, data: unknown) => stream.writeSSE({ event, data: JSON.stringify(data), id: String(++seq) });
-    const ping = setInterval(() => void stream.writeSSE({ event: "ping", data: "" }), 15_000);
     const ctrl = new AbortController();
+    let writes = Promise.resolve();
+    let writeFailed = false;
+    const send = (event: string, data: unknown) => {
+      const message = { event, data: JSON.stringify(data), id: String(++seq) };
+      writes = writes.then(async () => {
+        if (writeFailed) return;
+        try {
+          await stream.writeSSE(message);
+        } catch (error) {
+          writeFailed = true;
+          ctrl.abort(error);
+        }
+      });
+      return writes;
+    };
+    const ping = setInterval(() => void send("ping", ""), 15_000);
     stream.onAbort(() => ctrl.abort());
     try {
       await runChatTurn(threadId, text, (e) => void send(e.type, e), { signal: ctrl.signal });
@@ -71,6 +85,8 @@ chatRoutes.post("/threads/:id/messages", async (c) => {
       await send("error", { type: "error", message: e instanceof LlmGateError ? `${msg} (Settings › AI › chat)` : msg });
     } finally {
       clearInterval(ping);
+      // The core emitter is synchronous; drain its writes before Hono closes SSE.
+      await writes;
     }
   });
 });
