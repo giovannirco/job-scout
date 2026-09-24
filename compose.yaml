@@ -22,7 +22,7 @@ x-app-env: &app-env
   NODE_ENV: production
   LOG_FORMAT: json
   LOG_LEVEL: ${LOG_LEVEL:-info}
-  API_TOKEN_SEED: ${API_TOKEN_SEED:-dev-agent-token}
+  API_TOKEN_SEED: ${API_TOKEN_SEED:-}
   OPENAI_BASE_URL: ${COMPOSE_OPENAI_BASE_URL:-http://host.docker.internal:8317/v1}
   OPENAI_API_KEY: ${OPENAI_API_KEY:-}
   LLM_TIMEOUT_MS: ${LLM_TIMEOUT_MS:-180000}
@@ -57,7 +57,8 @@ services:
     environment:
       <<: *app-env
       AUTH_MODE: ${AUTH_MODE:-dev}
-      AUTH_PASSWORD: ${AUTH_PASSWORD:-job-scout}
+      ALLOW_INSECURE_DEV_AUTH: "1" # Local stack only; host ports are loopback-bound.
+      AUTH_PASSWORD: ${AUTH_PASSWORD:-}
       HOST: 0.0.0.0
       PORT: "8080"
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}

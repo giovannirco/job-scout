@@ -1,3 +1,4 @@
+import { publicFetch } from "./public-fetch.js";
 import { extractSalaryRaw, isCityOffice, isCraftMatch } from "@job-scout/shared";
 import {
   detectAts,
@@ -19,23 +20,21 @@ async function fetchText(
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 25000);
   try {
-    let res = await fetch(url, {
+    let res = await publicFetch(url, {
       headers: {
         "User-Agent": UA,
         Accept: opts?.accept || "application/json, text/html;q=0.9,*/*;q=0.8",
       },
       signal: ctrl.signal,
-      redirect: "follow",
     });
     if (res.status === 429 || res.status >= 500) {
       await new Promise((r) => setTimeout(r, 800));
-      res = await fetch(url, {
+      res = await publicFetch(url, {
         headers: {
           "User-Agent": UA,
           Accept: opts?.accept || "application/json, text/html;q=0.9,*/*;q=0.8",
         },
         signal: ctrl.signal,
-        redirect: "follow",
       });
     }
     const body = await res.text();
@@ -1219,7 +1218,7 @@ async function fetchAshbyApplicationPrompts(org: string, jobId: string): Promise
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 25000);
   try {
-    const res = await fetch("https://jobs.ashbyhq.com/api/non-user-graphql?op=ApiJobPosting", {
+    const res = await publicFetch("https://jobs.ashbyhq.com/api/non-user-graphql?op=ApiJobPosting", {
       method: "POST",
       headers: { "User-Agent": UA, Accept: "application/json", "Content-Type": "application/json" },
       body: JSON.stringify({ operationName: "ApiJobPosting", query, variables: { organizationHostedJobsPageName: org, jobPostingId: jobId } }),

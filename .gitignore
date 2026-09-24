@@ -3,7 +3,8 @@ node_modules
 dist
 .data
 .env
-.env.local
+.env.*
+!.env.example
 *.log
 /tmp
 .DS_Store
@@ -19,3 +20,8 @@ screenshots/*.png
 
 # unattended-loop scratch state
 loop/LAST-NOTIFY.txt
+
+# Runtime personal exports and backups belong outside the public source tree.
+/private/
+/backups/
+*.sql.gz

@@ -54,7 +54,7 @@ dashboard:
   folder: job-scout
 
 env:
-  AUTH_MODE: dev
+  AUTH_MODE: token
   PUBLIC_BASE_URL: http://localhost:8080
   HOST: 0.0.0.0
   PORT: "8080"

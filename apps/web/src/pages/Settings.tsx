@@ -902,7 +902,7 @@ function SystemTab() {
     <div className="space-y-5">
       <Panel title="Job clipper" meta="bookmarklet">
         <p className="text-[12.5px] text-muted mb-3">
-          Copy the snippet and paste it as a bookmark URL (Chrome blocks javascript: links on this page). Stay on the LinkedIn or Indeed listing, then click the bookmark — the tab text is POSTed so login-walled JDs survive. Session cookie only — no token in the bookmark.
+          Copy the snippet and paste it as a bookmark URL (Chrome blocks javascript: links on this page). Stay on the LinkedIn or Indeed listing, then click the bookmark — the tab text is POSTed to a confirmation page so login-walled JDs survive. Confirm to save it. Session cookie only — no token in the bookmark.
         </p>
         <div className="flex flex-wrap items-center gap-2 mb-2">
           <Btn

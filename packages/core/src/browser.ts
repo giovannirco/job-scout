@@ -1,3 +1,4 @@
+import { publicFetch, assertPublicUrl } from "@job-scout/ats";
 import { coreEnv } from "./env.js";
 import { browserRenderDuration, browserRenders } from "./metrics.js";
 import { log as rootLog } from "@job-scout/shared";
@@ -50,13 +51,13 @@ export function steelHealthUrl(baseUrl: string): string {
 }
 
 export function browserConfigured(): boolean {
-  return Boolean(coreEnv.steelBaseUrl);
+  return Boolean(coreEnv.steelBaseUrl) && coreEnv.browserEgressIsolated;
 }
 
 export async function browserStatus(): Promise<BrowserStatus> {
   const mcpUrl = coreEnv.browserMcpUrl || null;
-  if (!coreEnv.steelBaseUrl) {
-    return { configured: false, baseUrl: null, healthUrl: null, ok: false, error: "STEEL_BASE_URL not set", mcpUrl, owner: "job-scout" };
+  if (!browserConfigured()) {
+    return { configured: false, baseUrl: null, healthUrl: null, ok: false, error: "Browser requires STEEL_BASE_URL and BROWSER_EGRESS_ISOLATED=1", mcpUrl, owner: "job-scout" };
   }
   const healthUrl = steelHealthUrl(coreEnv.steelBaseUrl);
   try {
@@ -69,7 +70,8 @@ export async function browserStatus(): Promise<BrowserStatus> {
 
 /** Render a URL in the job-scout Chromium and return html + markdown. Null when the browser plane is not configured. */
 export async function renderUrl(url: string, opts: { delayMs?: number; timeoutMs?: number } = {}): Promise<RenderedPage | null> {
-  if (!coreEnv.steelBaseUrl) return null;
+  if (!browserConfigured()) return null;
+  assertPublicUrl(url);
   const scrapeUrl = steelScrapeUrl(coreEnv.steelBaseUrl);
   const t0 = Date.now();
   let res: Response;
@@ -119,7 +121,7 @@ export const steelRenderer = browserConfigured()
 
 /** Markdown of a page for the chat agent's `web_fetch` tool. Falls back to plain fetch + tag strip. */
 export async function fetchPageMarkdown(url: string, maxChars = 20_000): Promise<{ title: string | null; markdown: string; via: "steel" | "http" }> {
-  if (coreEnv.steelBaseUrl) {
+  if (browserConfigured()) {
     try {
       const r = await renderUrl(url, { delayMs: 1500 });
       if (r && (r.markdown || r.html)) {
@@ -130,7 +132,7 @@ export async function fetchPageMarkdown(url: string, maxChars = 20_000): Promise
       /* fall through to plain fetch */
     }
   }
-  const res = await fetch(url, { headers: { accept: "text/html,*/*" }, signal: AbortSignal.timeout(20_000) });
+  const res = await publicFetch(url, { headers: { accept: "text/html,*/*" }, signal: AbortSignal.timeout(20_000) });
   browserRenders.labels({ via: "http", ok: String(res.ok) }).inc();
   const text = await res.text();
   const title = text.match(/<title>([^<]+)<\/title>/i)?.[1]?.trim() ?? null;

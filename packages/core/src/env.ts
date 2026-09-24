@@ -18,6 +18,8 @@ export const coreEnv = {
   /** Job-scout Steel REST base (in-cluster: http://steel.example:3000). Empty = off. Not the shared human browser. */
   steelBaseUrl: (process.env.STEEL_BASE_URL || "").replace(/\/+$/, ""),
   /** Playwright MCP sidecar on the job-scout Steel pod (in-cluster: http://playwright.example:8931/mcp) */
+  // Set only after enforcing public-only renderer egress outside the app.
+  browserEgressIsolated: process.env.BROWSER_EGRESS_ISOLATED === "1",
   browserMcpUrl: process.env.BROWSER_MCP_URL || "",
   wahaBaseUrl: (process.env.WAHA_BASE_URL || "").replace(/\/+$/, ""),
   wahaApiKey: process.env.WAHA_API_KEY || "",

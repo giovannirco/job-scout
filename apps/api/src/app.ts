@@ -1,4 +1,6 @@
 import { Hono } from "hono";
+import { allowedOrigin, originMiddleware } from "./origin.js";
+import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { nanoid } from "nanoid";
 import { getDb } from "@job-scout/db";
@@ -18,7 +20,7 @@ import { settingsRoutes } from "./routes/settings.js";
 import { webhookRoutes } from "./routes/webhooks.js";
 import { todayRoutes } from "./routes/today.js";
 import { interviewsDeskRoutes, processesRoutes } from "./routes/process.js";
-import { handleClip } from "./routes/clip.js";
+import { clipPreview, handleClip } from "./routes/clip.js";
 
 const log = rootLog.child({ scope: "http" });
 const QUIET_PATHS = new Set(["/api/v1/health", "/api/v1/ready", "/metrics", "/favicon.ico"]);
@@ -27,6 +29,9 @@ export function createApp() {
   const app = new Hono();
 
   app.use("*", async (c, next) => {
+    c.header("X-Frame-Options", "DENY");
+    c.header("X-Content-Type-Options", "nosniff");
+    c.header("Referrer-Policy", "strict-origin-when-cross-origin");
     const requestId = c.req.header("x-request-id") || nanoid(10);
     c.set("requestId", requestId);
     const t0 = performance.now();
@@ -59,10 +64,20 @@ export function createApp() {
     else if (status >= 400) log.warn("http.request", fields);
     else log.info("http.request", fields);
   });
+  app.use("/mcp", bodyLimit({ maxSize: 2 * 1024 * 1024 }));
+  app.use("/mcp/*", bodyLimit({ maxSize: 2 * 1024 * 1024 }));
+  app.use("/clip", bodyLimit({ maxSize: 2 * 1024 * 1024 }));
+  app.use("/api/v1/auth/login", bodyLimit({ maxSize: 4096 }));
+  app.use("/clip", clipPreview);
+  app.use("/api/*", originMiddleware);
+  app.use("/clip", originMiddleware);
+  app.use("/mcp", originMiddleware);
+  app.use("/mcp/*", originMiddleware);
   app.use(
     "*",
     cors({
-      origin: "*",
+      origin: (origin) => allowedOrigin(origin) ? origin : undefined,
+      credentials: true,
       allowHeaders: ["Content-Type", "Authorization", "Mcp-Session-Id", "Mcp-Protocol-Version", "Mcp-Method", "Mcp-Name", "Last-Event-ID"],
       allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     }),
@@ -78,8 +93,8 @@ export function createApp() {
       const db = await getDb();
       await db.execute(sql`select 1`);
       return ok(c, { ready: true });
-    } catch (e) {
-      return fail(c, "INTERNAL", e instanceof Error ? e.message : String(e), {}, 503);
+    } catch {
+      return fail(c, "INTERNAL", "Database is not ready", {}, 503);
     }
   });
   app.post("/api/v1/auth/login", loginHandler);
@@ -98,7 +113,7 @@ export function createApp() {
 
   app.onError((err, c) => {
     log.error("http.unhandled", { requestId: c.get("requestId"), method: c.req.method, path: c.req.path, err });
-    return fail(c, "INTERNAL", err.message);
+    return fail(c, "INTERNAL", "Internal server error");
   });
   app.notFound((c) => (c.req.path.startsWith("/api/") ? fail(c, "NOT_FOUND", `no route ${c.req.method} ${c.req.path}`) : c.text("not found", 404)));
 

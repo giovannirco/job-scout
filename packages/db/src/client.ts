@@ -2,6 +2,7 @@ import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
 import { drizzle as drizzlePg } from "drizzle-orm/node-postgres";
 import { PGlite } from "@electric-sql/pglite";
 import pg from "pg";
+import { postgresConfig } from "./pg-config.js";
 import path from "node:path";
 import fs from "node:fs";
 import { currentDb } from "./db-context.js";
@@ -39,26 +40,7 @@ export async function getDb(): Promise<Db> {
 async function openDb(): Promise<Db> {
   const url = process.env.DATABASE_URL;
   if (url && !url.startsWith("pglite:")) {
-    // CNPG / internal cluster certs are not public CAs — never verify-full by default.
-    const useSsl =
-      process.env.PGSSL !== "0" &&
-      process.env.PGSSL !== "false" &&
-      (process.env.PGSSL === "1" ||
-        /sslmode=/i.test(url) ||
-        url.includes(".svc") ||
-        url.includes("postgres-platform") ||
-        url.includes("cnpg"));
-    const cleanUrl = url
-      .replace(/([?&])sslmode=[^&]*/gi, "$1")
-      .replace(/[?&]$/, "")
-      .replace(/\?&/, "?");
-    _pool = new pg.Pool({
-      connectionString: cleanUrl,
-      ssl: useSsl ? { rejectUnauthorized: false } : undefined,
-      max: Number(process.env.PG_POOL_MAX || 8),
-      // 0 disables idle disconnects (useful over kubectl port-forward, which dies on resets)
-      idleTimeoutMillis: process.env.PG_IDLE_MS ? Number(process.env.PG_IDLE_MS) : 10_000,
-    });
+    _pool = new pg.Pool(postgresConfig(url));
     // Idle clients can be dropped by the server / a proxy; without a handler this is an uncaught error.
     _pool.on("error", (err) => log.error("db.pool.error", { err }));
     _db = drizzlePg(_pool, { schema });

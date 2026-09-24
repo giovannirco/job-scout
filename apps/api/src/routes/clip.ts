@@ -1,3 +1,6 @@
+import { html } from "hono/html";
+import { CLIP_TEXT_MAX } from "@job-scout/shared";
+import { allowedOrigin } from "../origin.js";
 import type { Context } from "hono";
 import * as core from "@job-scout/core";
 import { fail } from "../envelope.js";
@@ -37,4 +40,34 @@ export async function handleClip(c: Context) {
   } catch (e) {
     return fail(c, "VALIDATION_ERROR", e instanceof Error ? e.message : String(e));
   }
+}
+
+/** Cross-site bookmarklets stage an escaped preview; only a same-origin confirmation writes. */
+export async function clipPreview(c: Context, next: import("hono").Next) {
+  const origin = c.req.header("origin");
+  const crossSite = c.req.header("sec-fetch-site") === "cross-site";
+  if ((!origin || allowedOrigin(origin)) && !crossSite) return next();
+  if (!["GET", "POST"].includes(c.req.method)) return fail(c, "FORBIDDEN", "Origin is not allowed");
+  const payload = await readClipPayload(c);
+  if (!payload.url || payload.url.length > 8192 || payload.title.length > 2000 || payload.text.length > CLIP_TEXT_MAX) {
+    return fail(c, "VALIDATION_ERROR", "Clip is empty or too large");
+  }
+  try {
+    const url = new URL(payload.url);
+    if (!["https:", "http:"].includes(url.protocol)) throw new Error("Invalid URL");
+  } catch {
+    return fail(c, "VALIDATION_ERROR", "HTTP(S) URL required");
+  }
+  c.header("Content-Security-Policy", "default-src 'none'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
+  c.header("Cache-Control", "no-store");
+  c.header("Referrer-Policy", "no-referrer");
+  return c.html(html`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Confirm job clip</title></head><body>
+    <h1>Save this job to Job Scout?</h1><p>${payload.title || payload.url}</p><p>${payload.url}</p>
+    <p>Confirm this clip to add it to your desk. You must already be signed in to Job Scout.</p>
+    <form method="${c.req.method}" action="/clip">
+      <input type="hidden" name="url" value="${payload.url}">
+      <input type="hidden" name="title" value="${payload.title}">
+      <input type="hidden" name="text" value="${payload.text}">
+      <button type="submit">Save job clip</button>
+    </form></body></html>`);
 }
