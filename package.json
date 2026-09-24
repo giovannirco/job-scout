@@ -5,20 +5,20 @@
   "type": "module",
   "packageManager": "pnpm@9.15.0",
   "scripts": {
-    "dev": "EMBED_WORKER=1 tsx watch --clear-screen=false apps/api/src/index.ts",
-    "dev:api": "tsx apps/api/src/index.ts",
-    "dev:worker": "tsx apps/worker/src/index.ts",
+    "dev": "EMBED_WORKER=1 tsx watch --env-file-if-exists=.env --clear-screen=false apps/api/src/index.ts",
+    "dev:api": "tsx --env-file-if-exists=.env apps/api/src/index.ts",
+    "dev:worker": "tsx --env-file-if-exists=.env apps/worker/src/index.ts",
     "build": "vite build --config apps/web/vite.config.ts",
-    "start": "NODE_ENV=production tsx apps/api/src/index.ts",
-    "start:worker": "NODE_ENV=production tsx apps/worker/src/index.ts",
-    "once": "NODE_ENV=production tsx apps/worker/src/once.ts",
+    "start": "NODE_ENV=production tsx --env-file-if-exists=.env apps/api/src/index.ts",
+    "start:worker": "NODE_ENV=production tsx --env-file-if-exists=.env apps/worker/src/index.ts",
+    "once": "NODE_ENV=production tsx --env-file-if-exists=.env apps/worker/src/once.ts",
     "db:generate": "drizzle-kit generate --config packages/db/drizzle.config.ts",
-    "db:migrate": "tsx packages/db/src/migrate.ts",
+    "db:migrate": "tsx --env-file-if-exists=.env packages/db/src/migrate.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "eslint apps packages",
     "lint:strict": "pnpm lint --max-warnings 0",
-    "db:repair": "tsx packages/core/src/cli/repair-data.ts"
+    "db:repair": "tsx --env-file-if-exists=.env packages/core/src/cli/repair-data.ts"
   },
   "workspaces": [
     "apps/*",

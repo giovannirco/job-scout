@@ -1,3 +1,5 @@
+import { SetupChecklist } from "./SetupChecklist";
+import { ScoreRefresh } from "./ScoreRefresh";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ArrowRight, Check, Inbox, RadarIcon, RotateCcw, X } from "lucide-react";
@@ -18,7 +20,6 @@ export function TodayPage() {
   const q = useApi<TodayData>(["today"], "/api/v1/today", { refetchInterval: 30_000 });
   const auto = useApi<AutopilotState>(["autopilot"], "/api/v1/settings/autopilot", { staleTime: 60_000 });
   const sys = useApi<SystemInfo>(["system"], "/api/v1/settings/system", { staleTime: 30_000 });
-  const refresh = useAction(async () => post<{ enqueued: number; deduped: number }>("/api/v1/positions/refresh-stale-triage", { dryRun: false }), ["today", "positions"]);
   const d = q.data;
 
   if (q.isLoading) return <Page><Loading rows={6} /></Page>;
@@ -82,11 +83,13 @@ export function TodayPage() {
         {sys.data && !sys.data.llmConfigured ? (
           <p className="text-[12.5px] text-muted">
             No model key is set, so discovery files listings without scoring them.{" "}
-            <Link to="/settings" search={{ tab: "ai" }} className="text-accent hover:underline">Add a key in Settings</Link>
+            <Link to="/settings" search={{ tab: "ai" }} className="text-accent hover:underline">Configure AI in Settings</Link>
             {" "}when you want triage.
           </p>
         ) : null}
       </PageHeader>
+
+      <SetupChecklist llmConfigured={!!sys.data?.llmConfigured} />
 
       <div className="grid lg:grid-cols-[1fr_340px] gap-5 items-start">
         <div className="space-y-5 min-w-0">
@@ -114,12 +117,7 @@ export function TodayPage() {
               </div>
             ) : (
               <>
-                {d.decisions.some(r => r.triageStale) ? <div className="p-3 border-b border-border text-[12px] text-muted flex items-center justify-between gap-3">
-                  <span>Some scores use an older profile or have no recorded profile version. Refresh before relying on them.</span>
-                  <Btn size="xs" disabled={!sys.data?.llmConfigured || refresh.isPending} onClick={() => { void refresh.mutateAsync().then(r => toast.success(`${r.enqueued} refreshes queued · ${r.deduped} already queued`)).catch(e => toast.error(e.message)); }}>
-                    <RotateCcw className="h-3 w-3" /> Refresh stale scores
-                  </Btn>
-                </div> : null}
+                {d.decisions.some(r => r.triageStale) ? <ScoreRefresh /> : null}
                 <DecisionList rows={d.decisions} />
               </>
             )}
@@ -230,8 +228,9 @@ export function TodayPage() {
             <div className="grid grid-cols-3 gap-2 mb-3">
               <Mini label="LLM calls" value={llmRuns} />
               <Mini label="tokens" value={compact(llmTokens)} />
-              <Mini label="queue" value={running ? `${running}▸ ${queued}` : String(queued)} tone={running ? "accent" : failed ? "bad" : undefined} hint={failed ? `${failed} failed` : undefined} />
+              <Mini label="queue" value={running ? `${running}▸ ${queued}` : String(queued)} tone={running ? "accent" : failed ? "bad" : undefined} hint={failed ? `${failed} retained failures` : undefined} />
             </div>
+            {failed > 0 ? <p className="text-[12px] text-muted mb-3">Failure counts cover retained job history. <Link to="/settings" search={{ tab: "system" }} className="text-accent hover:underline">Inspect failures and recovery options</Link>.</p> : null}
             {d.llm.remaining?.length ? (
               <div className="space-y-1.5 mb-3">
                 {d.llm.remaining.map((r) => (

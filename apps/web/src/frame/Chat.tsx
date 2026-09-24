@@ -327,7 +327,7 @@ function Starter({ scope, onPick }: { scope: ChatScopeCtx; onPick: (t: string) =
   return (
     <div className="space-y-2">
       <div className="text-[12px] text-muted leading-relaxed">
-        {scope.scope === "global" ? "This chat can read your pipeline, change positions, and drive the browser." : `Scoped to ${scope.label}. It sees the JD, triage, evaluations and materials.`}
+        {scope.scope === "global" ? "This chat can help you review positions, manage your pipeline, and read job pages." : `Scoped to ${scope.label}. It sees the JD, triage, evaluations and materials.`}
       </div>
       <div className="grid gap-1">
         {prompts.map((p) => (

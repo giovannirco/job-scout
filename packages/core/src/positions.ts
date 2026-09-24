@@ -216,7 +216,7 @@ export async function listPositions(q: ListPositionsQuery) {
   const d = <T>(col: T) => (dir === "asc" ? asc(col as never) : desc(col as never));
   const order =
     field === "score"
-      ? [d(sql`coalesce(${positions.triageScore}, -1)`), desc(positions.updatedAt)]
+      ? [d(sql`coalesce(${positions.triageScore}, -1)`), desc(positions.updatedAt), desc(positions.id)]
       : field === "company"
         ? [d(companies.name), desc(positions.updatedAt)]
         : field === "status"

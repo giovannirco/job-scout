@@ -11,7 +11,7 @@ import { getPosition, getPositionDetail, patchPosition, upsertFromJob } from "./
 import { getProfile, profileFingerprint, updateProfile } from "./profile.js";
 import { updateSettings } from "./settings.js";
 import { runTriage } from "./triage.js";
-import { refreshStaleTriage } from "./triage-refresh.js";
+import { refreshStaleTriage, triageRefreshStatus } from "./triage-refresh.js";
 import { processJob } from "../../../apps/worker/src/loop.js";
 import * as autopilot from "./autopilot.js";
 import * as notify from "./notify.js";
@@ -110,6 +110,15 @@ describe("triage freshness", () => {
     expect(await refreshStaleTriage({ dryRun: false })).toMatchObject({ enqueued: 0, deduped: 1 });
     const queued = (await db.select().from(jobs))[0];
     expect(queued.payload).toMatchObject({ refreshOnly: true, positionId: p.id });
+    expect(await triageRefreshStatus()).toMatchObject({ total: 1, unavailable: null, items: [{ id: p.id, state: "queued" }] });
+    await db.update(jobs).set({ runAfter: new Date(Date.now() + 3_600_000), error: "daily call budget reached" }).where(eq(jobs.id, queued.id));
+    expect((await triageRefreshStatus()).items[0]).toMatchObject({ state: "waiting", error: "daily call budget reached" });
+    await db.update(jobs).set({ status: "failed", error: "provider unavailable" }).where(eq(jobs.id, queued.id));
+    expect((await triageRefreshStatus()).items[0]).toMatchObject({ state: "failed", error: "provider unavailable" });
+    await updateSettings({ llm: { operations: { triage: { enabled: false } } } });
+    expect((await triageRefreshStatus()).unavailable).toContain("disabled");
+    await updateSettings({ llm: { operations: { triage: { enabled: true } } } });
+    await db.update(jobs).set({ status: "queued", error: null, runAfter: new Date() }).where(eq(jobs.id, queued.id));
     await patchPosition(p.id, { status: "applied" });
     const llm = vi.spyOn(getLlmClient(), "chatJson");
     expect(await processJob(queued)).toMatchObject({ skipped: true, reason: "position_no_longer_eligible" });

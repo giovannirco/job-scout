@@ -23,12 +23,12 @@ Use Node.js 22.12 or newer and pnpm 9.15.0:
 ```sh
 cp .env.example .env
 pnpm install --frozen-lockfile
-pnpm exec node --env-file=.env --import tsx apps/api/src/index.ts
+pnpm dev
 ```
 
 Open [localhost:8080](http://localhost:8080), then fill in Settings › Profile. With `DATABASE_URL` unset, the app stores data locally in PGlite. The example configuration includes an embedded worker.
 
-The command above explicitly loads `.env`. The `pnpm dev` watch command currently reads exported environment variables only. Local defaults use unauthenticated development mode on loopback; configure authentication before exposing the app. See [Security](docs/SECURITY.md).
+Development, server, worker and database maintenance commands load `.env` when present. Exported environment variables take precedence. Local defaults use unauthenticated development mode on loopback; configure authentication before exposing the app. See [Security](docs/SECURITY.md).
 
 To enable AI, set `OPENAI_BASE_URL` and `OPENAI_API_KEY`, restart, and select models in Settings › AI. The gateway needs the structured-output and streaming features used by your selected operations. Set a random `API_TOKEN_SEED` or create a token in Settings › System for MCP clients.
 

@@ -100,6 +100,6 @@ Policy: `packages/shared/src/notify.ts`. Sender: `packages/core/src/waha.ts`. Ou
 ## Failure behaviour
 
 - LLM gate errors (operation disabled, no model, cap or budget reached) are not job failures: the job is parked and retried in an hour.
-- Transient LLM/network errors retry up to 3 attempts with linear backoff.
+- Transient AI errors and temporary scan fetch failures retry up to 3 attempts with linear backoff. Blocked, invalid and missing source URLs require inspection.
 - Postgres pool errors are logged, not fatal; the client reconnects.
 - A worker killed mid-job leaves the row `running`; the next worker requeues it after 30 min, and a graceful shutdown releases it immediately.

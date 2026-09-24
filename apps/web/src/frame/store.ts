@@ -72,7 +72,7 @@ function loadUi(): UiState {
   }
   const wide = window.innerWidth >= 1280;
   return {
-    dockOpen: saved.dockOpen ?? wide,
+    dockOpen: wide && (saved.dockOpen ?? true),
     dockTab: saved.dockTab ?? "wire",
     sidebarCollapsed: saved.sidebarCollapsed ?? false,
     chatScope: { scope: "global" },
@@ -87,7 +87,10 @@ const uiListeners = new Set<() => void>();
 export function setUi(patch: Partial<UiState> | ((s: UiState) => Partial<UiState>)) {
   const p = typeof patch === "function" ? patch(ui) : patch;
   ui = { ...ui, ...p };
-  const { dockOpen, dockTab, sidebarCollapsed } = ui;
+  const { dockTab, sidebarCollapsed } = ui;
+  let saved: Partial<UiState> = {};
+  try { saved = JSON.parse(localStorage.getItem(UI_KEY) || "{}"); } catch { /* use defaults */ }
+  const dockOpen = window.innerWidth >= 1024 ? ui.dockOpen : saved.dockOpen;
   localStorage.setItem(UI_KEY, JSON.stringify({ dockOpen, dockTab, sidebarCollapsed }));
   uiListeners.forEach((l) => l());
 }

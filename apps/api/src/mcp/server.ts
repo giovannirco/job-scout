@@ -37,27 +37,18 @@ import {
   getCurrentMaterial,
   listEvents,
   briefOf,
+  triageBriefOf,
   mcpCalls,
   mcpDuration,
 } from "@job-scout/core";
 import { log as rootLog } from "@job-scout/shared";
 import { env } from "../env.js";
+import { text } from "./result.js";
+import { workQueue, WorkQueueInput } from "./work-queue.js";
 
 type ToolCtx = { authInfo?: { clientId?: string; scopes?: string[] }; http?: { authInfo?: { clientId?: string; scopes?: string[] } } };
 const agentOf = (ctx: ToolCtx) => ctx.http?.authInfo?.clientId || ctx.authInfo?.clientId || "mcp-client";
 
-const RESULT_CAP = 100_000;
-/** Pretty JSON for small payloads; compact when it would otherwise blow the result cap. */
-function text(data: unknown, isError = false) {
-  let t: string;
-  if (typeof data === "string") t = data;
-  else {
-    const compact = JSON.stringify(data);
-    t = compact.length > 30_000 ? compact : JSON.stringify(data, null, 2);
-  }
-  if (t.length > RESULT_CAP) t = t.slice(0, RESULT_CAP - 40) + `\n…[truncated at ${RESULT_CAP} chars]`;
-  return { content: [{ type: "text" as const, text: t }], isError };
-}
 const errText = (e: unknown) => text({ error: e instanceof Error ? e.message : String(e), code: e instanceof LlmGateError ? e.code : undefined }, true);
 
 async function resolvePositionId(idOrSlug?: string, q?: string) {
@@ -193,7 +184,7 @@ export function createJobScoutMcpServer() {
       if (!p) return text({ error: "not found" }, true);
       const profile = await getProfile();
       const ev = await getEvaluation(p.id, "evaluate");
-      return text({ position: { ...p, jd: undefined }, jdText: await currentJdText(p.id), triage: p.triageJson, evaluation: ev ? { id: ev.id, model: ev.model, summary: ev.json, createdAt: ev.createdAt } : null, brief: briefOf(profile) });
+      return text({ position: { ...p, jd: undefined }, jdText: await currentJdText(p.id), triage: p.triageJson, evaluation: ev ? { id: ev.id, model: ev.model, summary: ev.json, createdAt: ev.createdAt } : null, brief: triageBriefOf(profile) });
     },
   );
 
@@ -235,18 +226,8 @@ export function createJobScoutMcpServer() {
 
   server.registerTool(
     "work_queue",
-    { title: "Work queue", description: "Decision lanes: PASS awaiting decision; review (including deliberate operator overrides); applied; marginal; failedReview (failed triage without an operator override, lower priority). Closed/invalid decision rows are excluded.", inputSchema: { limit: z.number().int().min(1).max(100).optional() }, annotations: { readOnlyHint: true } },
-    async (a) => {
-      const lim = String(a.limit ?? 20);
-      const [decide, review, applied, marginal, failedReview] = await Promise.all([
-        listPositions({ status: "triaged", verdict: "pass", sort: "score_desc", pageSize: lim, actionable: "true", collapseFamilies: "true" }),
-        listPositions({ status: "review", reviewLane: "pending", sort: "updated_desc", pageSize: lim, actionable: "true", collapseFamilies: "true" }),
-        listPositions({ status: "applied", sort: "updated_desc", pageSize: lim }),
-        listPositions({ status: "triaged", verdict: "marginal", sort: "score_desc", pageSize: lim, actionable: "true", collapseFamilies: "true" }),
-        listPositions({ status: "review", reviewLane: "failed", sort: "score_desc", pageSize: lim, actionable: "true", collapseFamilies: "true" }),
-      ]);
-      return text({ decide: decide.items, review: review.items, applied: applied.items, marginal: marginal.items, failedReview: failedReview.items });
-    },
+    { title: "Work queue", description: "Compact decision lanes with profile freshness. Use lane and page to read more; pagination reports totals and nextPage for each lane. Use get_position for full details.", inputSchema: WorkQueueInput, annotations: { readOnlyHint: true } },
+    async (a) => text(await workQueue(a)),
   );
 
   server.registerTool(

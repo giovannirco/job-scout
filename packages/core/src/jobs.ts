@@ -1,3 +1,4 @@
+import { jobRecovery } from "@job-scout/shared";
 import { and, asc, desc, eq, inArray, lte, sql } from "drizzle-orm";
 import { getDb, id, jobs, positions, type JobType } from "@job-scout/db";
 
@@ -171,4 +172,28 @@ export async function requeueStale(staleMs = 30 * 60_000) {
     .where(and(eq(jobs.status, "running"), lte(jobs.startedAt, cutoff)))
     .returning();
   return res.length;
+}
+
+/** Reset only a failed, transient scan; preserve its payload and guard double clicks. */
+export async function retryFailedScan(jobId: string) {
+  const db = await getDb();
+  return db.transaction(async tx => {
+    const row = (await tx.select().from(jobs).where(eq(jobs.id, jobId)).for("update")).at(0);
+    if (!row) throw new Error("Job not found");
+    if (row.status !== "failed") throw new Error("Only failed checks can be retried");
+    const recovery = jobRecovery(row.type, row.error);
+    if (!recovery.retryable) throw new Error(recovery.advice);
+    const payload = row.payload ?? {};
+    const target = row.type === "board_scan" ? "boardId" : row.type === "scan_url" ? "url" : payload.watchId ? "watchId" : "positionId";
+    const value = payload[target];
+    if (typeof value !== "string" || !value) throw new Error("This check has no target. Queue a new check from Sources or the position page.");
+    const pending = (await tx.select({ id: jobs.id }).from(jobs).where(and(
+      eq(jobs.type, row.type), inArray(jobs.status, ["queued", "running"]),
+      sql`${jobs.payload}->>${target} = ${value}`,
+    )).limit(1)).at(0);
+    if (pending) return { id: pending.id, deduped: true };
+    await tx.update(jobs).set({ status: "queued", attempts: 0, error: null, result: {},
+      startedAt: null, finishedAt: null, runAfter: new Date() }).where(and(eq(jobs.id, row.id), eq(jobs.status, "failed")));
+    return { id: row.id, deduped: false };
+  });
 }

@@ -97,3 +97,5 @@ Board scans and watch checks do not use a model. Their frequency depends on the 
 Triage now combines the current location, target roles, cash floor and career direction with the scout brief, identity and master resume. The stored fingerprint covers that effective input. Contact-only changes do not invalidate scores. Scores made before this prompt change need one refresh; missing historical fingerprints also count as stale.
 
 Today marks old scores and provides **Refresh stale scores** for up to 25 PASS candidates in the decision queue. This action only recalculates triage: pipeline stages remain unchanged, and it does not trigger autopilot or notifications. Caps and model settings still apply. Refreshes are queued, so the warning disappears after the worker completes them. Chat includes the same freshness flag in its tool results.
+
+Today shows whether score refreshes are queued, running, waiting for a retry or budget, or failed. Failures link to Settings for diagnosis; retries keep application stages unchanged.

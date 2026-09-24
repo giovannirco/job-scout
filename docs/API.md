@@ -168,3 +168,9 @@ curl -N -X POST $B/chat/threads/$T/messages -H "$H" -H 'content-type: applicatio
 Authentication, scope requirements, trusted origins and deployment migration: [SECURITY.md](SECURITY.md).
 
 `POST /api/v1/positions/refresh-stale-triage` accepts `{ "limit": 25, "dryRun": true }`. Preview is the default. Set `dryRun: false` to queue up to 25 stale PASS candidates from the decision queue. Refresh jobs preserve pipeline stages and do not run autopilot or send notifications. Existing queued triage jobs are reported as deduplicated.
+
+`GET /api/v1/positions/refresh-stale-triage` reports stale candidate count, whether triage is available, and progress for the next batch: `needed`, `queued`, `running`, `waiting`, or `failed`. Waiting items include their next retry time. It does not enqueue model calls.
+
+`POST /api/v1/settings/system/jobs/:id/retry` retries one failed scan with a temporary fetch error. It preserves the target, resets the attempt counter and refuses blocked/invalid URLs, non-scan jobs and checks already running. Existing pending work is deduplicated. AI retries use `/settings/llm/retry`.
+
+`POST /api/v1/settings/system/watches` queues checks for due watched positions and URLs. It returns the number due and enqueued.

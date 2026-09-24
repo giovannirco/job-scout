@@ -1,6 +1,8 @@
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { getDb, jobs } from "@job-scout/db";
 import { z } from "zod";
 import { enqueueJob } from "./jobs.js";
-import { gateOperation } from "./llm.js";
+import { gateOperation, operationUnavailable } from "./llm.js";
 import { listPositions } from "./positions.js";
 
 export const RefreshStaleTriageInput = z.object({
@@ -24,4 +26,22 @@ export async function refreshStaleTriage(input: unknown = {}) {
   return { dryRun, total: candidates.total, selected: items.length,
     enqueued: items.filter(p => p.jobId && !p.deduped).length,
     deduped: items.filter(p => p.deduped).length, items };
+}
+
+/** Read refresh progress across reloads, including jobs waiting on a budget. */
+export async function triageRefreshStatus() {
+  const preview = await refreshStaleTriage();
+  const unavailable = await operationUnavailable("triage");
+  const db = await getDb();
+  const ids = preview.items.map(p => p.id);
+  const rows = ids.length ? await db.select().from(jobs).where(and(eq(jobs.type, "triage"),
+    inArray(sql<string>`${jobs.payload}->>'positionId'`, ids))).orderBy(desc(jobs.createdAt), desc(jobs.id)) : [];
+  return { total: preview.total, unavailable, items: preview.items.map(p => {
+    const candidates = rows.filter(j => j.payload?.positionId === p.id);
+    const job = candidates.find(j => j.status === "running" || j.status === "queued") ?? candidates.at(0);
+    return { id: p.id, state: job?.status === "queued" && job.runAfter > new Date() ? "waiting" :
+      job && ["queued", "running", "failed"].includes(job.status) ? job.status : "needed",
+      jobId: job?.id ?? null, retryAt: job?.status === "queued" ? job.runAfter : null,
+      error: job?.status === "failed" || job?.status === "queued" ? job.error : null };
+  }) };
 }

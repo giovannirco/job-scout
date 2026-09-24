@@ -68,6 +68,14 @@ function Frame() {
   const today = useToday();
   const navigate = useNavigate();
 
+  useEffect(() => {
+    const narrow = window.matchMedia("(max-width: 1023px)");
+    const closeOverlay = () => { if (narrow.matches) setUi({ dockOpen: false }); };
+    closeOverlay();
+    narrow.addEventListener("change", closeOverlay);
+    return () => narrow.removeEventListener("change", closeOverlay);
+  }, []);
+
   // global keys
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

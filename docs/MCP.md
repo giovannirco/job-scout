@@ -7,7 +7,7 @@ The API includes an MCP server for reading positions, managing the pipeline and 
 | **Endpoint** | `POST https://<host>/mcp` (Streamable HTTP, stateless: one POST per message, any replica can answer) |
 | **SDK** | `@modelcontextprotocol/server` with `legacy: "stateless"`, so 2025-era clients still work |
 | **Auth** | `Authorization: Bearer <token>` — the seed token, or a Settings › System token with scope `mcp`, `agent` or `admin` |
-| **Payloads** | JSON, with a 100 KB result limit. Use cursor pagination where offered and small limits for `work_queue`; oversized results currently truncate the JSON text |
+| **Payloads** | JSON, with a 100 KB UTF-8 result limit. Oversized results return `isError: true` with `RESULT_TOO_LARGE`; request fewer rows or narrower filters. JSON is never cut mid-response |
 | **Code** | `apps/api/src/mcp/server.ts` (tools) · `apps/api/src/mcp/handler.ts` (HTTP + auth) |
 
 ## Tools
@@ -23,7 +23,7 @@ The API includes an MCP server for reading positions, managing the pipeline and 
 | `scout_context` | everything to reason about one role: position, triage JSON, JD text, latest evaluation summary, profile brief |
 | `get_evaluation` | latest markdown + JSON for `evaluate` / `jd_review` / `company_research` |
 | `get_materials` | current resume + cover markdown |
-| `work_queue` | decision lanes: PASS awaiting a decision, review (including a deliberate operator override), applied, marginal, and failed triage that has no operator override. Closed rows are left out |
+| `work_queue` | decision lanes: PASS awaiting a decision, review (including a deliberate operator override), applied, marginal, and failed triage that has no operator override. Closed rows are left out. Compact summaries; `lane`, `page`, `limit` (default 20 per lane), with totals and `nextPage` in `pagination`. Use `get_position` for full details |
 | `list_discovery` | `lane`, `hours`, `q`, `reason` prefix; cursor pagination |
 | `list_companies` / `get_company` | companies with counts / detail with positions and latest research |
 | `get_profile` / `get_identity` | operator profile / identity + master resume + scout brief markdown |
@@ -99,3 +99,5 @@ curl -sS -X POST http://localhost:8080/mcp \
 ```
 
 `refresh_stale_triage` previews the top stale PASS decision candidates by default (`limit` 1–25). Set `dryRun=false` to enqueue score-only refreshes without moving stages, running autopilot or sending notifications. `run_llm` with `operation=triage` now reruns stale or unknown-profile scores without requiring `force`; unchanged current-profile scores remain cached.
+
+`scout_context` includes the same current profile facts used by triage, alongside the scout brief, background and resume.

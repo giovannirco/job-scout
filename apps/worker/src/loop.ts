@@ -30,7 +30,7 @@ import {
   type JobRow,
 } from "@job-scout/core";
 import type { JobType } from "@job-scout/db";
-import { log as rootLog } from "@job-scout/shared";
+import { jobRecovery, log as rootLog } from "@job-scout/shared";
 
 const log = rootLog.child({ scope: "worker" });
 
@@ -142,7 +142,7 @@ export function startWorker(opts: WorkerOptions = {}) {
         jobsProcessed.labels({ type: job.type, outcome: "ok" }).inc();
         jlog.info("job.skipped", { ms, reason: "junk_title" });
         return;
-      } else if (!gate && LLM_TYPES.includes(job.type) && job.attempts < 3 && /timeout|429|5\d\d|ECONN|fetch failed/i.test(msg)) {
+      } else if (!gate && job.attempts < 3 && (jobRecovery(job.type, msg).retryable || (LLM_TYPES.includes(job.type) && /timeout|429|5\d\d|ECONN|fetch failed/i.test(msg)))) {
         outcome = "retry";
         await failJob(job.id, msg, { retryInMs: 2 * 60_000 * job.attempts });
       } else {

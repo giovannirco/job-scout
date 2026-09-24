@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { Bot, Copy, Globe, Hand, MessageCircle, Play, RefreshCw, Sparkles, Trash2, Zap } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { clipBookmarklet, isStarterScoutBrief, pausedGeoBlocks, titleExcludesFromNorthStar } from "@job-scout/shared";
+import { jobRecovery, clipBookmarklet, isStarterScoutBrief, pausedGeoBlocks, titleExcludesFromNorthStar } from "@job-scout/shared";
 import { useChatScope, useTheme, type ThemePref } from "@/frame/store";
 import { api, del, patch, post, qs, useApi, type ApiToken, type AutopilotConfig, type AutopilotState, type Job, type LlmStatus, type ModelsCatalog, type NotificationsConfig, type NotifyChannel, type Profile, type Settings, type SystemInfo } from "@/lib/api";
 import { ago, compact, dateTime } from "@/lib/format";
@@ -206,7 +206,7 @@ function ProfileTab() {
   return (
     <div className="space-y-4 max-w-4xl">
       <p className="text-[12.5px] text-muted">
-        The <b className="text-fg font-medium">scout brief</b> is what triage reads. <b className="text-fg font-medium">Target roles</b> are the title gate: saving them rechecks listings from the last 7 days. Untouched scan filings whose titles no longer match are archived. A specialty word such as java is kept on its own, so Java Developer still matches, and it does not match JavaScript. Engineer and developer are the same shape, so Software Engineer also matches Software Developer. Extra include or exclude terms stay under Gate.
+        Start with your location, target roles and career direction. Triage also reads your scout brief, background and resume. Contact details are optional. <b className="text-fg font-medium">Target roles</b> are the title gate: saving them rechecks listings from the last 7 days. Untouched scan filings whose titles no longer match are archived. A specialty word such as java is kept on its own, so Java Developer still matches, and it does not match JavaScript. Engineer and developer are the same shape, so Software Engineer also matches Software Developer. Extra include or exclude terms stay under Gate.
       </p>
       <Panel title="Identity">
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -412,6 +412,9 @@ function AiTab() {
 
   return (
     <div className="space-y-4">
+      {!s.configured ? <Panel title="Connect a model provider">
+        <p className="text-[13px] text-muted">Set OPENAI_BASE_URL and OPENAI_API_KEY in your local .env file or server secrets, then restart the API and worker. Select a model for each operation below, save, and use Test to verify it. Set daily limits before enabling automatic work.</p>
+      </Panel> : null}
       <Card className="p-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-[12px]">
         <span className="inline-flex items-center gap-2">
           <Dot tone={s.configured ? "good" : "bad"} />
@@ -856,7 +859,18 @@ function Swatch({ mode }: { mode: "dark" | "light" }) {
 function SystemTab() {
   const sys = useApi<SystemInfo>(["system"], "/api/v1/settings/system", { refetchInterval: 15_000 });
   const settings = useApi<Settings>(["settings"], "/api/v1/settings");
-  const [jobStatus, setJobStatus] = useState("");
+  const [jobStatus, setJobStatus] = useState("failed");
+  const [retrying, setRetrying] = useState<string | null>(null);
+  async function retryCheck(id: string) {
+    setRetrying(id);
+    try {
+      const r = await post<{ deduped: boolean }>(`/api/v1/settings/system/jobs/${id}/retry`);
+      toast.success(r.deduped ? "This check is already queued" : "Check queued for retry");
+      await qc.invalidateQueries({ queryKey: ["system"] });
+      await qc.invalidateQueries({ queryKey: ["today"] });
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Retry failed"); }
+    finally { setRetrying(null); }
+  }
   const jobs = useApi<Job[]>(["system", "jobs", jobStatus], `/api/v1/settings/system/jobs${qs({ status: jobStatus, limit: 60 })}`, { refetchInterval: 10_000 });
   const tokens = useApi<ApiToken[]>(["tokens"], "/api/v1/settings/tokens");
   const qc = useQueryClient();
@@ -876,10 +890,12 @@ function SystemTab() {
     const r = await post<Record<string, number>>("/api/v1/settings/system/retention");
     toast.success(`Retention: ${Object.entries(r).map(([k, v]) => `${k}=${v}`).join(" ")}`);
   }
-  async function enqueue(type: string) {
-    await post("/api/v1/settings/system/jobs", { type });
-    toast.success(`${type} queued`);
-    void qc.invalidateQueries({ queryKey: ["system"] });
+  async function enqueueWatches() {
+    try {
+      const r = await post<{ enqueued: number }>("/api/v1/settings/system/watches");
+      toast.success(r.enqueued ? `${r.enqueued} watch checks queued` : "No watch checks are due");
+      void qc.invalidateQueries({ queryKey: ["system"] });
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not queue watch checks"); }
   }
   async function createToken() {
     const r = await post<{ token: string }>("/api/v1/settings/tokens", { name: tokName });
@@ -919,7 +935,7 @@ function SystemTab() {
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <Fact label="version" value={`v${sys.data?.version ?? "…"}`} />
         <Fact label="auth" value={sys.data?.authMode ?? "…"} />
-        <Fact label="LLM gateway" value={sys.data?.llmConfigured ? "connected" : "no key"} tone={sys.data?.llmConfigured ? "good" : "bad"} hint={sys.data?.llmBaseUrl} />
+        <Fact label="LLM gateway" value={sys.data?.llmConfigured ? "key configured" : "no key"} tone={sys.data?.llmConfigured ? "good" : "bad"} hint={sys.data?.llmBaseUrl} />
         <Fact
           label="job-scout Steel"
           value={!br?.configured ? "off" : br.ok ? "ready" : "unreachable"}
@@ -931,13 +947,13 @@ function SystemTab() {
 
       <Panel
         title="Queue"
-        meta={`${by("running")} running · ${by("queued")} queued · ${by("failed")} failed`}
+        meta={`${by("running")} running · ${by("queued")} queued · ${by("failed")} retained failures`}
         actions={
           <>
             <Btn size="xs" variant="ghost" onClick={() => post<{ enqueued: number }>("/api/v1/radar/boards/scan-all").then((r) => { const text = discoveryQueuedMessage(r); if (r.enqueued > 0) toast.success(text); else toast.message(text); })}>
               Discovery
             </Btn>
-            <Btn size="xs" variant="ghost" onClick={() => enqueue("watch_check")}>
+            <Btn size="xs" variant="ghost" onClick={enqueueWatches}>
               Watches
             </Btn>
             <Btn size="xs" variant="ghost" onClick={runRetention}>
@@ -948,6 +964,7 @@ function SystemTab() {
         flush
       >
         <div className="px-3 py-2 border-b border-border">
+          <p className="text-[12px] text-muted mb-2">Failures remain here until retention removes them. They are historical attempts, not a count of currently broken sources. A blocked request does not mean the posting closed.</p>
           <Seg<string>
             size="xs"
             value={jobStatus}
@@ -970,7 +987,7 @@ function SystemTab() {
                 <Th right>Att</Th>
                 <Th right>Created</Th>
                 <Th right>Took</Th>
-                <Th>Error</Th>
+                <Th>Error and recovery</Th>
               </tr>
             </thead>
             <tbody>
@@ -992,10 +1009,15 @@ function SystemTab() {
                   <Td right mono className="text-muted">
                     {j.startedAt && j.finishedAt ? `${((new Date(j.finishedAt).getTime() - new Date(j.startedAt).getTime()) / 1000).toFixed(1)}s` : "—"}
                   </Td>
-                  <Td className="max-w-[320px] text-bad text-[11px]">
-                    <div className="truncate" title={j.error || ""}>
-                      {j.error || ""}
-                    </div>
+                  <Td className="min-w-[240px] max-w-[360px] text-[11px]">
+                    {j.error ? <div className="space-y-2">
+                      <p className="font-medium text-warn">{jobRecovery(j.type, j.error).title}</p>
+                      <p className="text-muted whitespace-normal">{jobRecovery(j.type, j.error).advice}</p>
+                      {j.status === "failed" && jobRecovery(j.type, j.error).retryable ? <Btn size="xs" disabled={retrying === j.id} onClick={() => { void retryCheck(j.id); }}>Retry check</Btn> : null}
+                      {typeof j.payload.positionId === "string" ? <Link to="/positions/$id" params={{ id: j.payload.positionId }} className="block text-accent">Open position</Link> : null}
+                      {jobRecovery(j.type, j.error).kind === "model" ? <Link to="/settings" search={{ tab: "ai" }} className="block text-accent">AI settings and retries</Link> : null}
+                      <details><summary className="cursor-pointer text-muted">Error details</summary><p className="whitespace-pre-wrap break-all text-bad">{j.error}</p></details>
+                    </div> : null}
                   </Td>
                 </Tr>
               ))}

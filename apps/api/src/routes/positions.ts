@@ -36,6 +36,7 @@ import {
   reconcileCareerOps,
   llmConfigured,
   refreshStaleTriage,
+  triageRefreshStatus,
 } from "@job-scout/core";
 import type { EvaluationKind } from "@job-scout/db";
 import { body, fail, ok, queryMap } from "../envelope.js";
@@ -47,6 +48,7 @@ positionsRoutes.get("/", async (c) => {
   return ok(c, r.items, { page: r.page, pageSize: r.pageSize, total: r.total, nextCursor: r.nextCursor });
 });
 
+positionsRoutes.get("/refresh-stale-triage", async (c) => ok(c, await triageRefreshStatus()));
 positionsRoutes.post("/refresh-stale-triage", async (c) => {
   try { return ok(c, await refreshStaleTriage(await body(c))); }
   catch (e) {

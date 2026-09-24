@@ -58,6 +58,11 @@ export async function gateOperation(operation: LlmOperationId, settings?: Settin
   }
 }
 
+export async function operationUnavailable(operation: LlmOperationId): Promise<string | null> {
+  try { await gateOperationInner(operation); return null; }
+  catch (e) { if (!(e instanceof LlmGateError)) throw e; return e.message; }
+}
+
 async function gateOperationInner(operation: LlmOperationId, settings?: Settings) {
   if (!llmConfigured()) throw new LlmGateError("not_configured", "OPENAI_API_KEY is not set");
   const s = settings ?? (await getSettings());

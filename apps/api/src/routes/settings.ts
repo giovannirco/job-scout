@@ -11,6 +11,7 @@ import {
   wahaConfigured,
   jobStats,
   listJobs,
+  retryFailedScan,
   llmConfigured,
   recentRuns,
   listLlmRuns,
@@ -22,6 +23,7 @@ import {
   updateSettings,
   usageSummary,
   enqueueJob,
+  enqueueDueWatchChecks,
   retryFailedLlm,
   coreEnv,
   LlmGateError,
@@ -177,6 +179,11 @@ settingsRoutes.get("/system/browser", async (c) => ok(c, await browserStatus()))
 settingsRoutes.get("/system/jobs", async (c) =>
   ok(c, await listJobs({ status: c.req.query("status"), type: c.req.query("type"), limit: Number(c.req.query("limit") || 50) })),
 );
+settingsRoutes.post("/system/jobs/:id/retry", async (c) => {
+  try { return ok(c, await retryFailedScan(c.req.param("id")), {}, 202); }
+  catch (e) { return fail(c, "CONFLICT", e instanceof Error ? e.message : "Check could not be retried"); }
+});
+settingsRoutes.post("/system/watches", async (c) => ok(c, await enqueueDueWatchChecks(), {}, 202));
 settingsRoutes.post("/system/retention", async (c) => ok(c, await runRetention()));
 settingsRoutes.post("/system/jobs", async (c) => {
   const b = await body<{ type?: string; payload?: Record<string, unknown> }>(c);
