@@ -6,7 +6,7 @@ import tseslint from "typescript-eslint";
 export default [
   { ignores: ["**/node_modules/**", "**/dist/**", "**/.data/**", "**/migrations/meta/**", "packages/lint-config/**"] },
   {
-    files: ["apps/**/*.{ts,tsx}", "packages/**/*.{ts,tsx}", "scripts/*.ts"],
+    files: ["apps/**/*.{ts,tsx}", "packages/**/*.{ts,tsx}"],
     languageOptions: {
       parser: tseslint.parser,
       // Honor stdin/editor buffers too, not just immutable CLI disk snapshots.

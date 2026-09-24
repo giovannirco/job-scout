@@ -29,7 +29,6 @@ backups
 **/*.sqlite3
 **/*.db
 **/bench-cases*.json
-scripts/bench-models.ts
 
 # Development privacy checks and local documents
 .githooks

@@ -2,9 +2,9 @@
 
 Public source and runtime images are intended to contain application code and generic defaults only. Keep your profile, applications, notes, resumes, transcripts, service credentials, and database backups in runtime storage or a private deployment repository. Do not copy a private checkout into the public build context. The public repository is not a place to store real Helm Secret values.
 
-## Authentication migration
+## Authentication
 
-Existing `js_session=ok` cookies are invalid. Sign in again after upgrading. Password sessions are HMAC-authenticated, expire after 30 days, and are invalidated when either configured credential changes. They use HttpOnly, SameSite=Lax and (in production) Secure cookies. Production therefore requires HTTPS at the browser-facing proxy.
+Password sessions are HMAC-authenticated, expire after 30 days, and are invalidated when either configured credential changes. They use HttpOnly, SameSite=Lax and (in production) Secure cookies. Production therefore requires HTTPS at the browser-facing proxy.
 
 * `AUTH_MODE=token`: configure `AUTH_PASSWORD` (at least 16 characters) for UI login and/or `API_TOKEN_SEED` (at least 32 characters) for API/MCP access. Use independently generated random credentials. A seed token cannot be used as a UI password. There are no built-in password or bearer credentials.
 * `AUTH_MODE=cf_access`: configure `CF_ACCESS_ISSUER=https://your-team.cloudflareaccess.com` and `CF_ACCESS_AUDIENCE` for this Access application. Job Scout verifies the `Cf-Access-Jwt-Assertion` signature, issuer, audience, expiry and activation time against that team's HTTPS signing-key endpoint. The email header alone grants no access; local password/cookie login is disabled. Configured bearer tokens remain supported for automation. Signing keys are cached for five minutes; newly rotated keys may be rejected until the cache expires.
@@ -36,7 +36,7 @@ PostgreSQL connections verify the server certificate and hostname by default, in
 2. Keep the existing private PostgreSQL database/PVC and a restorable backup. Repoint the deployment image to a reviewed public image while retaining that database. App migrations update schema; replacing the image does not require exporting a personal profile into source files.
 3. Supply `DATABASE_URL`, authentication credentials, integration keys, and (if needed) `PGSSL_CA` through the chart's `existingSecret` or a secret-management controller. Keep site-specific routes and private overrides in private GitOps configuration. Do not use public `secrets.create` values for real credentials.
 4. For a new empty database, enter your profile through Settings after authenticating, or perform a separately reviewed private data import. Public defaults intentionally contain no operator profile.
-5. Verify login, private API rejection without credentials, DB readiness and worker operation in staging before switching traffic. No deployment or private-data migration is performed by this security patch.
+5. Verify login, private API rejection without credentials, DB readiness and worker operation in staging before switching traffic.
 
 The WAHA webhook requires a separately configured `WAHA_WEBHOOK_KEY` in `X-Api-Key`, fails closed when unset, and filters configured chat/session/from-me events. Keep that key distinct from the WAHA service key and API seed.
 
@@ -44,4 +44,4 @@ The WAHA webhook requires a separately configured `WAHA_WEBHOOK_KEY` in `X-Api-K
 
 Public source supplies the application, schema, generic chart and public career-board catalog. Private runtime storage holds profiles, job-search state and generated documents. A private deployment repository supplies installation-specific values and secret references. A private legacy source repository is not automatically overlaid onto the public application; the deployed image digest and deployment manifests determine what runs. Never build a public image from a private source checkout.
 
-Deleting sensitive text from the current tree does not remove it from previous commits, tags, pull-request diffs, clones or previously built image layers. Audit those separately when responding to an exposure. Keep benchmark case files and reports private; see [BENCHMARKS.md](BENCHMARKS.md).
+Deleting sensitive text from the current tree does not remove it from previous commits, tags, pull-request diffs, clones or previously built image layers. Audit those separately when responding to an exposure. Keep evaluation inputs and reports private when they contain personal data.

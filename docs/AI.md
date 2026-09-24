@@ -1,6 +1,6 @@
 # AI: operations, autopilot, chat, browser
 
-job-scout talks to one OpenAI-compatible gateway (`OPENAI_BASE_URL`, `OPENAI_API_KEY`; an OpenAI-compatible gateway in production). There is no other AI integration: no agent framework, no message bus, no separate harness. The model is a function the worker and the API call, and every call is a row in `llm_runs`.
+Job Scout uses the gateway configured by `OPENAI_BASE_URL` and `OPENAI_API_KEY`. The API and worker record model calls in `llm_runs`, including usage, latency and status.
 
 ## Operations
 
@@ -55,7 +55,7 @@ Editing any field switches the preset to **custom**. `POST /settings/autopilot/p
 
 Guarantees:
 
-- **Status never changes by itself.** An `apply` verdict files a `status_suggestion` (→ materials); a `skip` verdict files an `archive_suggestion`. You approve or dismiss in the Inbox, the Today page, or the dock.
+- **AI status suggestions require approval.** An `apply` verdict files a `status_suggestion` (→ materials); a `skip` verdict files an `archive_suggestion`. You approve or dismiss in the Inbox, the Today page, or the dock.
 - **Materials drafted by autopilot always land in the Inbox** as a `materials_draft`; they do not move the position to `materials`.
 - **Budgets are hard stops.** Per-operation `dailyCap` first, then the global `budget`. A job that hits one is parked for an hour, not failed.
 - **Dedupe.** Every auto-enqueued job carries a `dedupeKey` (`evaluate:<position>`, `company_research:<company>`, `jd_review:<position>:<rev>`), so a burst of changes never fans out.
@@ -71,7 +71,7 @@ Each user message runs a tool-calling loop (`ChatConfig.maxSteps`, default 12) o
 
 Local tools: `search_positions`, `get_position`, `get_evaluation`, `get_materials`, `get_company`, `search_companies`, `today`, `list_approvals`, `resolve_approval`, `set_position_status`, `add_note`, `run_operation`, `intake_url`, `list_processes`, `web_fetch`. `writeTools=false` hides the mutating ones. With `browserTools=true`, a configured browser, and `BROWSER_EGRESS_ISOLATED=1`, selected Playwright MCP navigation/read/lifecycle tools are available so the agent can open a public HTTP(S) job page and read it. Desk write permission never enables browser scripts, clicks, typing, form filling, or other external submission actions.
 
-WhatsApp **job-scout chat** (`packages/core/src/whatsapp-inbox.ts`) is the same agent on Settings › Notifications `chat.model` (default **grok-4.6**), with writes on, over a durable global thread titled `WhatsApp · job-scout chat`. It can inspect process and intake a JD URL. It never applies. Inbound is a ClusterIP webhook, not the dock SSE.
+WhatsApp **job-scout chat** (`packages/core/src/whatsapp-inbox.ts`) is the same agent on Settings › Notifications `chat.model` (default **grok-4.6**), with writes on, over a durable global thread titled `WhatsApp · job-scout chat`. It can inspect process and intake a JD URL. It never applies. Inbound messages use the authenticated WAHA webhook.
 
 ## Browser plane
 
@@ -86,15 +86,11 @@ Both empty = browser plane off; everything degrades to plain HTTP fetches. Setti
 
 ## Choosing models
 
-`pnpm bench:models` (`scripts/bench-models.ts`) runs every operation with the production prompts
-against a fixed set of positions, grades document outputs blind with several judge models, and
-prints comparison tables. Recorded runs and the current per-operation decision live in
-`docs/benchmarks/`. Short version (2026-09-03): a small fast model wins triage; reasoning models
-win evaluate and research; avoid anything that rate-limits under bursts for triage.
+Choose models that support each operation's output format. Use Settings › AI to test connectivity, then inspect scores and drafts against examples you understand. Compare accuracy, latency, failures and usage before enabling automatic evaluation or drafting. Keep personal evaluation inputs and reports outside the public repository.
 
 ## Cost and frequency
 
-Nothing is on a model timer. Board scans and watch checks run on CronJobs (every 30 min / every 2 h) and cost nothing; the gate typically rejects > 90 % of listings; triage is called once per new listing that passes (a few hundred per day at the current board list) and evaluate/research only where the policy says so. Today › Machine and Settings › AI › Recent calls show the numbers; the `chat` operation shows up there like any other.
+Board scans and watch checks do not use a model. Their frequency depends on the worker or CronJob configuration. New listings that pass the filters can trigger triage, followed by evaluation, research or drafting according to the selected policy. Infrastructure and gateway costs depend on your deployment. Today and Settings › AI show model usage; configure daily caps for each operation and the global budget.
 
 ## Refreshing old decision scores
 

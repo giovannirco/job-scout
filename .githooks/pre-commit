@@ -1,3 +1,3 @@
 #!/bin/sh
 set -eu
-python3 scripts/check-public.py --index
+python3 .github/scripts/check-public.py --index

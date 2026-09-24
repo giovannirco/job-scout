@@ -23,3 +23,16 @@ After a history cleanup, make a fresh clone. Never merge an old checkout or push
 Automated checks detect known patterns, not every possible personal fact. Local hooks can be bypassed and CI runs after a branch is pushed. Review the full staged diff before the first public push; secret push protection cannot identify every kind of personal data. Never paste private runtime output into PRs, issues or workflow logs. Changes to these guards require the same review as authentication code.
 
 For a local extra check, set `privacy.privatePatternsFile` to an absolute path outside the checkout containing a JSON array of private strings. The scanner checks those strings without printing them. Keep that file out of Git and CI; do not upload private profile text as public workflow fixtures. Repository-level email-pattern rules are unavailable for this personal repository: hooks and the required `public-source` check enforce the author/committer policy, while GitHub enforces valid signatures.
+
+## Local checks
+
+Repository checks live under `.github/scripts`; application tests live beside their source. Before committing and pushing, run:
+
+```sh
+python3 .github/scripts/check-public.test.py
+python3 .github/scripts/check-public.py --index
+python3 .github/scripts/check-public.py HEAD
+gitleaks git . --config .gitleaks.toml --log-opts=HEAD --redact --no-banner
+```
+
+The Python tests verify that the privacy guard rejects private exports, personal contact patterns and disallowed commit metadata, including data deleted later in history. They test the publishing safeguards independently of the application.

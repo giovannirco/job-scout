@@ -1,35 +1,26 @@
 # Product
 
-job-scout is a personal career control plane for an engineer who runs a real job hunt with AI at hand: a pipeline CRM, a market radar, an append-only record of every job description seen, model-assisted triage and evaluation with a configurable degree of autonomy, and a chat agent that knows the pipeline and can look at the actual web page.
+Job Scout is a job-search workspace for one person. It combines job discovery, application tracking, description history and optional AI assistance. Its default sources and filters focus on engineering roles.
 
-## Principles
+## Workflow
 
-1. **Discovery is not applying.** The system finds, filters, scores, drafts and suggests. `applied` is a human action, and status changes proposed by the model wait in an inbox.
-2. **Filter first, model second.** Deterministic gates run on everything. With no model key, passes sit in the pipeline unscored and the model is never called. Rejections stay visible under Discovery › Filtered.
-3. **One model call, one row.** Every operation has a model, a switch and a cap; every call is logged with tokens and latency. There is no hidden AI activity.
-4. **Append-only JD history.** Postings change quietly — comp, location, scope, closure. Each observation is a revision with a diff; nothing is overwritten.
-5. **Honest data.** Null salary when unknown, never invented. Scores are 1–5 from the scout brief you wrote, shown with the reason. An empty brief is sent as empty. A board description cut off mid-sentence is labeled, and the missing words are not filled in. A revision this app rewrote is labeled **rewritten here**, apart from an employer edit.
-6. **The operator owns the truth.** Settings, profile and scout brief are editable; presets are starting points. career-ops (markdown in git) can hold the same pipeline and the two reconcile.
+1. Set your location, target roles, career direction and resume in Settings › Profile.
+2. Review listings found by the scanners. Discovery explains why listings passed or were filtered out.
+3. With AI configured, compare scores and evaluations against the actual job description. Without it, review unscored listings directly.
+4. Save promising positions, draft materials and prepare answers. Review those drafts before using them.
+5. Submit on the employer's site, mark the position applied, and track interviews and follow-ups here.
 
-## Who talks to it
+Today brings together decisions, approvals, changed job descriptions and upcoming interviews. Position pages hold the description, evaluations, materials, questions and history. Chat can read that context, and authenticated MCP clients can use the pipeline tools.
 
-| actor | through |
-|--|--|
-| you | the web UI (Today, Pipeline, Process, Interviews, Discovery, Sources, Companies, Inbox, AI logs, Position, Settings), the dock chat, the API, WhatsApp **job-scout chat** |
-| the worker | the queue — scans, checks, model operations, retention, WhatsApp outbox flush |
-| agents (career-ops sync, Grok, Cursor, Claude Code) | MCP at `/mcp` with a scoped token |
-| the chat agent | local tools plus, when configured, a headless browser through Playwright MCP; WhatsApp **job-scout chat** uses the same agent on grok-4.6 via a ClusterIP webhook |
+## Behavior
 
-## What a day looks like
+- Filters run before automatic AI triage. Rejected listings stay visible with a reason.
+- Each AI operation has a model, an enable switch and a daily cap. Logs show usage, latency and failures.
+- Previous job descriptions remain available, with differences between versions. Text cleaned up by the app is labeled separately from employer changes.
+- Unknown compensation stays unknown. Scores reflect the profile used when they were generated; stale scores need refreshing after profile changes.
+- AI suggestions to change status and automatically drafted materials require review in the Inbox. Updating filters can archive untouched scan results.
+- Optional WhatsApp notifications go to the chats configured in Settings. The inbound chat can inspect positions and save job URLs.
 
-With no model key, Today opens on unscored filings and the pipeline opens on everything still open. Chat and the scoring buttons stay off.
+## Scope
 
-With a key, Today opens on the funnel and the count of things that need a decision: PASS verdicts, approvals filed by autopilot, JDs that changed on positions in play, interviews coming up, applications with no reply for a week. Decide from the list (Review / Skip), open a position for the brief, the A–H evaluation and the JD history, ask the scoped chat to compare the role against your master resume, draft materials, mark applied. The Wire shows what the worker is doing meanwhile; the Machine panel shows what it cost.
-
-WhatsApp is a second surface for the same desk: Settings › Notifications routes triage PASS to **job-scout new**, inbox/interview/stale nags to **job-scout desk**, hot process and JD changes to **job-scout process**, company packs to **job-scout research**. Paste a JD URL in **job-scout chat** to intake and triage (webhook → desk agent; never apply). Product alerts never go to **an engineering-only room**.
-
-## Non-goals
-
-- Submitting applications or messaging recruiters. Greenhouse and Ashby questions can be stored and drafted here. The employer site is where the form is sent.
-- Being a general job board. Sources are the boards and companies you add.
-- Multi-tenant SaaS. One operator, one profile, one database.
+Job Scout does not submit applications or message recruiters. Its source catalog is configurable, but it does not cover the entire job market. Home-country filtering currently supports the US and Brazil; other locations need explicit rules. It is designed for one profile and one database, not a shared service with separate user accounts.

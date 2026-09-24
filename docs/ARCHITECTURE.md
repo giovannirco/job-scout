@@ -5,7 +5,7 @@
 ```mermaid
 flowchart LR
   UI[React app] -->|/api/v1| API
-  Agents[MCP clients<br/>career-ops · Grok · Cursor] -->|/mcp| API
+  Agents[MCP clients<br/>job search assistants] -->|/mcp| API
   API --> PG[(Postgres)]
   Worker --> PG
   Worker --> ATS[Greenhouse · Ashby · Lever · BambooHR · RemoteOK · Remotive · WWR RSS · HTML]

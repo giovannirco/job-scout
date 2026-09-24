@@ -10,7 +10,7 @@ function count(r: unknown): number | null {
   return typeof x?.rowCount === "number" ? x.rowCount : typeof x?.affectedRows === "number" ? x.affectedRows : null;
 }
 
-/** Prune append-only tables per Settings > retention. Idempotent, cheap. */
+/** Prune diagnostic and queue records according to Settings > retention. */
 export async function runRetention() {
   const db = await getDb();
   const r = (await getSettings()).retention;

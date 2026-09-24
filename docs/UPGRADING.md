@@ -11,7 +11,7 @@ Normal API/worker startup now runs schema migrations and initializes missing pro
 3. Run `pnpm db:repair --preview --report /private/path/preview.json`.
 4. Inspect every step's result and changes: table, row ID, operation, and changed fields before/after. Fetch failures include `failedIds`. A failed report exits nonzero and all database changes roll back. Fix source access or data problems and repeat using a new report filename.
 5. When the preview is acceptable, run `pnpm db:repair --apply --report /private/path/applied.json` against the restored copy. Compare the report and smoke-test the app. Repeat apply with another filename: completed versioned steps must be skipped. Start twice and compare profile/posting states.
-6. After a successful rehearsal, take another backup and perform the same explicit migration/preview/apply procedure during the real maintenance window. Keep API/workers stopped until it completes. No live deployment is performed by this change.
+6. After a successful rehearsal, take another backup and perform the same explicit migration/preview/apply procedure during the real maintenance window. Keep API/workers stopped until it completes.
 
 Preview runs the actual repair helpers in one transaction, captures per-step row differences, and rolls back. Apply commits data and repair-version markers together only when every step succeeds. `ok` means that step executed; only an overall `applied` outcome means changes persisted. Following a failure, later steps remain `pending`. PostgreSQL uses a transaction advisory lock to serialize repair runners; it does not stop ordinary application writes, so stopping other writers is required. PGlite also uses transaction-scoped database access.
 

@@ -1,6 +1,6 @@
 import { openSync, writeFileSync, closeSync } from "node:fs";
 import { closeDb } from "@job-scout/db";
-import { repairSteps, runDataRepairs, selectRepairSteps } from "../packages/core/src/repairs.js";
+import { repairSteps, runDataRepairs, selectRepairSteps } from "../repairs.js";
 
 const args = process.argv.slice(2);
 const mode = args.includes("--preview") ? "preview" : args.includes("--apply") ? "apply" : null;

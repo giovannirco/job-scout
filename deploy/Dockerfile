@@ -9,7 +9,6 @@ RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json vitest.config.ts ./
 COPY packages ./packages
 COPY apps ./apps
-COPY scripts ./scripts
 RUN pnpm install --frozen-lockfile
 ARG APP_VERSION=2.0.0
 ENV APP_VERSION=${APP_VERSION}

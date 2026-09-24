@@ -11,7 +11,7 @@ import { syncGateFromTargetRoles } from "./profile.js";
 import * as fetching from "./fetch-job.js";
 
 const dir = mkdtempSync(join(tmpdir(), "job-scout-ingest-review-"));
-describe("public review ingest regressions", () => {
+describe("job ingestion", () => {
   beforeAll(async () => { delete process.env.DATABASE_URL; process.env.PGLITE_DATA_DIR = dir; await bootstrap({ seedBoards: false }); });
   afterEach(() => vi.restoreAllMocks());
   afterAll(async () => { await closeDb(); rmSync(dir, { recursive: true, force: true }); });

@@ -22,6 +22,6 @@
       "@/*": ["./apps/web/src/*"]
     }
   },
-  "include": ["apps", "packages", "scripts/*.ts"],
+  "include": ["apps", "packages"],
   "exclude": ["node_modules", "**/dist"]
 }

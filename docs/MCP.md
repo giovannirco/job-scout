@@ -1,13 +1,13 @@
 # MCP
 
-job-scout **is** the MCP server; there is no separate process. Every capability of the UI is also a tool, so an agent can work the pipeline without scraping the API. WhatsApp desk chat is not MCP — it is the same local tools (`intake_url`, `list_processes`, …) invoked from `runChatTurn` on the API webhook.
+The API includes an MCP server for reading positions, managing the pipeline and running AI operations. WhatsApp chat uses the local chat tools through its webhook.
 
 | | |
 |--|--|
 | **Endpoint** | `POST https://<host>/mcp` (Streamable HTTP, stateless: one POST per message, any replica can answer) |
 | **SDK** | `@modelcontextprotocol/server` with `legacy: "stateless"`, so 2025-era clients still work |
 | **Auth** | `Authorization: Bearer <token>` — the seed token, or a Settings › System token with scope `mcp`, `agent` or `admin` |
-| **Payloads** | pretty JSON up to 30 KB, compact above that, capped at 100 KB per result; paginate with `cursor` / `nextCursor` |
+| **Payloads** | JSON, with a 100 KB result limit. Use cursor pagination where offered and small limits for `work_queue`; oversized results currently truncate the JSON text |
 | **Code** | `apps/api/src/mcp/server.ts` (tools) · `apps/api/src/mcp/handler.ts` (HTTP + auth) |
 
 ## Tools
@@ -66,15 +66,9 @@ job-scout **is** the MCP server; there is no separate process. Every capability 
 
 `set_match_override` (`human_skip` archives, `match` → review) and `list_eval_inbox` (review without evaluation) keep older agent prompts working.
 
-## career-ops
+## External tracker integration
 
-[career-ops](https://a separate tracker) stays its own project: a markdown tracker, reports and JDs in git. A skill on its side (`.claude/skills/job-scout-sync/`, user-layer, not committed there) reconciles two-way over these tools:
-
-1. read every tracker row and every position (`list_positions status=all`, paged);
-2. match by posting URL → ATS id → `js:<slug>` token in the tracker notes → company + role fuzzy;
-3. matched rows get `upsert_career_ops_stamp` and the slug in the tracker; status becomes the lifecycle max and is written to the side that is behind (job-scout `archived` never wins over a tracker decision);
-4. tracker rows without a position → `create_position_from_career_ops`; hot positions without a row → new tracker row, JD file, report from the stored evaluation;
-5. `list_changes since=<lastSync>` keeps subsequent runs cheap.
+The `career_ops` tools support synchronizing an external application tracker. They store a tracker reference on each position and reconcile rows by posting URL. Preview reconciliation before applying it. The tracker format and synchronization client belong to the integration using these tools.
 
 Status mapping: Evaluated → review/materials · Applied → applied · Responded → screen · Interview → interview · Offer → offer · Rejected → rejected.
 
@@ -102,9 +96,6 @@ curl -sS -X POST http://localhost:8080/mcp \
   -H "Authorization: Bearer $JOB_SCOUT_TOKEN" \
   -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
-
-grok -p --yolo --max-turns 6 \
-  "Use job-scout MCP only: call server_info then list_positions status=hot pageSize=5. Summarize."
 ```
 
 `refresh_stale_triage` previews the top stale PASS decision candidates by default (`limit` 1–25). Set `dryRun=false` to enqueue score-only refreshes without moving stages, running autopilot or sending notifications. `run_llm` with `operation=triage` now reruns stale or unknown-profile scores without requiring `force`; unchanged current-profile scores remain cached.

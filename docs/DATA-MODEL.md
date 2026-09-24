@@ -25,7 +25,7 @@ Schema: `packages/db/src/schema.ts` (drizzle). Migrations: `packages/db/migratio
 |--|--|
 | `companies` | slug, name, website, careers URL, industry tags, metadata (aliases, ATS tokens) |
 | `positions` | the CRM row — see below |
-| `jd_revisions` | append-only JD history per position: `revision`, `observed_at`, `content_hash`, `change_kind` (`first_seen` `content` `title` `comp` `geo` `status` `closed` `reopened` `noise_rebase` `manual`), `material`, full JD fields, `field_diffs`, `diff_summary`. The UI labels `noise_rebase` **rewritten here** and groups those rows apart from employer edits. One `closed` revision per closing; later checks only bump `positions.last_checked_at` |
+| `jd_revisions` | Job description versions per position: `revision`, `observed_at`, `content_hash`, `change_kind` (`first_seen` `content` `title` `comp` `geo` `status` `closed` `reopened` `noise_rebase` `manual`), `material`, full JD fields, `field_diffs`, `diff_summary`. The UI labels `noise_rebase` **rewritten here** and groups those rows apart from employer edits. One `closed` revision per closing; later checks only bump `positions.last_checked_at` |
 | `timeline_events` | notes, status changes, applied, LLM results, approvals — everything History shows |
 | `evaluations` | one row per LLM report: `kind`, `model`, `markdown`, `summary` JSON, score/verdict; `position_id` or `company_id` |
 | `application_materials` | `kind` resume / cover, `version`, markdown, surface + keyword coverage in metadata |

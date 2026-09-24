@@ -14,13 +14,11 @@
     "once": "NODE_ENV=production tsx apps/worker/src/once.ts",
     "db:generate": "drizzle-kit generate --config packages/db/drizzle.config.ts",
     "db:migrate": "tsx packages/db/src/migrate.ts",
-    "db:import-v1": "tsx scripts/import-v1.ts",
-    "bench:models": "tsx scripts/bench-models.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint apps packages scripts",
+    "lint": "eslint apps packages",
     "lint:strict": "pnpm lint --max-warnings 0",
-    "db:repair": "tsx scripts/repair-data.ts"
+    "db:repair": "tsx packages/core/src/cli/repair-data.ts"
   },
   "workspaces": [
     "apps/*",
