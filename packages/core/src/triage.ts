@@ -16,7 +16,7 @@ import { fastTriageOutput } from "./fast-triage.js";
 export async function runTriage(positionId: string, opts: { force?: boolean; refreshOnly?: boolean } = {}) {
   const pos = await getPosition(positionId);
   if (!pos) throw new Error("position not found");
-  if (opts.refreshOnly && (!["triaged", "review"].includes(pos.status) || pos.listingStatus === "closed"))
+  if (opts.refreshOnly && (!["triaged", "review"].includes(pos.status) || pos.listingStatus === "closed" || pos.metadata?.quarantined))
     return { skipped: true as const, reason: "position_no_longer_eligible", verdict: pos.triageVerdict };
   const profile = await getProfile();
   if (pos.triagedAt && pos.triageJson?.profileHash === profileFingerprint(profile) && !opts.force) return { skipped: true as const, reason: "already triaged", verdict: pos.triageVerdict };
@@ -92,13 +92,17 @@ export async function runTriage(positionId: string, opts: { force?: boolean; ref
   const profileChanged = profileFingerprint(await getProfile()) !== profileFingerprint(profile);
   if (profileChanged && fast) return { skipped: true as const, reason: "profile_changed", verdict: pos.triageVerdict };
   if (profileChanged) { delete set.status; delete set.archiveReason; }
-  const applied = await db.transaction(async tx => {
-    const current = (await tx.select().from(positions).where(eq(positions.id, pos.id)).for("update"))[0];
-    if (!current || current.updatedAt.getTime() !== pos.updatedAt.getTime() || current.contentHash !== pos.contentHash || current.status !== pos.status || current.listingStatus !== pos.listingStatus) return false;
+  const completion = await db.transaction(async tx => {
+    const current = (await tx.select().from(positions).where(eq(positions.id, pos.id)).for("update")).at(0);
+    if (!current || current.updatedAt.getTime() !== pos.updatedAt.getTime() || current.contentHash !== pos.contentHash || current.status !== pos.status || current.listingStatus !== pos.listingStatus) {
+      const retryable = Boolean(current && !current.triagedAt && current.status === pos.status && ["triaged", "review"].includes(current.status)
+        && current.listingStatus !== "closed" && !current.metadata?.quarantined);
+      return { applied: false, retryable };
+    }
     await tx.update(positions).set(set).where(eq(positions.id, pos.id));
-    return true;
+    return { applied: true, retryable: false };
   });
-  if (!applied) return { skipped: true as const, reason: "position_changed", verdict: pos.triageVerdict };
+  if (!completion.applied) return { skipped: true as const, reason: "position_changed", verdict: pos.triageVerdict, retryable: completion.retryable };
   await addEvent({
     positionId: pos.id,
     kind: "triage",

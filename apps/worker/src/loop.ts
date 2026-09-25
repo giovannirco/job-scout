@@ -119,6 +119,16 @@ export function startWorker(opts: WorkerOptions = {}) {
     const jlog = log.child({ jobId: job.id, type: job.type, attempt: job.attempts, positionId: (job.payload as Record<string, unknown> | null)?.positionId ?? undefined });
     try {
       const result = await processJob(job);
+      if (job.type === "triage" && result.reason === "position_changed" && result.retryable === true) {
+        if (job.attempts >= 3) throw new Error("Position kept changing during triage; retry limit reached.");
+        await failJob(job.id, "Position changed during triage; retrying with current evidence.", {
+          retryInMs: 30_000, payload: { ...job.payload, refreshOnly: true },
+        });
+        jobDuration.labels({ type: job.type }).observe((Date.now() - t0) / 1000);
+        jobsProcessed.labels({ type: job.type, outcome: "retry" }).inc();
+        jlog.warn("job.triage_retry");
+        return;
+      }
       await completeJob(job.id, result);
       const ms = Date.now() - t0;
       jobDuration.labels({ type: job.type }).observe(ms / 1000);
