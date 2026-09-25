@@ -102,7 +102,7 @@ describe("automatic Jev checks", () => {
     const emptyCheck = (await checks()).find(j => j.payload?.positionId === empty.position.id)!;
     expect(await processJob(emptyCheck)).toMatchObject({ skipped: "missing_description" });
     await applySnapshot({ positionId: empty.position.id, job: emptyJob });
-    const filled = (await checks()).find(j => j.payload?.positionId === empty.position.id && j.payload?.revision === 2)!;
+    const filled = (await checks()).find(j => j.payload?.positionId === empty.position.id && j.payload.revision === 2)!;
     expect(filled).toBeDefined();
     expect(await processJob(filled)).toMatchObject({ status: "ok" });
   });
