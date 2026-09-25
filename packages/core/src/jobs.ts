@@ -112,12 +112,12 @@ export async function completeJob(jobId: string, result: Record<string, unknown>
     .where(eq(jobs.id, jobId));
 }
 
-export async function failJob(jobId: string, error: string, opts: { retryInMs?: number } = {}) {
+export async function failJob(jobId: string, error: string, opts: { retryInMs?: number; payload?: Record<string, unknown> } = {}) {
   const db = await getDb();
   if (opts.retryInMs) {
     await db
       .update(jobs)
-      .set({ status: "queued", error: error.slice(0, 4000), runAfter: new Date(Date.now() + opts.retryInMs) })
+      .set({ status: "queued", error: error.slice(0, 4000), runAfter: new Date(Date.now() + opts.retryInMs), ...(opts.payload ? { payload: opts.payload } : {}) })
       .where(eq(jobs.id, jobId));
     return;
   }
