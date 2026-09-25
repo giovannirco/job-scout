@@ -24,6 +24,7 @@ import {
   runMaterials,
   runRetention,
   runTriage,
+  runPositionDecision,
   runInterviewBrief,
   pollWhatsAppInbox,
   scanBoard,
@@ -39,6 +40,8 @@ const LLM_TYPES: JobType[] = ["triage", "evaluate", "materials", "company_resear
 export async function processJob(job: JobRow): Promise<Record<string, unknown>> {
   const p = job.payload as Record<string, unknown>;
   switch (job.type) {
+    case "jev_check":
+      return runPositionDecision(String(p.positionId), Number(p.revision));
     case "board_scan":
       return (await scanBoard(String(p.boardId), { force: Boolean(p.force) })) as unknown as Record<string, unknown>;
     case "watch_check":

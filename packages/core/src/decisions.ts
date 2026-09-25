@@ -20,7 +20,7 @@ export async function runDecision(input: { recipe: DecisionRecipe; state: unknow
   if (!key()) throw new DecisionError("not_configured", "Set OPENROUTER_API_KEY on the server to connect Jev.");
   if (JSON.stringify(input.state).length > cfg.maxStateChars) throw new DecisionError("input_limit", "This input exceeds the Jev context limit in Settings. The full input was kept out of the request.");
   const questions = decisionQuestions(input.recipe);
-  const inputHash = hash({ version: DECISION_RECIPE_VERSION, config: cfg, recipe: input.recipe, positionId: input.positionId, state: input.state, questions });
+  const inputHash = hash({ version: DECISION_RECIPE_VERSION, config: cfg, mode: input.mode ?? "preview", recipe: input.recipe, positionId: input.positionId, state: input.state, questions });
   const reservation = await db.transaction(async tx => {
     await tx.insert(settingsTable).values({ id: "default", data: {} }).onConflictDoNothing();
     const locked = (await tx.select().from(settingsTable).where(eq(settingsTable.id, "default")).for("update"))[0];

@@ -136,7 +136,7 @@ describe("Jev workflows on isolated PGlite", () => {
     vi.spyOn(getLlmClient(), "chatDocument").mockResolvedValue({ data: { score: 4.5, verdict: "apply", headline: "Relevant" }, markdown: "Unsupported claim", model: "test-model", tokensIn: 1, tokensOut: 1, latencyMs: 1 } as never);
     expect(await runEvaluate(position.id)).toMatchObject({ autopilotSkipped: "jev_review_required" });
     expect((await getEvaluation(position.id, "evaluate"))?.markdown).toBe("Unsupported claim");
-    expect((await (await getDb()).select().from(jobs)).filter(j => j.payload?.positionId === position.id)).toEqual([]);
+    expect((await (await getDb()).select().from(jobs)).filter(j => j.payload?.positionId === position.id && j.type !== "jev_check")).toEqual([]);
   });
   it("keeps uncertain materials pending and does not advance the position", async () => {
     await updateSettings({ jev: { verification: "apply" } }); const { position } = await upsertFromJob(role("materials"));

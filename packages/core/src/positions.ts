@@ -696,6 +696,10 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
   watchChecks.labels({ outcome: listingClosed ? "closed" : nextRev === 1 ? "first_seen" : "changed" }).inc();
   log.info("jd.revision", { positionId: pos.id, revision: nextRev, changeKind: change_kind, material, closed: listingClosed, source: opts.source || "scan", fields: diffs.map((d) => d.path) });
   await afterAtsFetch(pos.id, opts.job, facts);
+  if (nextRev === 1 || material || (!prevRev?.descriptionText?.trim() && bodyText.trim())) {
+    const { enqueuePositionDecision } = await import("./decision-events.js");
+    await enqueuePositionDecision(pos.id, nextRev);
+  }
   if (material && nextRev > 1) {
     // dynamic import: autopilot depends on this module
     const { afterJdChange } = await import("./autopilot.js");
@@ -1051,6 +1055,8 @@ export async function upsertFromJob(
   if (repost) await addEvent({ positionId: posId, kind: "repost", title: `Possible repost of ${repost.title}`, metadata: { repostOfId: repost.id, appliedAt: repost.appliedAt } });
   const createdPos = (await getPosition(posId))!;
   await afterAtsFetch(posId, job, facts);
+  const { enqueuePositionDecision } = await import("./decision-events.js");
+  await enqueuePositionDecision(posId, 1);
   return { position: createdPos, created: true, revived: false };
 }
 

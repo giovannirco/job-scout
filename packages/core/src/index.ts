@@ -34,3 +34,4 @@ export * from "./notify.js";
 export * from "./whatsapp-inbox.js";
 export * from "./triage-refresh.js";
 export * from "./decisions.js";
+export * from "./decision-events.js";

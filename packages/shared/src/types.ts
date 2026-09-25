@@ -108,6 +108,7 @@ export const ChangeKind = z.enum([
 export type ChangeKind = z.infer<typeof ChangeKind>;
 
 export const JobType = z.enum([
+  "jev_check",
   "board_scan",
   "watch_check",
   "scan_url",

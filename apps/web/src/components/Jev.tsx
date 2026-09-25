@@ -41,6 +41,7 @@ export function JevSettings() {
     <Panel title="Jev decisions" meta={status.data.configured ? "OpenRouter key configured" : "OpenRouter key missing"}>
       <div className="space-y-4 text-sm">
         <p className="text-muted">Jev returns choices and scores. Use it to screen a role, order your review queue, or check a draft against its sources. Your writing models still produce evaluations and application materials.</p>
+        <p className="text-muted text-xs">With fast triage set to Observe or Apply, new positions and meaningful JD changes also get a job-fit check. These checks record a result without changing your pipeline stage.</p>
         {!status.data.configured && <p className="text-warn">Set OPENROUTER_API_KEY in the server environment, then restart the API and worker.</p>}
         <p className="text-xs text-muted">A decision sends the relevant job description and profile evidence to OpenRouter and TypeSafe. Draft checks also send the draft. Loading this page makes no model calls.</p>
         <label className="flex items-center gap-2"><input type="checkbox" checked={draft.enabled} onChange={e => change("enabled", e.target.checked)} />Enable Jev</label>

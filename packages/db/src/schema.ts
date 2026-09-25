@@ -313,6 +313,7 @@ export const discoveryFeed = pgTable(
 );
 
 export const JOB_TYPES = [
+  "jev_check",
   "board_scan",
   "watch_check",
   "scan_url",
