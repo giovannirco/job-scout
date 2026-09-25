@@ -414,7 +414,6 @@ function Login({ onDone }: { onDone: () => void }) {
       const res = await fetch("/api/v1/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: pw }) });
       const json = (await res.json()) as { ok: boolean; error?: { message?: string } | string };
       if (!json.ok) throw new Error(typeof json.error === "string" ? json.error : json.error?.message || "Sign-in failed");
-      if (pw.startsWith("js_")) client.setToken(pw);
       onDone();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Sign-in failed");
@@ -433,7 +432,7 @@ function Login({ onDone }: { onDone: () => void }) {
             <div className="font-mono text-[10.5px] text-faint mt-1">career control plane · v{__APP_VERSION__}</div>
           </div>
         </div>
-        <Input label="Password or API token" type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoFocus />
+        <Input label="Password" type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoFocus />
         {err ? <div className="text-xs text-bad">{err}</div> : null}
         <Btn variant="primary" size="md" type="submit" className="w-full" disabled={busy || !pw}>
           {busy ? "Signing in…" : "Sign in"}

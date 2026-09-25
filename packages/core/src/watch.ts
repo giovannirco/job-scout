@@ -1,11 +1,16 @@
-import { and, asc, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
-import { getDb, id, positions, watches } from "@job-scout/db";
-import { detectAts, fetchGreenhouseJob } from "@job-scout/ats";
+import { and, asc, desc, eq, gte, isNull, lt, or, sql } from "drizzle-orm";
+import { getDb, id, jobs, positions, watches } from "@job-scout/db";
+import { assertPublicUrl, detectAts, fetchGreenhouseJob } from "@job-scout/ats";
 import { fetchJob as fetchJobFromUrl } from "./fetch-job.js";
-import { contentHash, HOT_STATUSES } from "@job-scout/shared";
+import { contentHash, HOT_STATUSES, jobRecovery } from "@job-scout/shared";
 import { enqueueJob } from "./jobs.js";
 import { applySnapshot } from "./positions.js";
 import { addEvent } from "./timeline.js";
+
+function watchableUrl(url: string | null) {
+  if (!url) return false;
+  try { assertPublicUrl(url); return true; } catch { return false; }
+}
 
 /**
  * Watches are the positions themselves (watch_enabled) plus the legacy
@@ -15,6 +20,7 @@ export async function checkWatch(watchId: string) {
   const db = await getDb();
   const w = (await db.select().from(watches).where(eq(watches.id, watchId)).limit(1))[0];
   if (!w) throw new Error("watch not found");
+  if (!watchableUrl(w.url)) return { skipped: "unsupported_url", positionId: w.positionId };
   const job = await fetchJobFromUrl(w.url);
   const now = new Date();
   if (w.positionId) {
@@ -43,6 +49,10 @@ export async function checkWatch(watchId: string) {
 
 /** Refresh the JD of a watched or hot position. */
 export async function checkPosition(positionId: string) {
+  const db = await getDb();
+  const position = (await db.select({ url: positions.primaryUrl }).from(positions).where(eq(positions.id, positionId)).limit(1)).at(0);
+  if (!position) throw new Error("position not found");
+  if (!watchableUrl(position.url)) return { skipped: "unsupported_url", positionId };
   return applySnapshot({ positionId, job: await fetchPositionJob(positionId), source: "watch" });
 }
 
@@ -68,34 +78,41 @@ async function fetchPositionJob(positionId: string) {
 export async function enqueueDueWatchChecks(opts: { hours?: number; limit?: number } = {}) {
   const db = await getDb();
   const cutoff = new Date(Date.now() - (opts.hours ?? 12) * 3_600_000);
-  const rows = await db
-    .select({ id: positions.id })
+  const blocked = (await db.select({ payload: jobs.payload, error: jobs.error }).from(jobs).where(and(
+    eq(jobs.type, "watch_check"), eq(jobs.status, "failed"), gte(jobs.finishedAt, new Date(Date.now() - 24 * 3_600_000)),
+  ))).filter(j => jobRecovery("watch_check", j.error).kind === "blocked");
+  const coolingDown = (target: "positionId" | "watchId", id: string, url: string | null) =>
+    blocked.some(j => j.payload?.[target] === id && (!j.payload.url || j.payload.url === url));
+  const candidates = await db
+    .select({ id: positions.id, url: positions.primaryUrl })
     .from(positions)
     .where(
       and(
         or(eq(positions.watchEnabled, true), sql`${positions.status} in (${sql.join(HOT_STATUSES.map((s) => sql`${s}`), sql`, `)})`),
         sql`${positions.listingStatus} <> 'closed'`,
-        sql`${positions.primaryUrl} is not null`,
+        sql`${positions.primaryUrl} ~* '^https?://'`,
         or(isNull(positions.lastCheckedAt), lt(positions.lastCheckedAt, cutoff))!,
       ),
     )
     .orderBy(asc(positions.lastCheckedAt))
-    .limit(Math.min(500, opts.limit ?? 100));
+    .limit(500);
+  const rows = candidates.filter(r => watchableUrl(r.url) && !coolingDown("positionId", r.id, r.url)).slice(0, Math.min(500, opts.limit ?? 100));
   let enqueued = 0;
   for (const r of rows) {
-    const q = await enqueueJob("watch_check", { positionId: r.id }, { dedupeKey: `watch:${r.id}`, priority: 90 });
+    const q = await enqueueJob("watch_check", { positionId: r.id, url: r.url }, { dedupeKey: `watch:${r.id}`, priority: 90 });
     if (!q.deduped) enqueued++;
   }
   const legacy = await db
-    .select({ id: watches.id })
+    .select({ id: watches.id, url: watches.url })
     .from(watches)
-    .where(and(eq(watches.enabled, true), isNull(watches.positionId), or(isNull(watches.lastCheckedAt), lt(watches.lastCheckedAt, cutoff))!))
-    .limit(50);
-  for (const w of legacy) {
-    const q = await enqueueJob("watch_check", { watchId: w.id }, { dedupeKey: `watch:${w.id}`, priority: 95 });
+    .where(and(eq(watches.enabled, true), isNull(watches.positionId), sql`${watches.url} ~* '^https?://'`, or(isNull(watches.lastCheckedAt), lt(watches.lastCheckedAt, cutoff))!))
+    .limit(500);
+  const dueLegacy = legacy.filter(w => watchableUrl(w.url) && !coolingDown("watchId", w.id, w.url)).slice(0, 50);
+  for (const w of dueLegacy) {
+    const q = await enqueueJob("watch_check", { watchId: w.id, url: w.url }, { dedupeKey: `watch:${w.id}`, priority: 95 });
     if (!q.deduped) enqueued++;
   }
-  return { due: rows.length + legacy.length, enqueued };
+  return { due: rows.length + dueLegacy.length, enqueued };
 }
 
 export async function listWatches(q: { sort?: string } = {}) {
