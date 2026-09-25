@@ -52,7 +52,7 @@ export function JevSettings() {
           <Input label="Minimum confidence" hint="How concentrated the route choice is; not a measured accuracy rate." type="number" min={0} max={1} step={0.01} value={draft.minConfidence} onChange={e => change("minConfidence", Number(e.target.value))} />
           <Input label="Minimum answer probability" hint="Required for the route, yes/no checks and strong-fit score levels." type="number" min={0.5} max={1} step={0.01} value={draft.minProbability} onChange={e => change("minProbability", Number(e.target.value))} />
           <Input label="Request timeout (ms)" type="number" min={500} max={30000} step={500} value={draft.timeoutMs} onChange={e => change("timeoutMs", Number(e.target.value))} />
-          <Input label="Maximum input characters" type="number" min={1000} max={40000} step={1000} value={draft.maxStateChars} onChange={e => change("maxStateChars", Number(e.target.value))} />
+          <Input label="Maximum input characters" hint="Includes profile evidence, the job and any draft. Inputs above this limit are skipped without truncation." type="number" min={1000} max={80000} step={1000} value={draft.maxStateChars} onChange={e => change("maxStateChars", Number(e.target.value))} />
           <Input label="Reuse identical decisions (minutes)" type="number" min={0} max={1440} value={draft.cacheMinutes} onChange={e => change("cacheMinutes", Number(e.target.value))} />
         </div>
         <p className="text-xs text-muted">Large or uncertain inputs use normal triage. A failed draft check keeps the draft for review. It cannot approve materials or submit an application.</p>

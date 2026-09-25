@@ -39,7 +39,7 @@ describe("Jev workflows on isolated PGlite", () => {
   });
   beforeEach(async () => {
     const db = await getDb(); await db.delete(decisionRuns);
-    await updateSettings({ jev: { enabled: true, triage: "observe", verification: "observe", dailyCalls: 100, cacheMinutes: 60 }, notifications: { enabled: false }, autopilot: { preset: "manual", triageNew: false, evaluate: { mode: "off" }, companyResearch: { mode: "off" }, suggestStatus: false, materials: { mode: "off" } }, llm: { operations: { triage: { enabled: true, model: "test-model", dailyCap: 0 }, evaluate: { enabled: true, model: "test-model", dailyCap: 0 }, materials: { enabled: true, model: "test-model", dailyCap: 0 } } } });
+    await updateSettings({ jev: { enabled: true, triage: "observe", verification: "observe", dailyCalls: 100, cacheMinutes: 60, maxStateChars: 20000 }, notifications: { enabled: false }, autopilot: { preset: "manual", triageNew: false, evaluate: { mode: "off" }, companyResearch: { mode: "off" }, suggestStatus: false, materials: { mode: "off" } }, llm: { operations: { triage: { enabled: true, model: "test-model", dailyCap: 0 }, evaluate: { enabled: true, model: "test-model", dailyCap: 0 }, materials: { enabled: true, model: "test-model", dailyCap: 0 } } } });
   });
   afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
   afterAll(async () => { if (savedKey === undefined) delete process.env.OPENROUTER_API_KEY; else process.env.OPENROUTER_API_KEY = savedKey; await closeDb(); rmSync(dir, { recursive: true, force: true }); });
@@ -68,6 +68,15 @@ describe("Jev workflows on isolated PGlite", () => {
     await expect(runDecision({ recipe: "ranking", state: "x".repeat(50000) })).rejects.toThrow("context limit");
     await updateSettings({ jev: { enabled: false } });
     await expect(runDecision({ recipe: "ranking", state: "test" })).rejects.toThrow("Enable Jev"); expect(fetcher).not.toHaveBeenCalled();
+  });
+  it("sends complete evidence when a larger input limit is explicitly saved", async () => {
+    await updateSettings({ jev: { maxStateChars: 60000 } });
+    const state = { candidateEvidence: "Synthetic skills evidence. ".repeat(1800), listing: "Remote platform role" };
+    expect(JSON.stringify(state).length).toBeGreaterThan(40000);
+    const fetcher = vi.fn().mockImplementation(async () => Response.json(match));
+    vi.stubGlobal("fetch", fetcher);
+    expect((await runDecision({ recipe: "triage", state })).status).toBe("ok");
+    expect(JSON.parse(fetcher.mock.calls[0][1].body).state).toEqual(state);
   });
   it("records a provider failure without exposing its body", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("Private provider body", { status: 429 })));

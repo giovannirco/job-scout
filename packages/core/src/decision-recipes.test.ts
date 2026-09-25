@@ -18,6 +18,11 @@ describe("decision policy", () => {
     expect(resolveSettings({ jev: { weights: { role: 7 } } }).jev.weights).toEqual({ role: 7, skills: 4, seniority: 2 });
     expect(() => resolveSettings({ jev: { weights: { role: 0, skills: 0, seniority: 0 } } })).toThrow();
   });
+  it("allows a larger explicit input limit without changing the default", () => {
+    expect(resolveSettings({}).jev.maxStateChars).toBe(20000);
+    expect(resolveSettings({ jev: { maxStateChars: 60000 } }).jev.maxStateChars).toBe(60000);
+    expect(() => resolveSettings({ jev: { maxStateChars: 80001 } })).toThrow();
+  });
   it("treats probability and confidence as independent requirements", () => {
     const r = clearMatch();
     if (r.answers.route.type === "choice") r.answers.route.confidence = 0.7;

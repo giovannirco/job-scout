@@ -11,7 +11,7 @@ export const JevConfig = z.object({
   minProbability: z.number().min(0.5).max(1).default(0.95),
   dailyCalls: z.number().int().min(1).max(10000).default(100),
   timeoutMs: z.number().int().min(500).max(30000).default(8000),
-  maxStateChars: z.number().int().min(1000).max(40000).default(20000),
+  maxStateChars: z.number().int().min(1000).max(80000).default(20000),
   cacheMinutes: z.number().int().min(0).max(1440).default(60),
   weights: z.object({
     role: z.number().min(0).max(10).default(4),

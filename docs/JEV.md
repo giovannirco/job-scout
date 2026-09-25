@@ -34,6 +34,8 @@ A fit or ranking request sends the job description and current profile evidence 
 
 The daily Jev limit is separate from the writing-model limits and resets at midnight UTC. A request reserves its place before calling OpenRouter, including when several workers call at once. Failed requests count. Matching cached results do not use another request. Changing the model, rubric, settings, job, or profile changes the cache key. Use the new-request checkbox to compare repeated calls.
 
+The input limit defaults to 20,000 characters and can be raised to 80,000 for longer profiles and drafts. It counts the complete request state. Oversized inputs are skipped without truncation. The model also has its own token limit; raising the character limit does not override it.
+
 Requests have a timeout and do not retry automatically. Provider failures use normal triage, while Apply-mode draft checks keep follow-up automation on hold. A preview reports the error. The key is sent only to OpenRouter's Decisions endpoint; the browser never receives it.
 
 ## MCP
