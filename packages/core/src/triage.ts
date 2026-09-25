@@ -9,7 +9,7 @@ import { getSettings } from "./settings.js";
 import { addEvent } from "./timeline.js";
 import { log } from "@job-scout/shared";
 import { ingestQuality } from "./metrics.js";
-import { sameJevConfig, tryDecision } from "./decisions.js";
+import { decisionListingOf, sameJevConfig, tryDecision } from "./decisions.js";
 import { fastTriageOutput } from "./fast-triage.js";
 
 /** Score one position and record the result. */
@@ -24,12 +24,13 @@ export async function runTriage(positionId: string, opts: { force?: boolean; ref
   const settings = await getSettings();
   if (!settings.llm.operations.triage?.enabled) await gateOperation("triage", settings);
   const jdText = await currentJdText(pos.id);
+  const listing = await decisionListingOf(pos, jdText);
   const ats = ((pos.metadata || {}) as { ats?: { workplaceType?: string | null } }).ats;
 
   const messages = buildTriageMessages({
     title: pos.title,
     company: pos.company.name,
-    locationRaw: pos.geoNotes ? `${pos.remoteClass || ""} ${pos.geoNotes}` : (await locationOf(pos.id)) || pos.remoteClass,
+    locationRaw: listing.location,
     workplaceType: ats?.workplaceType ?? null,
     salaryRaw: pos.salaryRaw,
     employmentType: pos.employmentType,
@@ -42,7 +43,7 @@ export async function runTriage(positionId: string, opts: { force?: boolean; ref
 
   const decision = settings.jev.enabled && settings.jev.triage !== "off" ? await tryDecision({
     recipe: "triage", positionId: pos.id, mode: settings.jev.triage,
-    state: { candidateEvidence: triageBriefOf(profile), listing: { title: pos.title, company: pos.company.name, location: pos.geoNotes || await locationOf(pos.id) || pos.remoteClass, salary: pos.salaryRaw, employmentType: pos.employmentType, description: jdText } },
+    state: { candidateEvidence: triageBriefOf(profile), listing },
   }) : null;
   const fast = settings.jev.triage === "apply" && sameJevConfig(settings.jev, (await getSettings({ fresh: true })).jev)
     ? fastTriageOutput(decision?.run ?? null, { salaryRaw: pos.salaryRaw, jdText, passThreshold: settings.triage.passThreshold }) : null;
@@ -128,19 +129,4 @@ export async function runTriage(positionId: string, opts: { force?: boolean; ref
     });
   }
   return { skipped: false as const, score, verdict, oneLiner: out.oneLiner, model: res.model, ...auto };
-}
-
-async function locationOf(positionId: string): Promise<string | null> {
-  const db = await getDb();
-  const { jdRevisions } = await import("@job-scout/db");
-  const { desc } = await import("drizzle-orm");
-  const r = (
-    await db
-      .select({ l: jdRevisions.locationRaw })
-      .from(jdRevisions)
-      .where(eq(jdRevisions.positionId, positionId))
-      .orderBy(desc(jdRevisions.revision))
-      .limit(1)
-  )[0];
-  return r?.l ?? null;
 }

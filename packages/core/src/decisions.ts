@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
-import { decisionRuns, getDb, id, positions, settings as settingsTable } from "@job-scout/db";
+import { decisionRuns, getDb, id, jdRevisions, positions, settings as settingsTable } from "@job-scout/db";
 import { DecisionError, requestDecision } from "@job-scout/llm";
 import { resolveSettings, type DecisionRecipe, type DecisionRecord, type JevConfig } from "@job-scout/shared";
 import { getSettings } from "./settings.js";
@@ -51,6 +51,13 @@ export async function runDecision(input: { recipe: DecisionRecipe; state: unknow
   }
 }
 
+export async function decisionListingOf(position: NonNullable<Awaited<ReturnType<typeof getPosition>>>, description: string) {
+  const db = await getDb();
+  const revision = (await db.select({ location: jdRevisions.locationRaw }).from(jdRevisions).where(eq(jdRevisions.positionId, position.id)).orderBy(desc(jdRevisions.revision)).limit(1)).at(0);
+  const location = position.geoNotes ? [position.remoteClass, position.geoNotes].filter(Boolean).join(" ") : revision?.location || position.remoteClass;
+  return { title: position.title, company: position.company.name, companyOverview: position.company.overview, location, salary: position.salaryRaw, employmentType: position.employmentType, description };
+}
+
 export async function decisionContext(positionId: string) {
   const position = await getPosition(positionId);
   if (!position) throw new DecisionError("not_found", "Position not found.");
@@ -58,7 +65,7 @@ export async function decisionContext(positionId: string) {
   const jdText = await currentJdText(position.id);
   return { position, profile, state: {
     candidateEvidence: triageBriefOf(profile),
-    listing: { title: position.title, company: position.company.name, location: position.geoNotes || position.remoteClass, salary: position.salaryRaw, employmentType: position.employmentType, description: jdText },
+    listing: await decisionListingOf(position, jdText),
   } };
 }
 

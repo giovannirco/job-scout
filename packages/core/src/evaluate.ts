@@ -15,7 +15,7 @@ import { gateOperation, getLlmClient, logged } from "./llm.js";
 import { currentJdText, getPosition } from "./positions.js";
 import { briefOf, getProfile, profileFingerprint, triageBriefOf } from "./profile.js";
 import { addEvent } from "./timeline.js";
-import { verificationFor } from "./decisions.js";
+import { decisionListingOf, verificationFor } from "./decisions.js";
 
 export async function getEvaluation(positionId: string, kind: EvaluationKind) {
   const db = await getDb();
@@ -48,6 +48,7 @@ export async function runEvaluate(positionId: string, opts: { auto?: boolean } =
   const cfg = await gateOperation("evaluate");
   const profile = await getProfile();
   const jdText = await currentJdText(pos.id);
+  const listing = await decisionListingOf(pos, jdText);
   const messages = buildEvaluateMessages({
     title: pos.title,
     company: pos.company.name,
@@ -66,7 +67,7 @@ export async function runEvaluate(positionId: string, opts: { auto?: boolean } =
     messages,
   );
   const db = await getDb();
-  const verification = await verificationFor({ recipe: "evaluation_check", positionId: pos.id, candidateEvidence: triageBriefOf(profile), listing: { title: pos.title, description: jdText, company: pos.company.name, companyOverview: pos.company.overview }, draft: res.markdown });
+  const verification = await verificationFor({ recipe: "evaluation_check", positionId: pos.id, candidateEvidence: triageBriefOf(profile), listing, draft: res.markdown });
   const evalId = id("ev");
   const profileHash = profileFingerprint(profile);
   const profileChanged = profileFingerprint(await getProfile()) !== profileHash;

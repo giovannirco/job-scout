@@ -8,7 +8,7 @@ import { gateOperation, getLlmClient, logged } from "./llm.js";
 import { currentJdText, getPosition } from "./positions.js";
 import { getProfile, profileFingerprint, triageBriefOf } from "./profile.js";
 import { addEvent } from "./timeline.js";
-import { verificationFor } from "./decisions.js";
+import { decisionListingOf, verificationFor } from "./decisions.js";
 
 export async function listMaterials(positionId: string) {
   const db = await getDb();
@@ -114,6 +114,7 @@ export async function runMaterials(positionId: string, opts: { surface?: string 
   const cfg = await gateOperation("materials");
   const profile = await getProfile();
   const jdText = await currentJdText(pos.id);
+  const listing = await decisionListingOf(pos, jdText);
   const evaluation = await getEvaluation(pos.id, "evaluate");
   const sourceResume = await getCurrentMaterial(pos.id, "resume");
   const sourceCover = await getCurrentMaterial(pos.id, "cover");
@@ -134,7 +135,7 @@ export async function runMaterials(positionId: string, opts: { surface?: string 
     getLlmClient().chatDocument({ model: cfg.model, fallbackModel: cfg.fallbackModel, messages, schema: MaterialsOutput, schemaName: "materials", sections: ["resume", "cover"], temperature: cfg.temperature ?? 0.4, maxTokens: 7000 }),
     messages,
   );
-  const verification = await verificationFor({ recipe: "materials_check", positionId: pos.id, candidateEvidence: [triageBriefOf(profile), profile.masterCoverMarkdown].filter(Boolean).join("\n\n"), listing: { title: pos.title, company: pos.company.name, description: jdText }, draft: [res.sections.resume || res.markdown, res.sections.cover || ""].join("\n\n") });
+  const verification = await verificationFor({ recipe: "materials_check", positionId: pos.id, candidateEvidence: [triageBriefOf(profile), profile.masterCoverMarkdown].filter(Boolean).join("\n\n"), listing, draft: [res.sections.resume || res.markdown, res.sections.cover || ""].join("\n\n") });
   const db = await getDb();
   const currentProfile = await getProfile();
   const profileChanged = profileFingerprint(currentProfile) !== profileFingerprint(profile)

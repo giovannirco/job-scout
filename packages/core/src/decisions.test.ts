@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { eq } from "drizzle-orm";
-import { applicationMaterials, closeDb, decisionRuns, getDb, jobs, positions } from "@job-scout/db";
+import { applicationMaterials, closeDb, companies, decisionRuns, getDb, jobs, positions } from "@job-scout/db";
 import type { AtsJob } from "@job-scout/ats";
 import { bootstrap } from "./bootstrap.js";
 import { updateSettings } from "./settings.js";
@@ -92,6 +92,22 @@ describe("Jev workflows on isolated PGlite", () => {
     const state = JSON.parse(fetcher.mock.calls[0][1].body).state;
     expect(state.candidateEvidence).toContain("Kubernetes");
     expect((await decisionContext(position.id)).state).toEqual(state);
+  });
+  it("uses the listing location and company evidence in previews and workflow checks", async () => {
+    const { position } = await upsertFromJob(role("source-consistency"));
+    const db = await getDb();
+    await db.update(positions).set({ geoNotes: null, remoteClass: null }).where(eq(positions.id, position.id));
+    await db.update(companies).set({ overview: "Example company builds scheduling software." }).where(eq(companies.id, position.companyId));
+    const expected = (await decisionContext(position.id)).state.listing;
+    expect(expected.location).toBe("Remote worldwide");
+    expect(expected.companyOverview).toBe("Example company builds scheduling software.");
+    const fetcher = vi.fn().mockImplementation(async () => Response.json(unsupported));
+    vi.stubGlobal("fetch", fetcher);
+    vi.spyOn(getLlmClient(), "chatDocument").mockResolvedValue({ data: { score: 4.5, verdict: "apply", headline: "Relevant" }, markdown: "The employer builds scheduling software.", model: "test-model", tokensIn: 1, tokensOut: 1, latencyMs: 1 } as never);
+    await runEvaluate(position.id);
+    await previewDecision("evaluation_check", position.id, true);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    for (const call of fetcher.mock.calls) expect(JSON.parse(call[1].body).state.listing).toEqual(expected);
   });
   it("observes a match without replacing the normal triage call", async () => {
     const { position } = await upsertFromJob(role("observe")); vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(match)));
