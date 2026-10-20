@@ -8,6 +8,7 @@ import { bootstrap } from "./bootstrap.js";
 import { applySnapshot, getPosition, patchPosition, upsertFromJob } from "./positions.js";
 import { afterTriage, afterEvaluate, createApproval, resolveApproval } from "./autopilot.js";
 import { updateSettings } from "./settings.js";
+import { saveMaterial } from "./materials.js";
 import { coreEnv } from "./env.js";
 import { getLlmClient } from "./llm.js";
 import { runListingClassify } from "./listing-classify.js";
@@ -31,6 +32,7 @@ describe("live-audit regressions on isolated PGlite", () => {
   it.each(["archived", "skip", "applied", "interview", "materials"] as const)("expires stale promotion after operator moved to %s", async status => {
     const { position } = await upsertFromJob(job(`stale-${status}`), { status: "review" });
     const approval = (await createApproval({ kind: "status_suggestion", positionId: position.id, title: "Apply", payload: { toStatus: "materials" } }))!;
+    if (status === "materials") await saveMaterial({ positionId: position.id, kind: "resume", bodyMarkdown: "# Resume" });
     await patchPosition(position.id, { status });
     expect(await resolveApproval(approval.id, "approved")).toMatchObject({ status: "expired", applied: false });
     expect((await getPosition(position.id))?.status).toBe(status);
@@ -39,6 +41,7 @@ describe("live-audit regressions on isolated PGlite", () => {
 
   it("approves a current suggestion exactly once and keeps timeline history", async () => {
     const { position } = await upsertFromJob(job("current-approval"), { status: "review" });
+    await saveMaterial({ positionId: position.id, kind: "resume", bodyMarkdown: "# Resume" });
     const approval = (await createApproval({ kind: "status_suggestion", positionId: position.id, title: "Apply", payload: { toStatus: "materials" } }))!;
     expect(await resolveApproval(approval.id, "approved")).toMatchObject({ status: "approved", applied: true });
     expect((await getPosition(position.id))?.status).toBe("materials");

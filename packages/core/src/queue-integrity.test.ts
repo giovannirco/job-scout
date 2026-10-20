@@ -9,6 +9,7 @@ import { applySnapshot, getPosition, getPositionDetail, listPositions, patchPosi
 import { getProfile, profileFingerprint, updateProfile } from "./profile.js";
 import { reconcileCareerOps } from "./career-ops.js";
 import { repairPositionData } from "./data-repair.js";
+import { saveMaterial } from "./materials.js";
 import type { AtsJob } from "@job-scout/ats";
 import { isPlaceholderAtsUrl, LEGACY_SYNTHETIC_POSTING_URLS } from "@job-scout/shared";
 
@@ -43,6 +44,7 @@ describe("queue integrity on isolated PGlite", () => {
     expect(list.total).toBe(1);
     expect(list.items[0].id).toBe(br.position.id);
     expect(list.items[0].siblingCount).toBe(6);
+    await saveMaterial({ positionId: br.position.id, kind: "resume", bodyMarkdown: "# Resume" });
     await patchPosition(br.position.id, { status: "materials" });
     expect((await listPositions({ company: "countries", status: "review", actionable: "true", collapseFamilies: "true" })).total).toBe(0);
     expect((await listPositions({ company: "countries", includeDuplicates: "true" })).total).toBe(6);

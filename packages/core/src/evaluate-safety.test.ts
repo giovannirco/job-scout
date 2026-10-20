@@ -11,6 +11,7 @@ import { archivePosition, getPosition, patchPosition, upsertFromJob } from "./po
 import { afterEvaluate } from "./autopilot.js";
 import { getEvaluation, runEvaluate } from "./evaluate.js";
 import { enqueueJob } from "./jobs.js";
+import { saveMaterial } from "./materials.js";
 import { getProfile, updateProfile } from "./profile.js";
 import { updateSettings } from "./settings.js";
 import { coreEnv } from "./env.js";
@@ -34,6 +35,7 @@ describe("evaluation freshness on isolated PGlite", () => {
   it.each(["archived", "skip", "applied", "interview", "materials"] as const)("worker skips queued auto evaluation after a move to %s", async status => {
     const { position } = await upsertFromJob(job(`queued-${status}`));
     const queued = await enqueueJob("evaluate", { positionId: position.id, auto: true });
+    if (status === "materials") await saveMaterial({ positionId: position.id, kind: "resume", bodyMarkdown: "# Resume" });
     await patchPosition(position.id, { status });
     const llm = vi.spyOn(getLlmClient(), "chatDocument");
     const db = await getDb();
@@ -47,7 +49,10 @@ describe("evaluation freshness on isolated PGlite", () => {
     const { position } = await upsertFromJob(job(`inflight-${status}`));
     vi.spyOn(getLlmClient(), "chatDocument").mockImplementation(async () => {
       if (status === "archived") await archivePosition(position.id, "operator decision");
-      else await patchPosition(position.id, { status });
+      else {
+        if (status === "materials") await saveMaterial({ positionId: position.id, kind: "resume", bodyMarkdown: "# Resume" });
+        await patchPosition(position.id, { status });
+      }
       return result as never;
     });
     expect(await runEvaluate(position.id, { auto: true })).toMatchObject({ staleAtCompletion: true, autopilotSkipped: "evaluation_superseded" });

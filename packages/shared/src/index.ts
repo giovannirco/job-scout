@@ -22,3 +22,5 @@ export * from "./scout-brief.js";
 export * from "./search.js";
 export * from "./job-recovery.js";
 export * from "./decisions.js";
+export * from "./page-signature.js";
+export * from "./snapshot-guard.js";
