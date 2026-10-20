@@ -8,6 +8,7 @@ export type AtsProvider =
   | "teamtailor"
   | "rippling"
   | "bamboohr"
+  | "inhire"
   | "linkedin"
   | "indeed"
   | "other"
