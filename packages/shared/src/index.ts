@@ -7,6 +7,7 @@ export * from "./classify.js";
 export * from "./sort.js";
 export * from "./hash.js";
 export * from "./salary.js";
+export * from "./archive-policy.js";
 export * from "./source-catalog.js";
 export * from "./role-family.js";
 export * from "./company-alias.js";

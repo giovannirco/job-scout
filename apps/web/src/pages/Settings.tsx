@@ -319,14 +319,11 @@ function GateTab() {
           <Input label="Triage PASS ≥" type="number" step="0.1" value={triage.passThreshold} onChange={(e) => setTriage({ ...triage, passThreshold: Number(e.target.value) })} />
           <Input label="Triage MARGINAL ≥" type="number" step="0.1" value={triage.marginalThreshold} onChange={(e) => setTriage({ ...triage, marginalThreshold: Number(e.target.value) })} />
           <Input label="JD chars sent to triage" type="number" value={triage.jdMaxChars} onChange={(e) => setTriage({ ...triage, jdMaxChars: Number(e.target.value) })} />
-          <Select label="Marginal verdicts" value={triage.keepMarginal ? "keep" : "archive"} onChange={(e) => setTriage({ ...triage, keepMarginal: e.target.value === "keep" })}>
-            <option value="keep">keep in pipeline</option>
-            <option value="archive">archive</option>
-          </Select>
           <Input label="Board scan interval (min)" type="number" value={scan.boardIntervalMinutes} onChange={(e) => setScan({ ...scan, boardIntervalMinutes: Number(e.target.value) })} />
           <Input label="Boards per tick" type="number" value={scan.boardsPerTick} onChange={(e) => setScan({ ...scan, boardsPerTick: Number(e.target.value) })} />
         </div>
         <p className="text-[12px] text-muted mt-3">A listing still on the board is kept even when it is older than the max posting age.</p>
+        <p className="text-[12px] text-muted mt-1">Triage archives a listing only for a hard disqualifier: residency, work authorization, onsite or hybrid, or posted pay under the profile's cash floor. Low scores and skill gaps stay in the pipeline, and a listing someone restored is never archived again automatically.</p>
       </Panel>
       <p className="text-[11.5px] text-faint">
         Board sources and URL watches are managed in{" "}

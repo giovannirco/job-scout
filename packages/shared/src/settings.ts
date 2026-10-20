@@ -52,7 +52,7 @@ export const TriageConfig = z.object({
   marginalThreshold: z.number().min(0).max(5).default(3.0),
   /** Trim JD text to this many chars before sending to the model */
   jdMaxChars: z.number().int().min(500).default(6000),
-  /** Automatically create/keep positions for marginal verdicts */
+  /** Deprecated: marginal verdicts are never auto-archived (only hard disqualifiers archive). Kept for config compatibility. */
   keepMarginal: z.boolean().default(true),
 });
 export type TriageConfig = z.infer<typeof TriageConfig>;

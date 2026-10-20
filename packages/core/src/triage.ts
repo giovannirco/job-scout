@@ -7,7 +7,8 @@ import { currentJdText, getPosition } from "./positions.js";
 import { triageBriefOf, getProfile, profileFingerprint } from "./profile.js";
 import { getSettings } from "./settings.js";
 import { addEvent } from "./timeline.js";
-import { log } from "@job-scout/shared";
+import { log, triageArchiveDecision } from "@job-scout/shared";
+import { humanRestore } from "./archive-guard.js";
 import { ingestQuality } from "./metrics.js";
 import { decisionListingOf, sameJevConfig, tryDecision } from "./decisions.js";
 import { fastTriageOutput } from "./fast-triage.js";
@@ -80,14 +81,20 @@ export async function runTriage(positionId: string, opts: { force?: boolean; ref
     triageModel: res.model,
     updatedAt: now,
   };
-  // Only auto-archive fails that the operator has not touched.
+  // Auto-archive only untouched fails with a hard disqualifier (residency, work
+  // authorization, onsite/hybrid, posted pay under the floor), and never a
+  // position a person restored from the archive. Everything else stays active
+  // with its score. Marginal verdicts are never archived.
   if (!opts.refreshOnly && verdict === "fail" && pos.status === "triaged") {
-    set.status = "archived";
-    set.archiveReason = `triage fail ${score.toFixed(1)}: ${out.hardDq[0] || out.oneLiner}`.slice(0, 300);
-  }
-  if (!opts.refreshOnly && verdict === "marginal" && pos.status === "triaged" && !settings.triage.keepMarginal) {
-    set.status = "archived";
-    set.archiveReason = `triage marginal ${score.toFixed(1)}`;
+    const decision = triageArchiveDecision({ hardDq: out.hardDq, salaryRaw: pos.salaryRaw, payFloorUsd: profile.cashFloorUsd });
+    const restored = decision.archive ? await humanRestore(pos.id) : null;
+    if (decision.archive && !restored) {
+      set.status = "archived";
+      set.archiveReason = `triage fail ${score.toFixed(1)}: ${decision.kind}: ${decision.reason}`.slice(0, 300);
+    }
+    (set.triageJson as Record<string, unknown>).archive = decision.archive && !restored
+      ? { archived: true, kind: decision.kind }
+      : { archived: false, why: restored ? "human_restored" : (decision as { why: string }).why, ...(restored ? { restoredBy: restored.actor, restoredAt: restored.at.toISOString() } : {}) };
   }
   const profileChanged = profileFingerprint(await getProfile()) !== profileFingerprint(profile);
   if (profileChanged && fast) return { skipped: true as const, reason: "profile_changed", verdict: pos.triageVerdict };

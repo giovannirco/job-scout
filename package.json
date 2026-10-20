@@ -18,7 +18,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint apps packages",
     "lint:strict": "pnpm lint --max-warnings 0",
-    "db:repair": "tsx --env-file-if-exists=.env packages/core/src/cli/repair-data.ts"
+    "db:repair": "tsx --env-file-if-exists=.env packages/core/src/cli/repair-data.ts",
+    "db:repair-triage-archives": "tsx --env-file-if-exists=.env packages/core/src/cli/repair-triage-archives.ts"
   },
   "workspaces": [
     "apps/*",
