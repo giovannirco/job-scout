@@ -14,6 +14,8 @@
     "once": "NODE_ENV=production tsx --env-file-if-exists=.env apps/worker/src/once.ts",
     "db:generate": "drizzle-kit generate --config packages/db/drizzle.config.ts",
     "db:migrate": "tsx --env-file-if-exists=.env packages/db/src/migrate.ts",
+    "db:repair-last-good-jd": "tsx --env-file-if-exists=.env packages/core/src/cli/repair-last-good-jd.ts",
+    "db:repair-materials-status": "tsx --env-file-if-exists=.env packages/core/src/cli/repair-materials-status.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "eslint apps packages",

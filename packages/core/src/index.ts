@@ -35,3 +35,5 @@ export * from "./whatsapp-inbox.js";
 export * from "./triage-refresh.js";
 export * from "./decisions.js";
 export * from "./decision-events.js";
+export * from "./jd-repair.js";
+export * from "./pipeline-integrity.js";

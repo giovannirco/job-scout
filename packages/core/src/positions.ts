@@ -29,12 +29,14 @@ import {
   summarizeDiffs,
   HOT_STATUSES,
   PipelineStatus,
+  snapshotIdentityMismatch, snapshotPageVerdict,
   isNoiseJobTitle, cleanJobTitle, cleanLocation, canonicalExternalIdentity, normalizePostingUrl,
   searchWords, likeContains, homeMarket, listedAtHome,
   employerFromPosting, unresolvedCompany, UNRESOLVED_COMPANY, requisitionId,
 } from "@job-scout/shared";
 import { resolveCompanyForName } from "./companies.js";
 import { addEvent } from "./timeline.js";
+import { hasMaterials, MaterialsMissingError, refreshedCareerOpsStamp } from "./pipeline-integrity.js";
 import { jdChanges, watchChecks, ingestQuality } from "./metrics.js";
 import { careerStamp, groupingRows, groupRows, groupSummary, repostFor, terminalCareerStatus, validOperatorRow } from "./position-groups.js";
 import { getProfile, profileFingerprint } from "./profile.js";
@@ -443,6 +445,8 @@ export async function patchPosition(idOrSlug: string, patch: Record<string, unkn
     if (k === "status") {
       const s = PipelineStatus.safeParse(v);
       if (!s.success) throw new Error(`invalid status ${String(v)}`);
+      // `materials` is a fact about files, not an intent: drafts land first (runMaterials moves the stage).
+      if (s.data === "materials" && pos.status !== "materials" && !(await hasMaterials(pos.id, pos.metadata))) throw new MaterialsMissingError(pos.id);
       set.status = s.data;
       if (s.data === "applied" && !pos.appliedAt) set.appliedAt = new Date();
       if (s.data !== "archived") set.archiveReason = null;
@@ -457,6 +461,10 @@ export async function patchPosition(idOrSlug: string, patch: Record<string, unkn
     const automated = /^(system|autopilot|career-ops|intake|scan(?::.*)?|triage|evaluate|import|seed)$/.test(actor);
     if (set.status === "review" && !automated) metadata.reviewIntent = { kind: "operator", actor, at: new Date().toISOString() };
     else delete metadata.reviewIntent;
+    if (set.status !== pos.status) {
+      const stamp = refreshedCareerOpsStamp(metadata.careerOps as Record<string, unknown> | undefined, String(set.status));
+      if (stamp) metadata.careerOps = stamp;
+    }
     set.metadata = metadata;
   }
   await db.update(positions).set(set).where(eq(positions.id, pos.id));
@@ -481,13 +489,18 @@ export async function patchPosition(idOrSlug: string, patch: Record<string, unkn
   return getPosition(pos.id);
 }
 
+function archivedStamp(metadata: Record<string, unknown> | null | undefined) {
+  const stamp = refreshedCareerOpsStamp(metadata?.careerOps as Record<string, unknown> | undefined, "archived");
+  return stamp ? { metadata: { ...(metadata || {}), careerOps: stamp } } : {};
+}
+
 export async function archivePosition(idOrSlug: string, reason: string, actor = "operator") {
   const db = await getDb();
   const pos = await getPosition(idOrSlug);
   if (!pos) return null;
   await db
     .update(positions)
-    .set({ status: "archived", archiveReason: reason.slice(0, 300), watchEnabled: false, updatedAt: new Date() })
+    .set({ status: "archived", archiveReason: reason.slice(0, 300), watchEnabled: false, updatedAt: new Date(), ...archivedStamp(pos.metadata) })
     .where(eq(positions.id, pos.id));
   await addEvent({ positionId: pos.id, kind: "status", title: `archived: ${reason}`, actor });
   return getPosition(pos.id);
@@ -498,7 +511,9 @@ export async function stampCareerOps(idOrSlug: string, stamp: Record<string, unk
   const db = await getDb();
   const pos = await getPosition(idOrSlug);
   if (!pos) return null;
-  const next = { ...stamp, syncedAt: new Date().toISOString() };
+  const now = new Date().toISOString();
+  // Record job-scout's own stage at stamp time so a later status change shows as drift.
+  const next = { ...stamp, syncedAt: now, jsStatus: pos.status, jsStatusAt: now };
   const [updated] = await db
     .update(positions)
     .set({ metadata: sql`jsonb_set(coalesce(${positions.metadata}, '{}'::jsonb), '{careerOps}', coalesce(${positions.metadata}->'careerOps', '{}'::jsonb) || ${JSON.stringify(next)}::jsonb)`, updatedAt: new Date() })
@@ -516,6 +531,36 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
   const db = await getDb();
   const pos = await getPosition(opts.positionId);
   if (!pos) throw new Error("position not found");
+
+  // A soft-404 / "Job Not Found" page is a closure signal, never content: keep title + JD.
+  const page = opts.job.listingStatus === "closed" ? null : snapshotPageVerdict(pos.title, opts.job);
+  if (page?.refuse && page.signature === "not_found") {
+    log.warn("jd.snapshot_not_found", { positionId: pos.id, where: page.where, url: opts.job.url });
+    opts = { ...opts, job: { ...opts.job, listingStatus: "closed", title: "", descriptionText: "", locationRaw: undefined, salaryRaw: pos.salaryRaw || undefined, rawPayload: { ...(opts.job.rawPayload || {}), closedReason: "not_found_page" } } };
+  }
+  const blocked = snapshotBlockReason(pos, opts.job);
+  if (blocked) {
+    // Keep the last good revision: no jd_revision, no jd_change, no re-scoring. Record why.
+    const now = new Date();
+    await db
+      .update(positions)
+      .set({
+        lastCheckedAt: now,
+        updatedAt: now,
+        metadata: { ...(pos.metadata || {}), lastAtsFetch: { at: now.toISOString(), provider: opts.job.provider, listingStatus: opts.job.listingStatus, rejected: blocked } },
+      })
+      .where(eq(positions.id, pos.id));
+    await addEvent({
+      positionId: pos.id,
+      kind: "harness",
+      title: `JD snapshot not applied: ${blocked}`.slice(0, 300),
+      body: `source=${opts.source || "scan"} url=${opts.job.url || ""} title=${(opts.job.title || "").slice(0, 120)} company=${opts.job.company || ""}`,
+      metadata: { reason: blocked, source: opts.source || "scan", incoming: { url: opts.job.url, title: opts.job.title, company: opts.job.company, provider: opts.job.provider, jobId: opts.job.jobId, externalIdentity: opts.job.externalIdentity } },
+    });
+    watchChecks.labels({ outcome: "rejected" }).inc();
+    log.warn("jd.snapshot_rejected", { positionId: pos.id, reason: blocked, source: opts.source || "scan", url: opts.job.url });
+    return { changed: false as const, revision: null, rejected: blocked };
+  }
 
   const title = preferJobTitle(isNoiseJobTitle(opts.job.title) ? "" : opts.job.title, pos.title, { slug: pos.slug, companySlug: pos.company.slug });
   const incomingShell = isNoiseJobTitle(opts.job.title);
@@ -889,6 +934,29 @@ export async function repairObjectSalaries(): Promise<{ checked: number; updated
     }
   }
   return { checked: rows.length, updated, failed, failedIds };
+}
+
+/**
+ * Why a fetched posting must NOT be applied to this position (null = apply):
+ *  - not a JD: JS wall, loading shell, placeholder or vendor boilerplate
+ *  - failed fetch flagged by the fetcher (e.g. InHire job id mismatch)
+ *  - identity: a different company or ATS posting (cross-company clobber)
+ */
+export function snapshotBlockReason(
+  pos: { title?: string | null; primaryUrl?: string | null; atsProvider?: string | null; atsJobId?: string | null; externalIdentity?: string | null; company: { name: string } },
+  job: AtsJob,
+): string | null {
+  if (job.listingStatus !== "closed") {
+    const page = snapshotPageVerdict(pos.title, job);
+    if (page.refuse) return `not_a_jd:${page.signature}:${page.where}`;
+  }
+  const failed = (job.rawPayload as { fetchFailed?: string } | undefined)?.fetchFailed;
+  if (failed) return `failed_fetch:${failed}`;
+  const mismatch = snapshotIdentityMismatch(
+    { companyName: pos.company.name, primaryUrl: pos.primaryUrl, atsProvider: pos.atsProvider, atsJobId: pos.atsJobId, externalIdentity: pos.externalIdentity },
+    { company: job.company, url: job.url, provider: job.provider, jobId: job.jobId, externalIdentity: job.externalIdentity },
+  );
+  return mismatch ? `identity_mismatch:${mismatch}` : null;
 }
 
 /** Create-or-update a position from an ATS job. New positions start as `triaged` (untriaged until the LLM runs). */

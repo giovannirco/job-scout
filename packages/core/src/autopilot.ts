@@ -13,6 +13,7 @@ import {
 import { HOT_STATUSES, type AutopilotConfig } from "@job-scout/shared";
 import { enqueueJob } from "./jobs.js";
 import { getPosition } from "./positions.js";
+import { hasMaterials } from "./pipeline-integrity.js";
 import { getSettings } from "./settings.js";
 import { addEvent } from "./timeline.js";
 import { log as rootLog } from "@job-scout/shared";
@@ -269,6 +270,7 @@ export async function resolveApproval(approvalId: string, decision: "approved" |
     let applied = false;
     let status: ApprovalStatus = decision;
     let staleReason: string | null = null;
+    let queueMaterials: string | null = null;
     if (decision === "approved") {
       const pos = row.positionId ? (await tx.select().from(positions).where(eq(positions.id, row.positionId)).limit(1).for("update"))[0] : null;
       const p = row.payload || {};
@@ -283,7 +285,9 @@ export async function resolveApproval(approvalId: string, decision: "approved" |
       if (staleReason) status = "expired";
       else if (pos) {
         const nextStatus = row.kind === "archive_suggestion" ? "archived" : "materials";
-        if (pos.status !== nextStatus) {
+        // Approving "move to materials" before drafts exist queues them; runMaterials moves the stage when they land.
+        if (nextStatus === "materials" && pos.status !== "materials" && !(await hasMaterials(pos.id, pos.metadata, tx))) queueMaterials = pos.id;
+        else if (pos.status !== nextStatus) {
           const metadata = { ...(pos.metadata || {}) };
           delete metadata.reviewIntent;
           await tx.update(positions).set({
@@ -299,8 +303,12 @@ export async function resolveApproval(approvalId: string, decision: "approved" |
     await tx.update(approvals).set({ status, resolvedAt: new Date(), resolvedBy: actor }).where(eq(approvals.id, approvalId));
     if (row.positionId) await tx.insert(timelineEvents).values({ id: id("tl"), positionId: row.positionId, kind: "approval", title: `${status}: ${row.title}`.slice(0, 300), actor, metadata: { staleReason } });
     approvalsResolved.labels({ kind: row.kind, decision: status }).inc();
-    log.info("approval.resolved", { approvalId, kind: row.kind, decision: status, applied, actor, positionId: row.positionId, staleReason });
-    return { id: row.id, status, applied, staleReason };
+    log.info("approval.resolved", { approvalId, kind: row.kind, decision: status, applied, actor, positionId: row.positionId, staleReason, queueMaterials });
+    return { id: row.id, status, applied, staleReason, queueMaterials };
+  }).then(async ({ queueMaterials: queued, ...r }) => {
+    if (!queued) return r;
+    const job = await enqueueJob("materials", { positionId: queued, auto: false }, { dedupeKey: `materials:${queued}`, priority: 20 });
+    return { ...r, materialsJobId: job.id };
   });
 }
 

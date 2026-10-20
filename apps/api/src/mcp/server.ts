@@ -30,6 +30,7 @@ import {
   RefreshStaleTriageInput,
   runListingClassify,
   stampCareerOps,
+  careerOpsStampState,
   upsertFromJob,
   usageSummary,
   retryFailedLlm,
@@ -490,7 +491,7 @@ export function createJobScoutMcpServer() {
 
   server.registerTool(
     "list_career_ops_stamps",
-    { title: "List career-ops stamps", description: "All positions that carry a careerOps stamp (id, slug, url, stamp).", inputSchema: z.object({}), annotations: { readOnlyHint: true } },
+    { title: "List career-ops stamps", description: "All positions that carry a careerOps stamp (id, slug, url, stamp, stampState.stale when the stamp names a different stage than the position).", inputSchema: z.object({}), annotations: { readOnlyHint: true } },
     async () => {
       const db = await getDb();
       const rows = await db
@@ -499,7 +500,8 @@ export function createJobScoutMcpServer() {
         .innerJoin(companies, eq(positions.companyId, companies.id))
         .where(and(sql`${positions.metadata} ? 'careerOps'`))
         .limit(1000);
-      return text(rows);
+      // `stale`: the stamp names a pipeline stage other than the position's current status.
+      return text(rows.map((r) => ({ ...r, stampState: careerOpsStampState(r.status, r.careerOps) })));
     },
   );
 
