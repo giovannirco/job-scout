@@ -430,6 +430,60 @@ function joinAshbyLocations(primary: AshbyLocation, secondary?: AshbyLocation[] 
   return parts.length ? [...new Set(parts)].join(" · ") : undefined;
 }
 
+/**
+ * Ashby posting-API compensation → a salaryRaw that parseSalary understands.
+ * Prefers the Salary summary component; falls back to the scrapeable summary.
+ */
+export function ashbySalaryRaw(comp: unknown): string | undefined {
+  type Component = { compensationType?: string | null; interval?: string | null; currencyCode?: string | null; minValue?: number | null; maxValue?: number | null };
+  const c = (comp || {}) as { summaryComponents?: Component[]; compensationTiers?: Array<{ components?: Component[] }>; scrapeableCompensationSalarySummary?: string | null };
+  const all = [...(c.summaryComponents || []), ...(c.compensationTiers || []).flatMap((t) => t.components || [])];
+  const salary = all.find((x) => /salary/i.test(x.compensationType || "") && (x.minValue || x.maxValue));
+  if (salary) {
+    const cur = salary.currencyCode || "USD";
+    const range = salary.minValue && salary.maxValue && salary.minValue !== salary.maxValue ? `${salary.minValue}–${salary.maxValue}` : String(salary.maxValue || salary.minValue);
+    const per = /month/i.test(salary.interval || "") ? " per month" : /hour/i.test(salary.interval || "") ? " per hour" : /week|day/i.test(salary.interval || "") ? "" : " per year";
+    return `${cur} ${range}${per}`;
+  }
+  return c.scrapeableCompensationSalarySummary?.trim() || undefined;
+}
+
+/** InHire public job API: GET https://api.inhire.app/job-posts/public/pages/{jobId} with X-Tenant: {tenant}. Never renders the page. */
+export async function fetchInhireJob(tenant: string, jobId: string, url?: string): Promise<AtsJob> {
+  const pageUrl = url || `https://${tenant}.inhire.app/vagas/${jobId}`;
+  const base = { provider: "inhire" as const, boardToken: tenant, jobId, externalIdentity: `inhire:${tenant}:${jobId}`, url: pageUrl };
+  const res = await publicFetch(`https://api.inhire.app/job-posts/public/pages/${encodeURIComponent(jobId)}`, {
+    headers: { "User-Agent": UA, Accept: "application/json", "X-Tenant": tenant },
+    signal: AbortSignal.timeout(25_000),
+  });
+  if (res.status === 404) return { ...base, title: "", listingStatus: "closed", rawPayload: { source: "inhire_api", httpStatus: 404 } };
+  if (!res.ok) throw new Error(`inhire fetch failed: ${res.status}`);
+  const d = (await res.json()) as {
+    tenantName?: string; displayName?: string; description?: string; status?: string; workplaceType?: string;
+    location?: string; locationComplement?: string; contractType?: string[]; publishedAt?: string; jobId?: string;
+  };
+  if (d.jobId && d.jobId !== jobId) {
+    // Never accept a different posting than the one asked for.
+    return { ...base, title: "", listingStatus: "unknown", rawPayload: { source: "inhire_api", fetchFailed: "job_id_mismatch", got: d.jobId } };
+  }
+  const loc = [d.location === "BR" ? "Brasil" : d.location, d.locationComplement].filter(Boolean).join(", ");
+  const description = stripHtml(decodeHtmlEntities(d.description || ""));
+  return {
+    ...base,
+    title: (d.displayName || "").trim(),
+    company: d.tenantName,
+    locationRaw: loc || undefined,
+    descriptionText: description || undefined,
+    descriptionHtml: d.description,
+    workplaceType: d.workplaceType?.toLowerCase(),
+    isRemote: /remote/i.test(d.workplaceType || "") || undefined,
+    employmentType: d.contractType?.join(", "),
+    postedAt: d.publishedAt,
+    listingStatus: d.status && d.status !== "published" ? "closed" : "open",
+    rawPayload: { source: "inhire_api", status: d.status, tenant },
+  };
+}
+
 export async function fetchAshbyJob(org: string, jobId: string, opts: { render?: HtmlRenderer } = {}): Promise<AtsJob> {
   const pageUrl = `https://jobs.ashbyhq.com/${org}/${jobId}`;
   // Ashby posting API (public)
@@ -467,25 +521,11 @@ export async function fetchAshbyJob(org: string, jobId: string, opts: { render?:
             publishedAt?: string;
             secondaryLocations?: AshbyLocation[];
             address?: { postalAddress?: { addressLocality?: string; addressRegion?: string; addressCountry?: string } };
-            compensation?: {
-              compensationTiers?: Array<{
-                title?: string;
-                componentDescriptions?: Array<{ currencyCode?: string; minValue?: number; maxValue?: number }>;
-              }>;
-            };
+            compensation?: unknown;
           }
         | undefined;
       if (job) {
-        const tier = job.compensation?.compensationTiers?.[0];
-        const comp = tier?.componentDescriptions?.[0];
-        let salaryRaw: string | undefined;
-        if (comp && (comp.minValue || comp.maxValue)) {
-          const cur = comp.currencyCode || "USD";
-          salaryRaw =
-            comp.minValue && comp.maxValue
-              ? `${cur} ${comp.minValue}–${comp.maxValue}`
-              : `${cur} ${comp.minValue || comp.maxValue}`;
-        }
+        const salaryRaw = ashbySalaryRaw(job.compensation);
         const locationsJoined = ashbyListingLocation(job.location, job.secondaryLocations, job.address);
         const applyUrl = job.applyUrl || job.jobUrl || pageUrl;
         let questionPrompts: QuestionPrompt[] | undefined = await fetchAshbyApplicationPrompts(org, jobId);
@@ -543,6 +583,20 @@ export async function fetchAshbyJob(org: string, jobId: string, opts: { render?:
             httpStatus: status,
             apiJob: job as unknown as Record<string, unknown>,
           },
+        };
+      }
+      // The board answered and this job is not on it: the posting is gone. The job page
+      // still answers 200 (SPA shell), so it must not be used for liveness.
+      if (Array.isArray(data.jobs) && !isPlaceholderJobId("ashby", jobId)) {
+        return {
+          provider: "ashby",
+          boardToken: org,
+          jobId,
+          externalIdentity: `ashby:${org}:${jobId}`,
+          title: "",
+          url: pageUrl,
+          listingStatus: "closed",
+          rawPayload: { provider: "ashby", httpStatus: status, closedReason: "not_on_board", boardJobs: data.jobs.length },
         };
       }
     } else if (status === 404) {
@@ -867,6 +921,10 @@ export async function fetchJobFromUrl(url: string, opts: { render?: HtmlRenderer
   }
   if (detected.provider === "bamboohr" && detected.boardToken && detected.jobId) {
     return fetchBambooHrJob(detected.boardToken, detected.jobId);
+  }
+  // InHire pages are a JS app: only the public API has the posting. Never render.
+  if (detected.provider === "inhire" && detected.boardToken && detected.jobId) {
+    return fetchInhireJob(detected.boardToken, detected.jobId, url);
   }
 
   // Workday / SmartRecruiters / Workable / LinkedIn / etc. → HTML + JSON-LD,
