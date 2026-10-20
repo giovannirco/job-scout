@@ -2,8 +2,8 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { eq } from "drizzle-orm";
-import { closeDb, getDb, positions } from "@job-scout/db";
+import { and, eq } from "drizzle-orm";
+import { closeDb, getDb, positions, timelineEvents } from "@job-scout/db";
 import { bootstrap } from "./bootstrap.js";
 import { coreEnv } from "./env.js";
 import { getLlmClient } from "./llm.js";
@@ -76,6 +76,21 @@ describe("triage auto-archive policy", () => {
     const after = (await getPosition(p.id))!;
     expect(after.status).toBe("archived");
     expect(after.archiveReason).toContain(`${kind}: ${hardDq[0]}`);
+    const db = await getDb();
+    const moves = await db.select().from(timelineEvents).where(and(eq(timelineEvents.positionId, p.id), eq(timelineEvents.kind, "status")));
+    expect(moves).toEqual([expect.objectContaining({ title: "triaged → archived", actor: "triage", body: after.archiveReason })]);
+  });
+
+  it("a manually restored skill-gap FAIL stays active and writes no status event", async () => {
+    const p = await position("restored-skill-gap");
+    await archivePosition(p.id, "triage fail 2.4: required GPU serving stack not claimed", "system");
+    await patchPosition(p.id, { status: "triaged" }, "manual");
+    vi.spyOn(getLlmClient(), "chatJson").mockResolvedValue(fail(["Required production GPU serving stack not claimed"]) as never);
+    await runTriage(p.id, { force: true });
+    expect((await getPosition(p.id))!.status).toBe("triaged");
+    const db = await getDb();
+    const moves = await db.select().from(timelineEvents).where(and(eq(timelineEvents.positionId, p.id), eq(timelineEvents.kind, "status")));
+    expect(moves.map((m) => m.title).sort()).toEqual(["archived → triaged", "archived: triage fail 2.4: required GPU serving stack not claimed"]);
   });
 
   it("a pay disqualifier with posted pay above the floor stays active", async () => {

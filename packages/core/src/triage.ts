@@ -113,6 +113,10 @@ export async function runTriage(positionId: string, opts: { force?: boolean; ref
     body: out.oneLiner,
     metadata: { model: res.model, tokensIn: res.tokensIn, tokensOut: res.tokensOut },
   });
+  // A triage archive is a status change like any other: it gets its own timeline entry.
+  if (set.status === "archived" && pos.status !== "archived") {
+    await addEvent({ positionId: pos.id, kind: "status", title: `${pos.status} → archived`, body: String(set.archiveReason || ""), actor: "triage" });
+  }
   const auto = opts.refreshOnly || profileChanged ? {} : await afterTriage({
     positionId: pos.id,
     companyId: pos.companyId,
