@@ -1,8 +1,9 @@
-import { and, eq, gte, like, or } from "drizzle-orm";
-import { getDb, positions } from "@job-scout/db";
+import { and, desc, eq, gte, like, or } from "drizzle-orm";
+import { getDb, positions, timelineEvents } from "@job-scout/db";
 import { triageArchiveDecision, type HardDisqualifierKind } from "@job-scout/shared";
 import { getProfile } from "./profile.js";
 import { addEvent } from "./timeline.js";
+import { careerOpsDropStatus } from "./career-ops-status.js";
 
 export type TriageArchiveRow = {
   id: string;
@@ -59,6 +60,7 @@ export async function repairTriageArchives(opts: { days?: number; apply?: boolea
       await addEvent({ positionId: r.id, kind: "status", title: "archived → triaged", body: `Archive policy repair: "${r.archiveReason}" is not a hard disqualifier; score kept.`, actor: "repair" });
     }
   }
+  const careerOpsSkips = await listCareerOpsSkips(since);
   return {
     dryRun: !opts.apply,
     since: since.toISOString(),
@@ -67,5 +69,30 @@ export async function repairTriageArchives(opts: { days?: number; apply?: boolea
     keepArchived: out.filter((r) => r.action === "keep_archived").length,
     skippedClosed: out.filter((r) => r.action === "skip_closed").length,
     rows: out,
+    /** Listed only (never changed here): skips whose career-ops tracker label is a drop (Discarded/SKIP/…). Review by hand. */
+    careerOpsSkips,
   };
+}
+
+/** Positions skipped in the window whose career-ops tracker status is a drop label. */
+export async function listCareerOpsSkips(since: Date) {
+  const db = await getDb();
+  const rows = await db
+    .select({ id: positions.id, slug: positions.slug, title: positions.title, metadata: positions.metadata })
+    .from(positions)
+    .where(eq(positions.status, "skip"));
+  const out: Array<{ id: string; slug: string; title: string; trackerStatus: string; skippedAt: string; skippedBy: string; from: string }> = [];
+  for (const r of rows) {
+    const trackerStatus = String(((r.metadata || {}) as { careerOps?: { status?: unknown } }).careerOps?.status ?? "");
+    if (!careerOpsDropStatus(trackerStatus)) continue;
+    const ev = (await db
+      .select({ title: timelineEvents.title, actor: timelineEvents.actor, at: timelineEvents.createdAt })
+      .from(timelineEvents)
+      .where(and(eq(timelineEvents.positionId, r.id), eq(timelineEvents.kind, "status"), like(timelineEvents.title, "% → skip")))
+      .orderBy(desc(timelineEvents.createdAt))
+      .limit(1)).at(0);
+    if (!ev || ev.at < since) continue;
+    out.push({ id: r.id, slug: r.slug, title: r.title, trackerStatus, skippedAt: ev.at.toISOString(), skippedBy: ev.actor || "system", from: ev.title.replace(/ → skip$/, "") });
+  }
+  return out;
 }

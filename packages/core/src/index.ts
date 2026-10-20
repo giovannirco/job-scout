@@ -26,6 +26,8 @@ export * from "./interviews.js";
 export * from "./interview-brief.js";
 export * from "./funnel.js";
 export * from "./career-ops.js";
+export * from "./career-ops-status.js";
+export * from "./archive-guard.js";
 export * from "./data-repair.js";
 export * from "./position-groups.js";
 export * from "./board-reconcile.js";

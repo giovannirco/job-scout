@@ -42,7 +42,7 @@ The API includes an MCP server for reading positions, managing the pipeline and 
 | `intake` | create/refresh a position from a job URL; queues triage when a model key is set |
 | `refresh_jd` | re-fetch the ATS page; revision if changed |
 | `update_position` | PATCH status, priority, notes, nextAction, resumeSurface, watchEnabled, appliedAt |
-| `set_position_status` | any pipeline status; `archived` requires a reason |
+| `set_position_status` | any pipeline status; `archived` requires a reason. A `skip`/`archived` from the career-ops sync (`source: "career-ops"` or a `note` starting with `career-ops`) is recorded as a note and not applied |
 | `log_activity` | append a timeline note |
 | `upsert_interview` | create/patch a screen or interview (transcript queues an AI brief unless `skipBrief`) |
 | `brief_interview` | queue or `sync` the `interview_brief` model vs JD + company pack. A transcript does not queue a brief when no model key is set |

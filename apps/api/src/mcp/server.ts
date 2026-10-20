@@ -43,6 +43,10 @@ import {
   jevStatus,
   recentDecisions,
   previewDecision,
+  setStatusFromCaller,
+  mapCareerOpsStatus,
+  careerOpsDropStatus,
+  noteCareerOpsDrop,
 } from "@job-scout/core";
 import { log as rootLog } from "@job-scout/shared";
 import { env } from "../env.js";
@@ -206,11 +210,10 @@ export function createJobScoutMcpServer() {
 
   server.registerTool(
     "set_position_status",
-    { title: "Set status", description: "Set pipeline status (triaged|review|materials|applied|screen|interview|offer|rejected|skip|archived). archived requires reason.", inputSchema: { idOrSlug: z.string(), status: z.string(), reason: z.string().optional() } },
+    { title: "Set status", description: "Set pipeline status (triaged|review|materials|applied|screen|interview|offer|rejected|skip|archived). archived requires reason. A skip/archive from the career-ops sync (source=career-ops, or a note starting 'career-ops') is recorded as a note and not applied.", inputSchema: { idOrSlug: z.string(), status: z.string(), reason: z.string().optional(), note: z.string().optional(), source: z.string().optional() } },
     async (a, ctx) => {
       try {
-        if (a.status === "archived") return text(await archivePosition(a.idOrSlug, a.reason || "mcp", agentOf(ctx as ToolCtx)));
-        const p = await patchPosition(a.idOrSlug, { status: a.status }, agentOf(ctx as ToolCtx));
+        const p = await setStatusFromCaller(a.idOrSlug, a.status, { actor: agentOf(ctx as ToolCtx), reason: a.reason, note: a.note, source: a.source });
         return p ? text(p) : text({ error: "not found" }, true);
       } catch (e) {
         return errText(e);
@@ -517,6 +520,7 @@ export function createJobScoutMcpServer() {
         }
         if (!position) throw new Error("position missing");
         const mapped = mapCareerOpsStatus(a.status);
+        if (careerOpsDropStatus(a.status)) await noteCareerOpsDrop(position.id, String(a.status));
         const patch: Record<string, unknown> = {};
         if (mapped && mapped !== position.status) patch.status = mapped;
         // Workday/landing pages often yield no title from the fetch: the tracker role is the truth then.
@@ -683,26 +687,4 @@ export function createJobScoutMcpServer() {
   return server;
 }
 
-/** career-ops tracker statuses -> job-scout statuses */
-export function mapCareerOpsStatus(s?: string | null): string | null {
-  if (!s) return null;
-  const k = s.toLowerCase().trim();
-  const table: Record<string, string> = {
-    "to apply": "review",
-    "to-apply": "review",
-    evaluated: "review",
-    applied: "applied",
-    screen: "screen",
-    screening: "screen",
-    interview: "interview",
-    interviewing: "interview",
-    offer: "offer",
-    rejected: "rejected",
-    declined: "rejected",
-    ghosted: "rejected",
-    skip: "skip",
-    skipped: "skip",
-    withdrawn: "skip",
-  };
-  return table[k] ?? null;
-}
+export { mapCareerOpsStatus };

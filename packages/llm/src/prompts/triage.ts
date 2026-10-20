@@ -43,7 +43,7 @@ export function buildTriageMessages(input: TriageInput): ChatMessage[] {
     "",
     "Scoring rules:",
     "- archetype: direct hit on a target archetype 4-5; analog title 3; mismatch 1-2.",
-    "- comp: below the hard floor => 0-1 and add a hardDq. For an advertised range, apply the floor to the range maximum (wide ranges are geo bands); a minimum below the floor is a soft flag, not a hardDq. Not stated => 4 unless the role/level implies low pay.",
+    "- comp: the profile cash floor is the only pay disqualifier. Posted pay below the floor => 0-1 and add a hardDq. For an advertised range, apply the floor to the range maximum (wide ranges are geo bands); a minimum below the floor is a soft flag, not a hardDq. Last/current/previous cash, the ask or a target are negotiation context: never a hardDq. Not stated => 4 unless the role/level implies low pay, and never a hardDq.",
     "- location: use the brief's location scoring table. On-site with no remote path => 1 and hardDq.",
     "- eligibility: if the listing restricts who may apply and the candidate is outside that group (affirmative postings for a specific group, citizenship or security-clearance requirements, employment limited to countries the candidate cannot work from with no contractor path) => hardDq.",
     "- cvMatch: how many must-haves the proof points cover. Missing a required stack the candidate does not claim => hardDq.",
