@@ -4,7 +4,6 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { companies, getDb, positions, timelineEvents, type EvaluationKind } from "@job-scout/db";
 import {
   addEvent,
-  archivePosition,
   currentJdText,
   discoverySummary,
   enqueueDueBoardScans,
@@ -44,6 +43,7 @@ import {
   recentDecisions,
   previewDecision,
   setStatusFromCaller,
+  patchFromCaller,
   mapCareerOpsStatus,
   careerOpsDropStatus,
   noteCareerOpsDrop,
@@ -197,10 +197,10 @@ export function createJobScoutMcpServer() {
 
   server.registerTool(
     "update_position",
-    { title: "Update position", description: "PATCH status, priority, notes, nextAction, resumeSurface, watchEnabled, appliedAt.", inputSchema: { idOrSlug: z.string(), status: z.string().optional(), priority: z.string().optional(), notes: z.string().optional(), nextAction: z.string().optional(), resumeSurface: z.string().optional(), watchEnabled: z.boolean().optional(), appliedAt: z.string().optional() } },
-    async ({ idOrSlug, ...patch }, ctx) => {
+    { title: "Update position", description: "PATCH status, priority, notes, nextAction, resumeSurface, watchEnabled, appliedAt. A status of skip/archived from the career-ops sync (token named career-ops…, or source=career-ops) is recorded as a note and not applied; the other fields still apply.", inputSchema: { idOrSlug: z.string(), status: z.string().optional(), priority: z.string().optional(), notes: z.string().optional(), nextAction: z.string().optional(), resumeSurface: z.string().optional(), watchEnabled: z.boolean().optional(), appliedAt: z.string().optional(), source: z.string().optional() } },
+    async ({ idOrSlug, source, ...patch }, ctx) => {
       try {
-        const p = await patchPosition(idOrSlug, patch, agentOf(ctx as ToolCtx));
+        const p = await patchFromCaller(idOrSlug, patch, { actor: agentOf(ctx as ToolCtx), source });
         return p ? text(p) : text({ error: "not found" }, true);
       } catch (e) {
         return errText(e);
@@ -223,10 +223,10 @@ export function createJobScoutMcpServer() {
 
   server.registerTool(
     "set_match_override",
-    { title: "Skip / unskip", description: "v1 compat: label=human_skip archives the position; label=match moves it to review.", inputSchema: { idOrSlug: z.string(), label: z.enum(["match", "human_skip"]) } },
+    { title: "Skip / unskip", description: "v1 compat: label=human_skip archives the position; label=match moves it to review. From the career-ops sync (token named career-ops…) human_skip is recorded as a note and not applied.", inputSchema: { idOrSlug: z.string(), label: z.enum(["match", "human_skip"]) } },
     async (a, ctx) => {
       const actor = agentOf(ctx as ToolCtx);
-      return text(a.label === "human_skip" ? await archivePosition(a.idOrSlug, "human_skip", actor) : await patchPosition(a.idOrSlug, { status: "review" }, actor));
+      return text(a.label === "human_skip" ? await setStatusFromCaller(a.idOrSlug, "archived", { actor, reason: "human_skip" }) : await patchPosition(a.idOrSlug, { status: "review" }, actor));
     },
   );
 
@@ -513,7 +513,8 @@ export function createJobScoutMcpServer() {
       try {
         let position;
         try {
-          position = (await intakeUrl(a.url, { companyName: a.company, status: "review" })).position;
+          // source=career-ops: a revive of an archived row here is the sync, not a person.
+          position = (await intakeUrl(a.url, { companyName: a.company, status: "review", source: "career-ops" })).position;
         } catch {
           const r = await upsertFromJob({ provider: "other", title: a.role, company: a.company, url: a.url, listingStatus: "unknown" }, { source: "career-ops", companyName: a.company, status: "review" });
           position = r.position;

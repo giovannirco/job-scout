@@ -41,8 +41,8 @@ The API includes an MCP server for reading positions, managing the pipeline and 
 |--|--|
 | `intake` | create/refresh a position from a job URL; queues triage when a model key is set |
 | `refresh_jd` | re-fetch the ATS page; revision if changed |
-| `update_position` | PATCH status, priority, notes, nextAction, resumeSurface, watchEnabled, appliedAt |
-| `set_position_status` | any pipeline status; `archived` requires a reason. A `skip`/`archived` from the career-ops sync (`source: "career-ops"` or a `note` starting with `career-ops`) is recorded as a note and not applied |
+| `update_position` | PATCH status, priority, notes, nextAction, resumeSurface, watchEnabled, appliedAt. The career-ops guard below applies to a `skip`/`archived` status; the other fields still apply |
+| `set_position_status` | any pipeline status; `archived` requires a reason. Subject to the career-ops guard below |
 | `log_activity` | append a timeline note |
 | `upsert_interview` | create/patch a screen or interview (transcript queues an AI brief unless `skipBrief`) |
 | `brief_interview` | queue or `sync` the `interview_brief` model vs JD + company pack. A transcript does not queue a brief when no model key is set |
@@ -64,7 +64,17 @@ The API includes an MCP server for reading positions, managing the pipeline and 
 
 ### Compatibility aliases
 
-`set_match_override` (`human_skip` archives, `match` → review) and `list_eval_inbox` (review without evaluation) keep older agent prompts working.
+`set_match_override` (`human_skip` archives, `match` → review) and `list_eval_inbox` (review without evaluation) keep older agent prompts working. `human_skip` is subject to the career-ops guard below.
+
+### career-ops skip/archive guard
+
+A career-ops tracker label never removes a role from the pipeline on its own. `update_position`, `set_position_status` and `set_match_override` (`human_skip`) record a `skip` or `archived` request as a timeline note (`career-ops says skip; not applied`) instead of applying it when the call comes from the career-ops sync:
+
+- the calling agent is the career-ops sync: the MCP actor is the API token name, so name the sync's token `career-ops` or `career-ops-…` (for example `career-ops-sync`);
+- or the call passes `source: "career-ops"` (`update_position`, `set_position_status`);
+- or the `note` starts with `career-ops` (`set_position_status`).
+
+Other statuses (applied, interview, rejected, …) apply normally. Tokens with any other name are treated as a person or operator agent: their skip/archive applies, and their restore of an archived or skipped role stops triage from re-archiving it until a person archives or skips it again.
 
 ## External tracker integration
 

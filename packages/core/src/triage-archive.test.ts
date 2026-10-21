@@ -12,6 +12,7 @@ import { updateProfile } from "./profile.js";
 import { updateSettings } from "./settings.js";
 import { runTriage } from "./triage.js";
 import { repairTriageArchives } from "./triage-archive-repair.js";
+import { humanRestore, statusTransition } from "./archive-guard.js";
 
 const dir = mkdtempSync(join(tmpdir(), "job-scout-triage-archive-"));
 const fail = (hardDq: string[], score = 2.4) => ({
@@ -115,6 +116,61 @@ describe("triage auto-archive policy", () => {
     const p = await position("system-restore");
     await archivePosition(p.id, "listing_closed", "system");
     await patchPosition(p.id, { status: "triaged" }, "system");
+    vi.spyOn(getLlmClient(), "chatJson").mockResolvedValue(fail(["On-site in Austin with no remote path"]) as never);
+    await runTriage(p.id, { force: true });
+    expect((await getPosition(p.id))!.status).toBe("archived");
+  });
+
+  it("classifies status titles as restore, drop or other", () => {
+    expect(statusTransition("archived → triaged")).toBe("restore");
+    expect(statusTransition("skip → review")).toBe("restore");
+    expect(statusTransition("triaged → archived")).toBe("drop");
+    expect(statusTransition("materials → skip")).toBe("drop");
+    expect(statusTransition("archived: listing_closed")).toBe("drop");
+    expect(statusTransition("archived → skip")).toBe("drop");
+    expect(statusTransition("triaged → review")).toBe("other");
+  });
+
+  it("humanRestore: the latest human restore-or-drop wins; automated events are ignored", async () => {
+    // A human re-archive (archivePosition shape) after a restore cancels it.
+    const a = await position("guard-rearchive");
+    await archivePosition(a.id, "triage fail 2.0: On-site", "system");
+    await patchPosition(a.id, { status: "triaged" }, "career-agent");
+    expect(await humanRestore(a.id)).toMatchObject({ actor: "career-agent" });
+    await archivePosition(a.id, "not for me", "operator");
+    expect(await humanRestore(a.id)).toBeNull();
+    // A human skip ("X → skip") after a restore cancels it too.
+    const b = await position("guard-reskip");
+    await patchPosition(b.id, { status: "skip" }, "operator");
+    await patchPosition(b.id, { status: "triaged" }, "operator");
+    await patchPosition(b.id, { status: "skip" }, "operator");
+    expect(await humanRestore(b.id)).toBeNull();
+    // Automated archives and restores after a human restore leave it in force; a
+    // human non-drop move (triaged → review → triaged) does too.
+    const c = await position("guard-automated");
+    await archivePosition(c.id, "triage fail 2.0: On-site", "system");
+    await patchPosition(c.id, { status: "triaged" }, "clip");
+    await archivePosition(c.id, "scan withdrawn", "scan:greenhouse");
+    await patchPosition(c.id, { status: "triaged" }, "repair");
+    await patchPosition(c.id, { status: "review" }, "operator");
+    await patchPosition(c.id, { status: "triaged" }, "operator");
+    expect(await humanRestore(c.id)).toMatchObject({ actor: "clip" });
+    // Restores by automated actors (career-ops sync, intake, watch) never count.
+    const d = await position("guard-career-ops");
+    await archivePosition(d.id, "triage fail 2.0: On-site", "system");
+    for (const actor of ["career-ops", "career-ops-sync", "intake", "watch", "autopilot"]) {
+      await patchPosition(d.id, { status: "triaged" }, actor);
+      await archivePosition(d.id, "again", "triage");
+    }
+    expect(await humanRestore(d.id)).toBeNull();
+  });
+
+  it("triage may archive again after a person restores and then re-archives and re-opens via automation", async () => {
+    const p = await position("rearchive-then-auto");
+    await archivePosition(p.id, "triage fail 2.0: On-site", "system");
+    await patchPosition(p.id, { status: "triaged" }, "operator");
+    await archivePosition(p.id, "operator agrees: onsite", "operator");
+    await patchPosition(p.id, { status: "triaged" }, "repair");
     vi.spyOn(getLlmClient(), "chatJson").mockResolvedValue(fail(["On-site in Austin with no remote path"]) as never);
     await runTriage(p.id, { force: true });
     expect((await getPosition(p.id))!.status).toBe("archived");
