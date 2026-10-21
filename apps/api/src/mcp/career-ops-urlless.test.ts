@@ -100,6 +100,14 @@ describe("career-ops tracker rows without a URL", () => {
     expect(await count()).toBe(before);
   });
 
+  it("create_position_from_career_ops does not create a position for a dropped row that matches nothing", async () => {
+    const before = await count();
+    const r = await call("create_position_from_career_ops", { company: "Example Skipped Co", role: "DevOps Engineer", trackerId: "403", status: "SKIP" });
+    expect(r.isError).toBe(false);
+    expect(r.data).toMatchObject({ skipped: true, reason: "tracker_dropped", trackerId: "403" });
+    expect(await count()).toBe(before);
+  });
+
   it("reconcile_career_ops never creates a position for a row the tracker dropped", async () => {
     const rows = [{ trackerId: 402, company: "Example Dropped Co", title: "Site Reliability Engineer", status: "Discarded" }];
     const before = await count();
