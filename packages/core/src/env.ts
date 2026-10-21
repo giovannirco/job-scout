@@ -26,6 +26,8 @@ export const coreEnv = {
   wahaSession: process.env.WAHA_SESSION || "default",
   wahaWebhookKey: process.env.WAHA_WEBHOOK_KEY || "",
   /** Operator-provided recruiter-threat blocklist (comma-separated domains). Empty by default. */
+  /** Same identity the ATS fetchers send; rdap.org rejects Node's default user agent. */
+  atsUserAgent: process.env.ATS_USER_AGENT || "job-scout/2 (local; no apply)",
   threatBlocklistDomains: (process.env.THREAT_BLOCKLIST_DOMAINS || "").split(",").map((d) => d.trim().toLowerCase()).filter(Boolean),
   publicBaseUrl: (process.env.PUBLIC_BASE_URL || "").replace(/\/+$/, ""),
   isProd: process.env.NODE_ENV === "production",

