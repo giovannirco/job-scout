@@ -7,7 +7,7 @@
  *
  * Exposed by `startMetricsServer()` on METRICS_PORT (default 9464) at /metrics, off the HTTPRoute.
  */
-import { createServer, type Server } from "node:http";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import client from "prom-client";
 import { sql } from "drizzle-orm";
 import { getDb, poolStats } from "@job-scout/db";
@@ -416,30 +416,38 @@ export async function renderMetrics(): Promise<string> {
 /** Tiny HTTP server for /metrics (and /healthz) on its own port so it never rides the HTTPRoute. */
 export function startMetricsServer(port = Number(process.env.METRICS_PORT ?? 9464), host = "0.0.0.0"): Server | null {
   if (!port) return null;
-  const server = createServer(async (req, res) => {
-    const url = req.url?.split("?")[0] ?? "/";
-    if (url === "/metrics") {
-      try {
-        const body = await renderMetrics();
-        res.writeHead(200, { "content-type": registry.contentType });
-        res.end(body);
-      } catch (e) {
-        res.writeHead(500, { "content-type": "text/plain" });
-        res.end(e instanceof Error ? e.message : String(e));
-      }
-      return;
-    }
-    if (url === "/healthz") {
-      res.writeHead(200, { "content-type": "text/plain" });
-      res.end("ok");
-      return;
-    }
-    res.writeHead(404);
-    res.end();
+  const server = createServer((req, res) => {
+    handleMetricsRequest(req, res).catch((err: unknown) => {
+      log.error("metrics.request.error", { err });
+      if (!res.headersSent) res.writeHead(500);
+      res.end();
+    });
   });
   server.listen(port, host, () => log.info("metrics.listening", { port, path: "/metrics" }));
   server.on("error", (err) => log.error("metrics.server.error", { err, port }));
   return server;
+}
+
+async function handleMetricsRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const url = req.url?.split("?")[0] ?? "/";
+  if (url === "/metrics") {
+    try {
+      const body = await renderMetrics();
+      res.writeHead(200, { "content-type": registry.contentType });
+      res.end(body);
+    } catch (e) {
+      res.writeHead(500, { "content-type": "text/plain" });
+      res.end(e instanceof Error ? e.message : String(e));
+    }
+    return;
+  }
+  if (url === "/healthz") {
+    res.writeHead(200, { "content-type": "text/plain" });
+    res.end("ok");
+    return;
+  }
+  res.writeHead(404);
+  res.end();
 }
 
 /** Route pattern for HTTP metrics: collapse ids so cardinality stays bounded. */

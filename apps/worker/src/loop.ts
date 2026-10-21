@@ -233,9 +233,10 @@ export function startWorker(opts: WorkerOptions = {}) {
   const timers: NodeJS.Timeout[] = [];
   timers.push(setInterval(() => void tick(), pollMs));
 
-  const safe = (label: string, fn: () => Promise<unknown>) => () => {
+  // Timer callback: the outcome (including failure) is counted and logged here, so the promise is settled.
+  const safe = (label: string, fn: () => Promise<unknown>) => (): void => {
     const t0 = Date.now();
-    return fn()
+    void fn()
       .then((r) => {
         schedulerRuns.labels({ task: label, status: "ok" }).inc();
         log.info("scheduler.ok", { task: label, ms: Date.now() - t0, ...summarize(r) });
