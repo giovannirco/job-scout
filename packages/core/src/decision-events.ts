@@ -2,7 +2,8 @@ import { and, desc, eq, gt } from "drizzle-orm";
 import { getDb, jdRevisions } from "@job-scout/db";
 import { DecisionError } from "@job-scout/llm";
 import { decisionContext, runDecision } from "./decisions.js";
-import { enqueueJob } from "./jobs.js";
+import { enqueueJob, recentPositionJob } from "./jobs.js";
+import { bypassesFollowUpLimit, jdSufficiency, JD_FOLLOWUP_WINDOW_MS } from "@job-scout/shared";
 import { getPosition } from "./positions.js";
 import { getSettings } from "./settings.js";
 import { addEvent } from "./timeline.js";
@@ -10,12 +11,17 @@ import { addEvent } from "./timeline.js";
 const active = (position: NonNullable<Awaited<ReturnType<typeof getPosition>>>) =>
   position.listingStatus !== "closed" && !["archived", "rejected", "skip"].includes(position.status) && !position.metadata?.quarantined;
 
-/** Queue a read-only fit check independently of writing-model automation. */
-export async function enqueuePositionDecision(positionId: string, revision: number) {
+/**
+ * Queue a read-only fit check independently of writing-model automation. One
+ * per position per JD_FOLLOWUP_WINDOW_MS for plain description edits; a new
+ * position, a JD that just arrived, or a title/pay/location change always queues.
+ */
+export async function enqueuePositionDecision(positionId: string, revision: number, opts: { changeKind?: string } = {}) {
   const cfg = (await getSettings()).jev;
   if (!cfg.enabled || cfg.triage === "off") return null;
   const position = await getPosition(positionId);
   if (!position || !active(position)) return null;
+  if (revision > 1 && !bypassesFollowUpLimit(opts.changeKind) && (await recentPositionJob("jev_check", positionId, JD_FOLLOWUP_WINDOW_MS))) return null;
   return enqueueJob("jev_check", { positionId, revision, trigger: revision === 1 ? "new_position" : "jd_change" },
     { dedupeKey: `jev:${positionId}:${revision}`, priority: 75 });
 }
@@ -34,6 +40,7 @@ export async function runPositionDecision(positionId: string, revision: number) 
     if (newer) return { skipped: "revision_superseded" };
   }
   if (!latest.descriptionText?.trim()) return { skipped: "missing_description" };
+  if (!jdSufficiency(latest.title || position.title, latest.descriptionText).sufficient) return { skipped: "needs_jd" };
   const { state } = await decisionContext(position.id);
   try {
     const run = await runDecision({ recipe: "triage", positionId: position.id, mode: cfg.triage, state });

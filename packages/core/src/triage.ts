@@ -7,7 +7,7 @@ import { currentJdText, getPosition } from "./positions.js";
 import { triageBriefOf, getProfile, profileFingerprint } from "./profile.js";
 import { getSettings } from "./settings.js";
 import { addEvent } from "./timeline.js";
-import { acceptableTzRangeOf, applyTzPolicy, log, triageArchiveDecision } from "@job-scout/shared";
+import { acceptableTzRangeOf, applyTzPolicy, jdSufficiency, log, triageArchiveDecision } from "@job-scout/shared";
 import { humanRestore } from "./archive-guard.js";
 import { ingestQuality } from "./metrics.js";
 import { decisionListingOf, sameJevConfig, tryDecision } from "./decisions.js";
@@ -24,9 +24,12 @@ export async function runTriage(positionId: string, opts: { force?: boolean; ref
   const profile = await getProfile();
   if (pos.triagedAt && pos.triageJson?.profileHash === profileFingerprint(profile) && !opts.force) return { skipped: true as const, reason: "already triaged", verdict: pos.triageVerdict };
 
+  const jdText = await currentJdText(pos.id);
+  // A title-only JD scores nothing: wait for the real one (applySnapshot re-queues triage).
+  const jd = jdSufficiency(pos.title, jdText);
+  if (!jd.sufficient) return { skipped: true as const, reason: "needs_jd", detail: jd.reason, verdict: pos.triageVerdict };
   const settings = await getSettings();
   if (!settings.llm.operations.triage?.enabled) await gateOperation("triage", settings);
-  const jdText = await currentJdText(pos.id);
   const listing = await decisionListingOf(pos, jdText);
   const ats = ((pos.metadata || {}) as { ats?: { workplaceType?: string | null } }).ats;
   const tzRange = acceptableTzRangeOf(profile.metadata);

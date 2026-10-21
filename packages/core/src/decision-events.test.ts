@@ -15,11 +15,14 @@ import { coreEnv } from "./env.js";
 import { getLlmClient } from "./llm.js";
 import { runTriage } from "./triage.js";
 
+/** Synthetic role detail: enough JD to score (see jdSufficiency). */
+const DUTIES = " You will own CI/CD pipelines, on-call rotations, incident reviews, capacity planning and cost reports. We expect solid Linux, networking and scripting skills, clear written communication, and care for reliable, observable services that teams can trust.";
+
 const dir = mkdtempSync(join(tmpdir(), "job-scout-decision-events-"));
 const savedKey = process.env.OPENROUTER_API_KEY;
 const role = (name: string): AtsJob => ({ provider: "unknown", company: "Example Systems", title: "Senior Platform Engineer",
   url: `https://jobs.example/${name}`, locationRaw: "Remote worldwide", listingStatus: "open",
-  descriptionText: "Build Kubernetes infrastructure and automate deployments with Terraform. Remote worldwide." });
+  descriptionText: "Build Kubernetes infrastructure and automate deployments with Terraform. Remote worldwide." + DUTIES });
 const score = { type: "score", score: 4, confidence: 1, probabilities: { "0": 0, "1": 0, "2": 0, "3": 0, "4": 1 } };
 const answer = { model: "typesafe/jev-1.13", usage: { input_tokens: 100, output_tokens: 20 }, answers: {
   route: { type: "choice", choice: "shortlist", confidence: 1, probabilities: { shortlist: 1, review: 0, mismatch: 0 } },
@@ -96,14 +99,16 @@ describe("automatic Jev checks", () => {
     const job = role("formatting");
     const { position } = await upsertFromJob({ ...job, descriptionText: `<p>${job.descriptionText}</p>` });
     const queued = (await checks())[0];
-    expect(await applySnapshot({ positionId: position.id, job })).toMatchObject({ material: false });
+    // Markup-only: no revision at all (cosmetic diffs are filtered before a revision is written).
+    expect(await applySnapshot({ positionId: position.id, job })).toMatchObject({ changed: false });
     expect(await checks()).toHaveLength(1);
     const fetcher = vi.fn().mockImplementation(async () => Response.json(answer)); vi.stubGlobal("fetch", fetcher);
     expect(await processJob(queued)).toMatchObject({ status: "ok" });
     const emptyJob = role("late-description");
     const empty = await upsertFromJob({ ...emptyJob, descriptionText: "" });
-    const emptyCheck = (await checks()).find(j => j.payload?.positionId === empty.position.id)!;
-    expect(await processJob(emptyCheck)).toMatchObject({ skipped: "missing_description" });
+    // No JD yet: no check is queued at all (the position is flagged needsJd).
+    expect((await checks()).find(j => j.payload?.positionId === empty.position.id)).toBeUndefined();
+    expect(empty.position.metadata?.needsJd).toMatchObject({ reason: "empty" });
     await applySnapshot({ positionId: empty.position.id, job: emptyJob });
     const filled = (await checks()).find(j => j.payload?.positionId === empty.position.id && j.payload.revision === 2)!;
     expect(filled).toBeDefined();

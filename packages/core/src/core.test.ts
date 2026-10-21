@@ -3,6 +3,9 @@ import fs from "node:fs";
 import path from "node:path";
 import type { AtsJob } from "@job-scout/ats";
 
+/** Synthetic role detail: enough JD to score (see jdSufficiency). */
+const DUTIES = " You will own CI/CD pipelines, on-call rotations, incident reviews, capacity planning and cost reports. We expect solid Linux, networking and scripting skills, clear written communication, and care for reliable, observable services that teams can trust.";
+
 const dataDir = path.join(process.cwd(), ".data", "pglite-core-test");
 
 function job(over: Partial<AtsJob> = {}): AtsJob {
@@ -15,7 +18,7 @@ function job(over: Partial<AtsJob> = {}): AtsJob {
     company: "Acme",
     url: "https://boards.greenhouse.io/acme/jobs/123",
     locationRaw: "Remote - LATAM",
-    descriptionText: "We run Kubernetes on EKS with Terraform and Argo CD. " + "x".repeat(300),
+    descriptionText: "We run Kubernetes on EKS with Terraform and Argo CD. " + "x".repeat(300) + DUTIES,
     salaryRaw: "$150,000 - $190,000",
     listingStatus: "open",
     postedAt: "2026-06-10T14:21:01.277+00:00",

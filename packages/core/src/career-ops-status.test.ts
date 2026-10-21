@@ -15,11 +15,14 @@ import { runTriage } from "./triage.js";
 import { careerOpsDropStatus, mapCareerOpsStatus, setStatusFromCaller } from "./career-ops-status.js";
 import { listCareerOpsSkips } from "./triage-archive-repair.js";
 
+/** Synthetic role detail: enough JD to score (see jdSufficiency). */
+const DUTIES = " You will own CI/CD pipelines, on-call rotations, incident reviews, capacity planning and cost reports. We expect solid Linux, networking and scripting skills, clear written communication, and care for reliable, observable services that teams can trust.";
+
 const dir = mkdtempSync(join(tmpdir(), "job-scout-career-ops-status-"));
 async function position(name: string, status: "triaged" | "review" | "materials" = "review", salaryRaw?: string) {
   const { position } = await upsertFromJob({ provider: "greenhouse", boardToken: name, jobId: "1", company: name,
     title: "Platform Engineer", url: `https://boards.greenhouse.io/${name}/jobs/1`, locationRaw: "Remote",
-    descriptionText: "Operate Kubernetes and Terraform for an example product.", salaryRaw, listingStatus: "open" }, { status });
+    descriptionText: "Operate Kubernetes and Terraform for an example product." + DUTIES, salaryRaw, listingStatus: "open" }, { status });
   return position;
 }
 const notes = async (id: string) => (await (await getDb()).select().from(timelineEvents).where(eq(timelineEvents.positionId, id))).filter((e) => e.kind === "note");

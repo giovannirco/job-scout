@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { listPositions, type ListPositionsQuery } from "@job-scout/core";
 
-const lanes = ["decide", "review", "applied", "marginal", "failedReview"] as const;
+const lanes = ["decide", "review", "applied", "marginal", "failedReview", "needsJd"] as const;
 export const WorkQueueInput = z.object({
   limit: z.number().int().min(1).max(100).default(20),
   page: z.number().int().min(1).default(1),
@@ -13,6 +13,8 @@ const filters: Record<typeof lanes[number], ListPositionsQuery> = {
   applied: { status: "applied", sort: "updated_desc" },
   marginal: { status: "triaged", verdict: "marginal", sort: "score_desc", actionable: "true", collapseFamilies: "true" },
   failedReview: { status: "review", reviewLane: "failed", sort: "score_desc", actionable: "true", collapseFamilies: "true" },
+  // Stored with too little JD to score: paste the JD or refresh once the posting fills in.
+  needsJd: { status: "triaged,review", needsJd: "true", sort: "updated_desc", actionable: "true" },
 };
 
 export async function workQueue(input: z.input<typeof WorkQueueInput> = {}) {
@@ -28,6 +30,7 @@ export async function workQueue(input: z.input<typeof WorkQueueInput> = {}) {
       triageOneLiner: p.triageOneLiner?.slice(0, 400) ?? null,
       summaryShortened: p.title.length > 200 || p.company.name.length > 120 || (p.triageOneLiner?.length ?? 0) > 400,
       locationRaw: p.locationRaw?.slice(0, 200) ?? null, updatedAt: p.updatedAt,
+      ...(p.needsJd ? { needsJd: p.needsJd } : {}),
     })) };
   }));
   return {

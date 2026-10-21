@@ -17,12 +17,15 @@ import * as autopilot from "./autopilot.js";
 import * as notify from "./notify.js";
 import { createThread, runChatTurn } from "./chat.js";
 
+/** Synthetic role detail: enough JD to score (see jdSufficiency). */
+const DUTIES = " You will own CI/CD pipelines, on-call rotations, incident reviews, capacity planning and cost reports. We expect solid Linux, networking and scripting skills, clear written communication, and care for reliable, observable services that teams can trust.";
+
 const dir = mkdtempSync(join(tmpdir(), "job-scout-triage-freshness-"));
 const result = { data: { score: 4.2, hardDq: [], oneLiner: "Fits the current profile" }, model: "test-model", tokensIn: 1, tokensOut: 1, latencyMs: 1 };
 async function stale(name: string, status: "triaged" | "review" = "review") {
   const { position } = await upsertFromJob({ provider: "greenhouse", boardToken: name, jobId: "1", company: name,
     title: "Platform Engineer", url: `https://boards.greenhouse.io/${name}/jobs/1`, locationRaw: "Remote",
-    descriptionText: "Operate Kubernetes infrastructure.", listingStatus: "open" }, { status });
+    descriptionText: "Operate Kubernetes infrastructure." + DUTIES, listingStatus: "open" }, { status });
   await (await getDb()).update(positions).set({ triageScore: 4.7, triageVerdict: "pass", triagedAt: new Date(), triageJson: {} }).where(eq(positions.id, position.id));
   return position;
 }

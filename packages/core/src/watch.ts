@@ -4,7 +4,7 @@ import { assertPublicUrl, detectAts, fetchGreenhouseJob } from "@job-scout/ats";
 import { fetchJob as fetchJobFromUrl } from "./fetch-job.js";
 import { contentHash, HOT_STATUSES, jobRecovery } from "@job-scout/shared";
 import { enqueueJob } from "./jobs.js";
-import { applySnapshot } from "./positions.js";
+import { applySnapshot, recordAtsFetchFailure } from "./positions.js";
 import { addEvent } from "./timeline.js";
 
 function watchableUrl(url: string | null) {
@@ -53,7 +53,13 @@ export async function checkPosition(positionId: string) {
   const position = (await db.select({ url: positions.primaryUrl }).from(positions).where(eq(positions.id, positionId)).limit(1)).at(0);
   if (!position) throw new Error("position not found");
   if (!watchableUrl(position.url)) return { skipped: "unsupported_url", positionId };
-  return applySnapshot({ positionId, job: await fetchPositionJob(positionId), source: "watch" });
+  let job;
+  try {
+    job = await fetchPositionJob(positionId);
+  } catch (e) {
+    throw await recordAtsFetchFailure(positionId, e, "watch");
+  }
+  return applySnapshot({ positionId, job, source: "watch" });
 }
 
 async function fetchPositionJob(positionId: string) {

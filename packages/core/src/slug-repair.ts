@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
-import { companies, getDb, positions, slugify } from "@job-scout/db";
-import { canonicalCompanySlug, isPrototypeSlug, titleSignature } from "@job-scout/shared";
+import { companies, getDb, jdRevisions, positions, slugify } from "@job-scout/db";
+import { canonicalCompanySlug, isPrototypeSlug, isShellJobTitle, titleSignature } from "@job-scout/shared";
 import { addEvent } from "./timeline.js";
 
 export type SlugRepairPlan = { id: string; name: string; from: string; to: string };
@@ -80,4 +80,59 @@ export function reslugSuggestion(pos: { id: string; slug: string; company: { slu
   if (!slugFromBadTitle(pos.slug, pos.company.slug)) return null;
   const to = positionSlugFor(pos.company.slug, realTitle, pos.id);
   return to === pos.slug ? null : { from: pos.slug, to };
+}
+
+/**
+ * The slug a position should move to when its title changes, or null to keep it.
+ * Only an auto-derived slug follows the title (one built from the old title, or
+ * from any title the position carried before, or from a shell title such as
+ * "Job openings"); a slug someone chose by hand never moves.
+ */
+export function slugForRetitle(
+  pos: { id: string; slug: string; title: string; companySlug: string },
+  newTitle: string,
+  knownTitles: Array<string | null | undefined> = [],
+): string | null {
+  const next = positionSlugFor(pos.companySlug, newTitle, pos.id);
+  if (!newTitle.trim() || next === pos.slug) return null;
+  const titles = [pos.title, ...knownTitles].filter((t): t is string => Boolean(t && t.trim()));
+  const derived = titles.some((t) => positionSlugFor(pos.companySlug, t, pos.id) === pos.slug);
+  const fromShell = pos.slug.endsWith(`-${pos.id.slice(-4)}`) && titles.some((t) => isShellJobTitle(t));
+  return derived || fromShell ? next : null;
+}
+
+/**
+ * Positions whose slug was built from an earlier title (a bad first scrape, a
+ * retitle on the board) and never followed the corrected title. Dry-run unless
+ * `apply`; old slugs stay resolvable through metadata.previousSlugs.
+ */
+export async function repairStaleTitleSlugs(opts: { apply?: boolean } = {}) {
+  const db = await getDb();
+  const rows = await db
+    .select({ id: positions.id, title: positions.title, slug: positions.slug, metadata: positions.metadata, companySlug: companies.slug })
+    .from(positions)
+    .innerJoin(companies, eq(positions.companyId, companies.id));
+  const revs = await db.select({ positionId: jdRevisions.positionId, title: jdRevisions.title }).from(jdRevisions);
+  const titlesBy = new Map<string, string[]>();
+  for (const r of revs) if (r.title) titlesBy.set(r.positionId, [...(titlesBy.get(r.positionId) || []), r.title]);
+  const taken = new Set(rows.map((r) => r.slug));
+  const plan: SlugRepairPlan[] = [];
+  for (const p of rows) {
+    if (positionSlugFor(p.companySlug, p.title, p.id) === p.slug) continue;
+    const earlier = titlesBy.get(p.id) || [];
+    // Only a slug built from an earlier title, never a hand-picked one.
+    if (!earlier.some((t) => positionSlugFor(p.companySlug, t, p.id) === p.slug)) continue;
+    const to = positionSlugFor(p.companySlug, p.title, p.id);
+    if (taken.has(to)) continue;
+    taken.add(to);
+    plan.push({ id: p.id, name: p.title, from: p.slug, to });
+  }
+  if (!opts.apply) return { dryRun: true as const, positions: plan };
+  const now = new Date();
+  for (const p of plan) {
+    const row = rows.find((x) => x.id === p.id)!;
+    await db.update(positions).set({ slug: p.to, metadata: withPrevious(row.metadata, p.from), updatedAt: now }).where(eq(positions.id, p.id));
+    await addEvent({ positionId: p.id, kind: "repair", title: `Slug follows title: ${p.from} → ${p.to}`, actor: "repair:title-slugs", metadata: { from: p.from, to: p.to } });
+  }
+  return { dryRun: false as const, positions: plan };
 }

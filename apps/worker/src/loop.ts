@@ -63,7 +63,7 @@ export async function processJob(job: JobRow): Promise<Record<string, unknown>> 
     case "materials":
       return await runMaterials(String(p.positionId), { surface: p.surface ? String(p.surface) : null, auto: Boolean(p.auto) });
     case "company_research":
-      return await runCompanyResearch(String(p.companyId), p.positionId ? String(p.positionId) : null);
+      return await runCompanyResearch(String(p.companyId), p.positionId ? String(p.positionId) : null, { auto: Boolean(p.auto) });
     case "jd_review":
       return await runJdReview(String(p.positionId));
     case "form_answers":

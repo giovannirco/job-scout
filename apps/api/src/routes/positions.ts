@@ -40,6 +40,7 @@ import {
 } from "@job-scout/core";
 import type { EvaluationKind } from "@job-scout/db";
 import { body, fail, ok, queryMap } from "../envelope.js";
+import { errorDetails } from "../error-details.js";
 
 export const positionsRoutes = new Hono();
 
@@ -68,7 +69,7 @@ positionsRoutes.post("/", async (c) => {
     const r = await intakeUrl(b.url, { companyName: b.companyName, status: b.status });
     return ok(c, r.position, { created: r.created, triageJobId: r.triageJobId }, r.created ? 201 : 200);
   } catch (e) {
-    return fail(c, "VALIDATION_ERROR", e instanceof Error ? e.message : String(e));
+    return fail(c, "VALIDATION_ERROR", e instanceof Error ? e.message : String(e), errorDetails(e));
   }
 });
 
@@ -99,7 +100,7 @@ positionsRoutes.post("/:id/refresh", async (c) => {
     const r = await refreshPosition(c.req.param("id"), "manual", { force: b.force === true });
     return ok(c, r);
   } catch (e) {
-    return fail(c, "VALIDATION_ERROR", e instanceof Error ? e.message : String(e));
+    return fail(c, "VALIDATION_ERROR", e instanceof Error ? e.message : String(e), errorDetails(e));
   }
 });
 

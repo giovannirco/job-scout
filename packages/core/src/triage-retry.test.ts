@@ -13,10 +13,13 @@ import { enqueueJob } from "./jobs.js";
 import { runTriage } from "./triage.js";
 import { startWorker } from "../../../apps/worker/src/loop.js";
 
+/** Synthetic role detail: enough JD to score (see jdSufficiency). */
+const DUTIES = " You will own CI/CD pipelines, on-call rotations, incident reviews, capacity planning and cost reports. We expect solid Linux, networking and scripting skills, clear written communication, and care for reliable, observable services that teams can trust.";
+
 const dir = mkdtempSync(join(tmpdir(), "job-scout-triage-retry-"));
 const result = { data: { score: 1.5, hardDq: [], oneLiner: "Needs review" }, model: "test-model", tokensIn: 1, tokensOut: 1, latencyMs: 1 };
 async function position(name: string) {
-  return (await upsertFromJob({ provider: "unknown", company: "Example Systems", title: "Platform Engineer", url: `https://jobs.example/${name}`, listingStatus: "open", descriptionText: "Operate Kubernetes." })).position;
+  return (await upsertFromJob({ provider: "unknown", company: "Example Systems", title: "Platform Engineer", url: `https://jobs.example/${name}`, listingStatus: "open", descriptionText: "Operate Kubernetes." + DUTIES })).position;
 }
 describe("discarded triage recovery", () => {
   beforeAll(async () => {

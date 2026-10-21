@@ -23,7 +23,8 @@
     "db:repair": "tsx --env-file-if-exists=.env packages/core/src/cli/repair-data.ts",
     "db:repair-triage-archives": "tsx --env-file-if-exists=.env packages/core/src/cli/repair-triage-archives.ts",
     "db:repair-prototype-slugs": "tsx --env-file-if-exists=.env packages/core/src/cli/repair-prototype-slugs.ts",
-    "db:retriage-timezone": "tsx --env-file-if-exists=.env packages/core/src/cli/retriage-timezone.ts"
+    "db:retriage-timezone": "tsx --env-file-if-exists=.env packages/core/src/cli/retriage-timezone.ts",
+    "db:repair-title-slugs": "tsx --env-file-if-exists=.env packages/core/src/cli/repair-title-slugs.ts"
   },
   "workspaces": [
     "apps/*",

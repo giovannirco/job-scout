@@ -208,3 +208,19 @@ export async function retryFailedScan(jobId: string) {
     return { id: row.id, deduped: false };
   });
 }
+
+/**
+ * Was a job of this type queued for the position within `withinMs`? Failed jobs
+ * do not count (a retry stays possible). Used to rate-limit paid follow-ups.
+ */
+export async function recentPositionJob(type: JobType, positionId: string, withinMs: number): Promise<boolean> {
+  const db = await getDb();
+  const since = new Date(Date.now() - withinMs);
+  const row = (await db.select({ id: jobs.id }).from(jobs).where(and(
+    eq(jobs.type, type),
+    sql`${jobs.payload}->>'positionId' = ${positionId}`,
+    sql`${jobs.status} <> 'failed'`,
+    sql`${jobs.createdAt} >= ${since.toISOString()}`,
+  )).limit(1))[0];
+  return Boolean(row);
+}

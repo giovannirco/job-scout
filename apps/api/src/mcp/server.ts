@@ -20,6 +20,7 @@ import {
   reconcileCareerOps,
   ReconcileInput,
   patchPosition,
+  recordAtsFetchFailure,
   refreshPosition,
   runEvaluate,
   runJdReview,
@@ -53,6 +54,7 @@ import {
 } from "@job-scout/core";
 import { GeoClass, log as rootLog, Workplace } from "@job-scout/shared";
 import { env } from "../env.js";
+import { errorDetails } from "../error-details.js";
 import { text } from "./result.js";
 import { interviewSummary, positionSummary } from "./summary.js";
 import { fitPage, leanRow, PAGE_BUDGET_BYTES } from "./page.js";
@@ -82,7 +84,11 @@ type Summarizable = Parameters<typeof positionSummary>[0];
 /** Write echo: compact by default, the full position row with verbose. */
 const echo = (p: Summarizable | null | undefined, verbose?: boolean) => (p ? text(verbose ? p : positionSummary(p)) : text({ error: "not found" }, true));
 
-const errText = (e: unknown) => text({ error: e instanceof Error ? e.message : String(e), code: e instanceof LlmGateError || e instanceof CursorError ? e.code : undefined }, true);
+const errText = (e: unknown) => text({
+  error: e instanceof Error ? e.message : String(e),
+  code: e instanceof LlmGateError || e instanceof CursorError ? e.code : (e as { code?: unknown } | null)?.code === "board_index" ? "board_index" : undefined,
+  ...errorDetails(e),
+}, true);
 
 async function resolvePositionId(idOrSlug?: string, q?: string) {
   if (idOrSlug) {
@@ -574,12 +580,16 @@ export function createJobScoutMcpServer() {
     async (a) => {
       try {
         let position;
+        let fetchFailure: Record<string, unknown> | undefined;
         try {
           // source=career-ops: a revive of an archived row here is the sync, not a person.
           position = (await intakeUrl(a.url, { companyName: a.company, status: "review", source: "career-ops" })).position;
-        } catch {
+        } catch (intakeError) {
+          // Never silent: the manual record carries the fetch reason (metadata.lastAtsFetch + response).
+          fetchFailure = { message: intakeError instanceof Error ? intakeError.message : String(intakeError), ...errorDetails(intakeError) };
           const r = await upsertFromJob({ provider: "other", title: a.role, company: a.company, url: a.url, listingStatus: "unknown" }, { source: "career-ops", companyName: a.company, status: "review" });
           position = r.position;
+          if (r.created) await recordAtsFetchFailure(position.id, intakeError, "career-ops");
         }
         if (!position) throw new Error("position missing");
         const mapped = mapCareerOpsStatus(a.status);
@@ -591,7 +601,7 @@ export function createJobScoutMcpServer() {
         if (Object.keys(patch).length) await patchPosition(position.id, patch, "career-ops");
         const stamp = await stampCareerOps(position.id, { trackerId: a.trackerId, score: a.score, status: a.status, reportPath: a.reportPath });
         const detail = await getPositionDetail(position.id);
-        return text({ position: a.verbose || !detail ? detail : positionSummary(detail), stamp });
+        return text({ position: a.verbose || !detail ? detail : positionSummary(detail), stamp, ...(fetchFailure ? { manualRecord: true, fetchFailure } : {}) });
       } catch (e) {
         return errText(e);
       }

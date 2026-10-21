@@ -14,6 +14,9 @@ import { runTriage } from "./triage.js";
 import { repairTriageArchives } from "./triage-archive-repair.js";
 import { humanRestore, statusTransition } from "./archive-guard.js";
 
+/** Synthetic role detail: enough JD to score (see jdSufficiency). */
+const DUTIES = " You will own CI/CD pipelines, on-call rotations, incident reviews, capacity planning and cost reports. We expect solid Linux, networking and scripting skills, clear written communication, and care for reliable, observable services that teams can trust.";
+
 const dir = mkdtempSync(join(tmpdir(), "job-scout-triage-archive-"));
 const fail = (hardDq: string[], score = 2.4) => ({
   data: { score, archetype: 3, comp: 4, location: 4, cvMatch: 2, hardDq, softFlags: [], archetypeLabel: "platform", compNote: "not stated", locationNote: "remote", oneLiner: "Low fit" },
@@ -22,7 +25,7 @@ const fail = (hardDq: string[], score = 2.4) => ({
 async function position(name: string, salaryRaw?: string) {
   const { position } = await upsertFromJob({ provider: "greenhouse", boardToken: name, jobId: "1", company: name,
     title: "Senior DevOps Engineer", url: `https://boards.greenhouse.io/${name}/jobs/1`, locationRaw: "Remote",
-    descriptionText: "Operate Kubernetes and Terraform for an example product.", salaryRaw, listingStatus: "open" }, { status: "triaged" });
+    descriptionText: "Operate Kubernetes and Terraform for an example product." + DUTIES, salaryRaw, listingStatus: "open" }, { status: "triaged" });
   return position;
 }
 

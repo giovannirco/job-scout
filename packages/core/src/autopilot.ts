@@ -10,8 +10,8 @@ import {
   type ApprovalStatus,
   type PositionStatus,
 } from "@job-scout/db";
-import { HOT_STATUSES, type AutopilotConfig } from "@job-scout/shared";
-import { enqueueJob } from "./jobs.js";
+import { bypassesFollowUpLimit, HOT_STATUSES, JD_FOLLOWUP_WINDOW_MS, type AutopilotConfig } from "@job-scout/shared";
+import { enqueueJob, recentPositionJob } from "./jobs.js";
 import { getPosition } from "./positions.js";
 import { hasMaterials } from "./pipeline-integrity.js";
 import { getSettings } from "./settings.js";
@@ -170,7 +170,9 @@ export function afterJdChange(ctx: { positionId: string; status: PositionStatus;
     const hot = (HOT_STATUSES as readonly string[]).includes(c.status);
     if (cfg.jdReview.mode === "hot_only" && !hot) return {};
     if (cfg.jdReview.mode === "all_active" && !active) return {};
-    const q = await enqueueJob("jd_review", { positionId: c.positionId, auto: true, changeKind: c.changeKind }, { dedupeKey: `jd_review:${c.positionId}:${c.revision}`, priority: 85 });
+    // A paid review at most once per window for description edits; title/pay/location always.
+    if (!bypassesFollowUpLimit(c.changeKind) && (await recentPositionJob("jd_review", c.positionId, JD_FOLLOWUP_WINDOW_MS))) return { jdReviewRateLimited: true };
+    const q = await enqueueJob("jd_review", { positionId: c.positionId, auto: true, changeKind: c.changeKind, revision: c.revision }, { dedupeKey: `jd_review:${c.positionId}`, priority: 85 });
     return { jdReviewJobId: q.id };
   });
 }

@@ -16,9 +16,12 @@ import { getCurrentMaterial, runMaterials, saveMaterial } from "./materials.js";
 import { coreEnv } from "./env.js";
 import { getLlmClient } from "./llm.js";
 
+/** Synthetic role detail: enough JD to score (see jdSufficiency). */
+const DUTIES = " You will own CI/CD pipelines, on-call rotations, incident reviews, capacity planning and cost reports. We expect solid Linux, networking and scripting skills, clear written communication, and care for reliable, observable services that teams can trust.";
+
 const dir = mkdtempSync(join(tmpdir(), "job-scout-decisions-"));
 const savedKey = process.env.OPENROUTER_API_KEY;
-const role = (suffix: string): AtsJob => ({ provider: "unknown", company: `Example ${suffix}`, title: "Senior Platform Engineer", url: `https://jobs.example/${suffix}`, locationRaw: "Remote worldwide", descriptionText: "Build Kubernetes infrastructure. Remote worldwide. Experience with Kubernetes required.", listingStatus: "open" });
+const role = (suffix: string): AtsJob => ({ provider: "unknown", company: `Example ${suffix}`, title: "Senior Platform Engineer", url: `https://jobs.example/${suffix}`, locationRaw: "Remote worldwide", descriptionText: "Build Kubernetes infrastructure. Remote worldwide. Experience with Kubernetes required." + DUTIES, listingStatus: "open" });
 const match = {
   model: "typesafe/jev-1.13-20260917", usage: { input_tokens: 400, output_tokens: 100, cost: 0.0000168 }, answers: {
     route: { type: "choice", choice: "shortlist", confidence: 1, probabilities: { shortlist: 1, review: 0, mismatch: 0 } },

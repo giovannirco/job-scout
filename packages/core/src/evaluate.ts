@@ -8,7 +8,7 @@ import {
   EvaluateOutput,
   JdReviewOutput,
 } from "@job-scout/llm";
-import { buildAtsKeywordChecklist } from "@job-scout/shared";
+import { buildAtsKeywordChecklist, jdSufficiency } from "@job-scout/shared";
 import { afterEvaluate } from "./autopilot.js";
 import { getCompany } from "./companies.js";
 import { gateOperation, getLlmClient, logged } from "./llm.js";
@@ -45,9 +45,11 @@ export async function runEvaluate(positionId: string, opts: { auto?: boolean } =
   if (opts.auto && (!["triaged", "review"].includes(pos.status) || pos.listingStatus === "closed" || pos.metadata?.quarantined)) {
     return { skipped: true, reason: "position_no_longer_eligible" };
   }
+  const jdText = await currentJdText(pos.id);
+  const jd = jdSufficiency(pos.title, jdText);
+  if (!jd.sufficient) return { skipped: true, reason: "needs_jd", detail: jd.reason };
   const cfg = await gateOperation("evaluate");
   const profile = await getProfile();
-  const jdText = await currentJdText(pos.id);
   const listing = await decisionListingOf(pos, jdText);
   const messages = buildEvaluateMessages({
     title: pos.title,
@@ -124,9 +126,11 @@ export async function runEvaluate(positionId: string, opts: { auto?: boolean } =
 export async function runJdReview(positionId: string) {
   const pos = await getPosition(positionId);
   if (!pos) throw new Error("position not found");
+  const jdText = await currentJdText(pos.id);
+  const jd = jdSufficiency(pos.title, jdText);
+  if (!jd.sufficient) return { skipped: true, reason: "needs_jd", detail: jd.reason };
   const cfg = await gateOperation("jd_review");
   const profile = await getProfile();
-  const jdText = await currentJdText(pos.id);
   const checklist = buildAtsKeywordChecklist({ jdText, materialsText: profile.masterResumeMarkdown || "" });
   const messages = buildJdReviewMessages({
     title: pos.title,
@@ -157,11 +161,16 @@ export async function runJdReview(positionId: string) {
   return { evaluationId: evalId, summary: res.data, model: res.model };
 }
 
-export async function runCompanyResearch(companyIdOrSlug: string, positionId?: string | null) {
+export async function runCompanyResearch(companyIdOrSlug: string, positionId?: string | null, opts: { auto?: boolean } = {}) {
   const company = await getCompany(companyIdOrSlug);
   if (!company) throw new Error("company not found");
+  const samplePosition = positionId ? company.positions.find((p) => p.id === positionId) ?? (await getPosition(positionId)) : company.positions[0];
+  const rawSample = samplePosition ? await currentJdText(samplePosition.id) : null;
+  const sampleOk = Boolean(samplePosition && jdSufficiency(samplePosition.title, rawSample).sufficient);
+  // Automation triggered by a position with no real JD waits; a person asking still gets research, minus the empty sample.
+  if (opts.auto && positionId && !sampleOk) return { skipped: true, reason: "needs_jd" };
   const cfg = await gateOperation("company_research");
-  const sampleJd = positionId ? await currentJdText(positionId) : company.positions[0] ? await currentJdText(company.positions[0].id) : null;
+  const sampleJd = sampleOk ? rawSample : null;
   const messages = buildCompanyResearchMessages({
     company: company.name,
     website: company.website,

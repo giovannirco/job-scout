@@ -1,8 +1,8 @@
 import { and, desc, eq, gte, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { boardDeltas, boardSnapshots, boardSources, companies, discoveryFeed, getDb, id, jdRevisions, positions } from "@job-scout/db";
-import { detectAts, externalIdentityFromDetect, fetchGreenhouseJob, greenhouseBoardToken, greenhouseListingNeedsBoardFetch, listBoard, regionsDisagree, type AtsJob, type BoardJobSummary } from "@job-scout/ats";
+import { boardIndexUrl, detectAts, externalIdentityFromDetect, fetchGreenhouseJob, type BoardIndexUrl, greenhouseBoardToken, greenhouseListingNeedsBoardFetch, listBoard, regionsDisagree, type AtsJob, type BoardJobSummary } from "@job-scout/ats";
 import { fetchJob as fetchJobFromUrl } from "./fetch-job.js";
-import { applyProfileToGate, canonicalExternalIdentity, normalizePostingUrl, classifyListing, cleanJobTitle, craftFamily, gateListing, geoClass, homeMarket, isNoiseJobTitle, listingCompany, missesHomeMarket, parseClipListing, unresolvedCompany, type GateConfig, type GateVerdict } from "@job-scout/shared";
+import { applyProfileToGate, canonicalExternalIdentity, normalizePostingUrl, classifyListing, cleanJobTitle, craftFamily, gateListing, geoClass, homeMarket, isBoardIndexTitle, isNoiseJobTitle, listingCompany, missesHomeMarket, parseClipListing, unresolvedCompany, type GateConfig, type GateVerdict } from "@job-scout/shared";
 import { classificationOverride } from "./classification-override.js";
 import { enqueueJob } from "./jobs.js";
 import { llmConfigured } from "./llm.js";
@@ -12,7 +12,7 @@ import { getSettings } from "./settings.js";
 import { boardErrorKind, type BoardErrorKind } from "./board-reconcile.js";
 import type { PositionStatus } from "@job-scout/db";
 import { log as rootLog } from "@job-scout/shared";
-import { boardScans, scanListings } from "./metrics.js";
+import { boardScans, ingestQuality, scanListings } from "./metrics.js";
 const log = rootLog.child({ scope: "scan" });
 const JUNK_PLACE = /^(n\/a|hq|tbd|none|null|-+|—+)$/i;
 
@@ -29,6 +29,8 @@ export type ScanResult = {
   updated: number;
   closed: number;
   triageEnqueued: number;
+  /** Known postings the board retitled; a watch_check refetches each. */
+  retitled?: number;
   error?: string;
   errorKind?: BoardErrorKind;
 };
@@ -198,9 +200,12 @@ export async function scanBoard(boardId: string, opts: { force?: boolean } = {})
     const existing = (
       await db.select({
         id: positions.id,
+        title: positions.title,
         triagedAt: positions.triagedAt,
         status: positions.status,
         archiveReason: positions.archiveReason,
+        listingStatus: positions.listingStatus,
+        metadata: positions.metadata,
       }).from(positions).where(eq(positions.externalIdentity, j.externalIdentity)).limit(1)
     )[0];
     if (existing && !opts.force) {
@@ -215,8 +220,14 @@ export async function scanBoard(boardId: string, opts: { force?: boolean } = {})
         continue;
       }
       await db.update(discoveryFeed).set({ positionId: existing.id }).where(eq(discoveryFeed.externalIdentity, j.externalIdentity));
+      // The board retitled a known posting: watch_check only covers hot/watched rows, so
+      // refetch this one now (applySnapshot records the title change and reslugs).
+      if (boardRetitled(existing, j.title)) {
+        const q = await enqueueJob("watch_check", { positionId: existing.id, reason: "board_retitled" }, { dedupeKey: `watch:${existing.id}`, priority: 85 });
+        if (!q.deduped) res.retitled = (res.retitled ?? 0) + 1;
+      }
       // Known position: watch_check refreshes JDs on its own schedule. Enqueue triage if never run.
-      if (!existing.triagedAt && settings.autopilot.triageNew && existing.status === "triaged" && llmConfigured()) {
+      if (!existing.triagedAt && !existing.metadata?.needsJd && settings.autopilot.triageNew && existing.status === "triaged" && llmConfigured()) {
         const q = await enqueueJob("triage", { positionId: existing.id }, { dedupeKey: `triage:${existing.id}`, priority: 60 });
         if (!q.deduped) res.triageEnqueued++;
       }
@@ -252,7 +263,7 @@ export async function scanBoard(boardId: string, opts: { force?: boolean } = {})
       if (created) res.created++;
       else res.updated++;
       await db.update(discoveryFeed).set({ positionId: position.id }).where(eq(discoveryFeed.externalIdentity, j.externalIdentity));
-      if (settings.autopilot.triageNew && llmConfigured() && (created || !position.triagedAt)) {
+      if (settings.autopilot.triageNew && llmConfigured() && (created || !position.triagedAt) && !position.metadata?.needsJd) {
         const q = await enqueueJob("triage", { positionId: position.id }, { dedupeKey: `triage:${position.id}`, priority: 60 });
         if (!q.deduped) res.triageEnqueued++;
       }
@@ -686,6 +697,8 @@ export async function followUpIntake(
   if (position.metadata?.duplicateOfId) return { triageJobId: null };
   const settings = await getSettings();
   if (!settings.autopilot.triageNew) return { triageJobId: null };
+  // A title-only JD is flagged needsJd; triage waits for the real one (applySnapshot queues it).
+  if (position.metadata?.needsJd) return { triageJobId: null };
   if (!position.triagedAt && !llmConfigured()) return { triageJobId: null };
   if (!position.triagedAt) {
     const q = await enqueueJob("triage", { positionId: position.id }, { dedupeKey: `triage:${position.id}`, priority: 20 });
@@ -744,6 +757,16 @@ export async function refreshListingLabels(): Promise<{ craft: number; company: 
 }
 
 /** A gh_jid careers URL has no board token. The company board has the location and the JD. */
+/** A trusted board listing names a different real title than the position (and no person pinned it). */
+export function boardRetitled(
+  pos: { title: string; listingStatus?: string | null; metadata?: Record<string, unknown> | null },
+  boardTitle: string | null | undefined,
+): boolean {
+  const next = cleanJobTitle(boardTitle);
+  if (!next || isNoiseJobTitle(next) || pos.listingStatus === "closed" || pos.metadata?.titleOverride) return false;
+  return next.toLowerCase() !== cleanJobTitle(pos.title).toLowerCase();
+}
+
 async function fetchListingForIntake(url: string, companyName?: string): Promise<AtsJob> {
   const detected = detectAts(url);
   if (detected.provider === "greenhouse" && detected.jobId && !detected.boardToken) {
@@ -921,10 +944,43 @@ export async function refetchJunkPlaceFilings(): Promise<{ titled: number; check
   return { titled, checked: junk.length, updated, withdrawn, failed, failedIds };
 }
 
-/** Manual intake: URL -> position (status triaged) -> triage job. */
+/** Intake refused: the URL is a careers board / index page, not one posting. */
+export class BoardIndexError extends Error {
+  readonly code = "board_index";
+  readonly reason: "board_url" | "board_title";
+  readonly suggestion: string;
+  readonly boardSuggestion?: { provider: string; token: string };
+
+  constructor(why: { reason: "board_url" | "board_title"; index?: BoardIndexUrl | null; title?: string }) {
+    const board = why.index?.scannable && why.index.boardToken ? { provider: why.index.provider, token: why.index.boardToken } : undefined;
+    const what = why.reason === "board_title" ? `the page is titled "${(why.title || "").slice(0, 80)}"` : "the URL is a careers board root";
+    const suggestion = board
+      ? `Add it as a board source (provider ${board.provider}, token ${board.token}) to track every opening, or intake one posting's URL.`
+      : "Open the careers page and intake a single posting's URL instead.";
+    super(`Not a job posting: ${what}. ${suggestion}`);
+    this.name = "BoardIndexError";
+    this.reason = why.reason;
+    this.suggestion = suggestion;
+    this.boardSuggestion = board;
+  }
+}
+
+/** Manual intake: URL -> position (status triaged) -> triage job. Board / index pages are refused. */
 export async function intakeUrl(url: string, opts: { companyName?: string; status?: "triaged" | "review"; source?: string } = {}) {
+  const fromScan = (opts.source || "").startsWith("scan:");
+  const index = boardIndexUrl(url);
+  if (index) {
+    ingestQuality.labels({ reason: "board_index" }).inc();
+    if (fromScan) return { position: null, created: false, revived: false, triageJobId: null, skipped: true as const, reason: "board_index" };
+    throw new BoardIndexError({ reason: "board_url", index });
+  }
   const job = await fetchListingForIntake(url, opts.companyName);
-  if ((opts.source || "").startsWith("scan:")) {
+  if (isBoardIndexTitle(job.title) && !(job.jobId || detectAts(url).jobId)) {
+    ingestQuality.labels({ reason: "board_index" }).inc();
+    if (fromScan) return { position: null, created: false, revived: false, triageJobId: null, skipped: true as const, reason: "board_index" };
+    throw new BoardIndexError({ reason: "board_title", title: job.title });
+  }
+  if (fromScan) {
     const settings = await getSettings();
     const verdict = listingGate(job, settings.gate, await profileGate(), { listedNow: true });
     if (!verdict.pass) {

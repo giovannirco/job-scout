@@ -37,7 +37,7 @@ Positions are drained first; evaluations start on the page that returns the last
 | `scout_context` | everything to reason about one role: position, triage JSON, JD text, latest evaluation summary, profile brief |
 | `get_evaluation` | latest markdown + JSON for `evaluate` / `jd_review` / `company_research` |
 | `get_materials` | current resume + cover markdown |
-| `work_queue` | decision lanes: PASS awaiting a decision, review (including a deliberate operator override), applied, marginal, and failed triage that has no operator override. Closed rows are left out. Compact summaries; `lane`, `page`, `limit` (default 20 per lane), with totals and `nextPage` in `pagination`. Use `get_position` for full details |
+| `work_queue` | decision lanes: PASS awaiting a decision, review (including a deliberate operator override), applied, marginal, failed triage that has no operator override, and `needsJd` (triaged/review rows stored with too little JD to score). Closed rows are left out. Compact summaries; `lane`, `page`, `limit` (default 20 per lane), with totals and `nextPage` in `pagination`. Use `get_position` for full details |
 | `list_discovery` | `lane`, `hours`, `q`, `reason` prefix; cursor pagination |
 | `list_companies` / `get_company` | companies with counts / detail with positions and latest research |
 | `get_profile` / `get_identity` | operator profile / identity + master resume + scout brief markdown |
@@ -54,8 +54,8 @@ Positions are drained first; evaluations start on the page that returns the last
 
 | tool | |
 |--|--|
-| `intake` | create/refresh a position from a job URL; queues triage when a model key is set |
-| `refresh_jd` | re-fetch the ATS page; revision if changed. Refused with `frozen:<status>` at interview/offer unless `force: true` (explicit operator refresh) |
+| `intake` | create/refresh a position from a job URL; queues triage when a model key is set. Board/careers index URLs are refused with `code: "board_index"` and a board suggestion. A JD too short to score is stored with `metadata.needsJd` and triage waits for the full JD |
+| `refresh_jd` | re-fetch the ATS page; revision if changed. A failed fetch returns `reason` (`http_status`, `blocked`, `timeout`, `network`, `parse_failed`, `unsupported_provider`) with `httpStatus`/`causeCode`, also stored in `metadata.lastAtsFetch`. Refused with `frozen:<status>` at interview/offer unless `force: true` (explicit operator refresh) |
 | `update_position` | PATCH status, priority, notes, nextAction, resumeSurface, watchEnabled, appliedAt, and the listing corrections below (`title`, `primaryUrl`, `workplace`, `geoClass`, `geoNotes`). The career-ops guard below applies to a `skip`/`archived` status; the other fields still apply. `status: materials` follows the materials rule below |
 | `set_position_status` | any pipeline status; `archived` requires a reason. Subject to the career-ops guard below; optional `actor` names the calling agent (see [Attribution](#attribution)); `materials` follows the materials rule below |
 | `log_activity` | append a timeline note |

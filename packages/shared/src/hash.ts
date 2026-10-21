@@ -71,6 +71,59 @@ export function isFormattingOnlyTextChange(
   return stripMarkupForCompare(before || "") === stripMarkupForCompare(after || "");
 }
 
+const TRACKING_PARAM_RE = /^(utm_[a-z_]+|gh_src|gh_jid|gclid|fbclid|msclkid|mc_[a-z]+|_hs[a-z]+|ref|referrer|source|src|lever-source(?:\[\])?|lever-origin|trk|trackingid|refid|ccuid|icid)$/i;
+
+/** Drop tracking parameters from every URL in a text; the rest of the URL stays. */
+export function stripTrackingParams(text: string): string {
+  return (text || "").replace(/https?:\/\/[^\s<>"')\]]+/gi, (raw) => {
+    try {
+      const url = new URL(raw);
+      for (const key of [...url.searchParams.keys()]) if (TRACKING_PARAM_RE.test(key)) url.searchParams.delete(key);
+      url.hash = "";
+      return url.toString().replace(/\?$/, "");
+    } catch {
+      return raw;
+    }
+  });
+}
+
+const MONTH = String.raw`(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)`;
+const DATE = String.raw`(?:\d{4}-\d{2}-\d{2}(?:[t ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:z|[+-]\d{2}:?\d{2})?)?|\d{1,2}[/.]\d{1,2}[/.]\d{2,4}|${MONTH}\.? \d{1,2}(?:st|nd|rd|th)?,? \d{4}|\d{1,2} ${MONTH}\.? \d{4}|today|yesterday)`;
+/** "Posted 3 days ago", "Updated on Oct 2, 2026", "Published: 2026-10-02" — page stamps, not JD content. */
+const DATE_STAMP_RE = new RegExp(
+  String.raw`(?:(?:posted|updated|published|refreshed|listed|last\s+updated|date\s+posted|publicad[ao]|atualizad[ao])\s*(?:on|:|em)?\s*(?:${DATE}|\d+\+?\s*(?:minutes?|hours?|days?|weeks?|months?)\s+ago|about\s+\d+\s+\w+\s+ago|just\s+now))|\b\d+\+?\s*(?:minutes?|hours?|days?|weeks?|months?)\s+ago\b`,
+  "gi",
+);
+
+/**
+ * Compare key for "did the JD really change": markup, whitespace, tracking
+ * parameters, page date stamps and careers chrome removed, and paragraph blocks
+ * sorted so reordered boilerplate (an "About us" block moving below the role)
+ * compares equal. Lines inside a block keep their order: a requirement moving
+ * from "Required" to "Nice to have" is a real change.
+ */
+export function cosmeticCompareKey(text: string): string {
+  const plain = stripMarkupForCompare(stripTrackingParams(decodeBasicEntities(text || "")));
+  return plain
+    .replace(DATE_STAMP_RE, " ")
+    .split(/\n\s*\n/)
+    .map((block) => block.split("\n").map((line) => line.replace(/[^\p{L}\p{N}%$€£]+/gu, " ").trim()).filter(Boolean).join("\n"))
+    .filter(Boolean)
+    .sort()
+    .join("\n\n");
+}
+
+/**
+ * Whitespace, markup, tracking params, date stamps or reordered blocks only.
+ * Never true when either side is empty (a JD arriving or vanishing is real).
+ */
+export function isCosmeticTextChange(before: string | null | undefined, after: string | null | undefined): boolean {
+  if (!(before || "").trim() || !(after || "").trim()) return false;
+  if (isFormattingOnlyTextChange(before, after)) return true;
+  const a = cosmeticCompareKey(before || "");
+  return Boolean(a) && a === cosmeticCompareKey(after || "");
+}
+
 /** Stable content hash for JD snapshots (title + body + salary + location). */
 export function contentHash(parts: {
   title?: string | null;
@@ -227,7 +280,7 @@ export function classifyMateriality(
     const d = meaningful.find((x) => x.path === "description_text");
     const before = d?.before || "";
     const after = d?.after || "";
-    if (isFormattingOnlyTextChange(before, after)) {
+    if (isCosmeticTextChange(before, after)) {
       return { material: false, change_kind: "noise_rebase" };
     }
     // A short addition can change eligibility ("US residents only") or pay.

@@ -18,7 +18,35 @@ export function isShellJobTitle(title?: string | null): boolean {
   if (/^join\s+(our|the)\s+team\b/i.test(t)) return true;
   if (/^job\s+board\b/i.test(t)) return true;
   if (/^search\s+jobs?\b/i.test(t)) return true;
+  if (isBoardIndexTitle(t)) return true;
   return false;
+}
+
+/** Whole-title (or first segment) names of a careers listing page, never of one role. */
+const BOARD_INDEX_TITLE_RES: RegExp[] = [
+  /^(?:job|current|open|all|latest|available)\s+(?:openings?|positions?|roles?|vacanc(?:y|ies)|opportunit(?:y|ies)|jobs)$/i,
+  /^(?:open|available)\s+(?:positions?|roles?|jobs)\s+at\s+.+$/i,
+  /^careers?(?:\s+(?:page|portal|site|home))?$/i,
+  /^(?:jobs?|careers?|openings?|vacancies)\s+(?:at|@|with)\s+.+$/i,
+  /^(?:join\s+(?:us|our\s+team)|work\s+with\s+us|we['’]?re\s+hiring)!?$/i,
+  /^(?:vagas(?:\s+abertas)?|trabalhe\s+conosco|oportunidades|carreiras|empleos|vacantes|trabaja\s+con\s+nosotros)$/i,
+];
+
+const BOARD_INDEX_FIRST_SEGMENT_RES = [BOARD_INDEX_TITLE_RES[0]!, BOARD_INDEX_TITLE_RES[3]!];
+
+/**
+ * "Job openings", "Open positions", "Careers at Acme", "Vagas": the title of a
+ * board / careers index page. Only the whole title or its first segment counts,
+ * so "Platform Engineer | Acme Careers" stays a role.
+ */
+export function isBoardIndexTitle(title?: string | null): boolean {
+  const t = (title || "").replace(/\s+/g, " ").trim();
+  if (!t || t.length > 120) return false;
+  if (BOARD_INDEX_TITLE_RES.some((re) => re.test(t))) return true;
+  // "Job openings | Acme": a multi-word index phrase first. A bare "Careers" first segment
+  // ("Careers - Platform Engineer") is not enough.
+  const first = t.split(/\s+[|–—·•]\s+|\s+-\s+/)[0]!.trim();
+  return first !== t && BOARD_INDEX_FIRST_SEGMENT_RES.some((re) => re.test(first));
 }
 
 const ROLE_TOKEN =

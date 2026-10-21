@@ -40,4 +40,9 @@ describe("work queue pagination", () => {
     expect(b.applied).toBeUndefined();
     expect(new Set([...a.decide, ...b.decide].map(p => p.id)).size).toBe(23);
   });
+  it("lists positions stored with too little JD in the needsJd lane", async () => {
+    const data = JSON.parse(text(await workQueue({ lane: "needsJd", limit: 5 })).content[0].text);
+    expect(data.pagination.needsJd.total).toBe(23);
+    expect(data.needsJd[0]).toMatchObject({ needsJd: { reason: "too_short" } });
+  });
 });

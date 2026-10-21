@@ -12,7 +12,7 @@ import {
   slugify,
   type PositionStatus,
 } from "@job-scout/db";
-import { assertPublicUrl, decodeHtmlEntities, detectAts, externalIdentityFromDetect, fetchJobFromUrl as fetchListing, greenhouseListingLocation, type AtsJob } from "@job-scout/ats";
+import { assertPublicUrl, classifyFetchError, decodeHtmlEntities, detectAts, externalIdentityFromDetect, fetchJobFromUrl as fetchListing, greenhouseListingLocation, type AtsFetchError, type AtsFetchFailure, type AtsJob } from "@job-scout/ats";
 import { fetchJob as fetchJobFromUrl } from "./fetch-job.js";
 import {
   classifyMateriality,
@@ -37,7 +37,9 @@ import {
   searchWords, likeContains, homeMarket, listedAtHome,
   employerFromPosting, unresolvedCompany, UNRESOLVED_COMPANY, requisitionId,
   aggregatorHost, extractAggregatorEmployer, decisionTitle,
+  isCosmeticTextChange, jdSufficiency, jdSubstantiallyRewritten, type JdSufficiency,
 } from "@job-scout/shared";
+import { positionSlugFor, slugForRetitle, withPrevious } from "./slug-repair.js";
 import { resolveCompanyForName } from "./companies.js";
 import { addEvent } from "./timeline.js";
 import { hasMaterials, MaterialsMissingError, refreshedCareerOpsStamp } from "./pipeline-integrity.js";
@@ -46,7 +48,7 @@ import { careerStamp, groupingRows, groupRows, groupSummary, repostFor, terminal
 import { getProfile, profileFingerprint } from "./profile.js";
 import { decodeCursor, encodeCursor, filterFingerprint } from "./list-cursor.js";
 import { applyClassificationOverride, classificationOverride } from "./classification-override.js";
-import { positionSlugFor, withPrevious } from "./slug-repair.js";
+
 import { log as rootLog } from "@job-scout/shared";
 const log = rootLog.child({ scope: "positions" });
 
@@ -91,6 +93,7 @@ const LIST_ROW = {
   triageProfileHash: sql<string | null>`${positions.triageJson}->>'profileHash'`,
   repostOfId: sql<string | null>`${positions.metadata}->>'repostOfId'`,
   repost: sql<Record<string, unknown> | null>`${positions.metadata}->'repost'`,
+  needsJd: sql<Record<string, unknown> | null>`${positions.metadata}->'needsJd'`,
   updatedAt: positions.updatedAt,
   /** career-ops tracker stamp (trackerId, score, status, reportPath) — small, useful in lists */
   careerOps: sql<Record<string, unknown> | null>`case when ${positions.metadata} ? 'careerOps' then jsonb_build_object(
@@ -126,6 +129,8 @@ export type ListPositionsQuery = {
   withoutEvaluation?: string;
   staleProfile?: string;
   reviewLane?: "pending" | "failed";
+  /** "true": only positions waiting for a fuller JD (metadata.needsJd). */
+  needsJd?: string;
 };
 
 export async function listPositions(q: ListPositionsQuery) {
@@ -149,6 +154,7 @@ export async function listPositions(q: ListPositionsQuery) {
     if (hidden.length) conds.push(notInArray(positions.id, hidden));
     conds.push(sql`${positions.listingStatus} is distinct from 'closed'`);
   }
+  if (q.needsJd === "true") conds.push(sql`${positions.metadata} ? 'needsJd'`);
   if (q.withoutEvaluation === "true") conds.push(sql`not exists (select 1 from evaluations e where e.position_id = ${positions.id} and e.kind = 'evaluate')`);
   if (q.staleProfile === "true") conds.push(sql`${positions.triagedAt} is not null and ${positions.triageJson}->>'profileHash' is distinct from ${profileHash}`);
   if (q.reviewLane) {
@@ -474,11 +480,14 @@ async function listingEdits(pos: PositionRow, patch: Record<string, unknown>, ac
     if (title !== pos.title) {
       set.title = title;
       set.craftFamily = craftFamily(title);
-      let slug = positionSlugFor(pos.company.slug, title, pos.id);
-      const db = await getDb();
-      const taken = (await db.select({ id: positions.id }).from(positions).where(and(eq(positions.slug, slug), sql`${positions.id} <> ${pos.id}`)).limit(1))[0];
-      if (taken) slug = `${slug}-${pos.id.slice(-8, -4).toLowerCase()}`;
-      if (slug !== pos.slug) {
+      // Only an auto-derived slug follows the title; a hand-picked one stays.
+      let slug = slugForRetitle({ id: pos.id, slug: pos.slug, title: pos.title, companySlug: pos.company.slug }, title);
+      if (slug) {
+        const db = await getDb();
+        const taken = (await db.select({ id: positions.id }).from(positions).where(and(eq(positions.slug, slug), sql`${positions.id} <> ${pos.id}`)).limit(1))[0];
+        if (taken) slug = `${slug}-${pos.id.slice(-8, -4).toLowerCase()}`;
+      }
+      if (slug && slug !== pos.slug) {
         set.slug = slug;
         Object.assign(metadata, withPrevious(metadata, pos.slug));
       }
@@ -553,12 +562,27 @@ export async function patchPosition(idOrSlug: string, patch: Record<string, unkn
   if (patch.metadata && typeof patch.metadata === "object") {
     set.metadata = { ...((set.metadata as Record<string, unknown> | undefined) || pos.metadata || {}), ...(patch.metadata as object) };
   }
+  // "<agent> via <token>" (MCP caller attribution) is automated when its token is.
+  const via = actor.lastIndexOf(" via ");
+  const principal = via >= 0 ? actor.slice(via + 5) : actor;
+  const automated = /^(system|autopilot|career-ops|intake|scan(?::.*)?|triage|evaluate|import|seed)$/.test(principal);
+  let reslugged: { from: string; to: string } | null = null;
+  if (typeof set.title === "string") {
+    const title = cleanJobTitle(set.title);
+    if (!title) throw new Error("title cannot be empty");
+    set.title = title;
+    if (title !== pos.title) {
+      const metadata = { ...(pos.metadata || {}), ...((set.metadata || {}) as Record<string, unknown>) };
+      // A person's title survives ATS refreshes; an automated fill does not pin it.
+      if (!automated) metadata.titleOverride = { title, actor, at: new Date().toISOString() };
+      // listingEdits already moved an auto-derived slug.
+      if (typeof set.slug === "string" && set.slug !== pos.slug) reslugged = { from: pos.slug, to: set.slug };
+      set.craftFamily = craftFamily(title);
+      set.metadata = metadata;
+    } else delete set.title;
+  }
   if (set.status) {
     const metadata = { ...(pos.metadata || {}), ...((set.metadata || {}) as Record<string, unknown>) };
-    // "<agent> via <token>" (MCP caller attribution) is automated when its token is.
-    const via = actor.lastIndexOf(" via ");
-    const principal = via >= 0 ? actor.slice(via + 5) : actor;
-    const automated = /^(system|autopilot|career-ops|intake|scan(?::.*)?|triage|evaluate|import|seed)$/.test(principal);
     if (set.status === "review" && !automated) metadata.reviewIntent = { kind: "operator", actor, at: new Date().toISOString() };
     else delete metadata.reviewIntent;
     if (set.status !== pos.status) {
@@ -571,6 +595,7 @@ export async function patchPosition(idOrSlug: string, patch: Record<string, unkn
   for (const e of edits.events) {
     await addEvent({ positionId: pos.id, kind: "edit", title: `${e.field}: ${String(e.from ?? "∅")} → ${String(e.to ?? "∅")}`.slice(0, 300), actor, metadata: { field: e.field, from: e.from ?? null, to: e.to ?? null } });
   }
+  if (reslugged) await addEvent({ positionId: pos.id, kind: "repair", title: `Slug follows title: ${reslugged.from} → ${reslugged.to}`, actor, metadata: reslugged });
   if (set.status && set.status !== pos.status) {
     await addEvent({ positionId: pos.id, kind: "status", title: `${pos.status} → ${String(set.status)}`, actor });
     if ((HOT_STATUSES as readonly string[]).includes(String(set.status))) {
@@ -626,6 +651,48 @@ export async function stampCareerOps(idOrSlug: string, stamp: Record<string, unk
   return meta.careerOps;
 }
 
+/** The title a person set by hand, which ATS refreshes must not replace. */
+function titleOverrideOf(metadata: Record<string, unknown> | null | undefined): string | null {
+  const o = metadata?.titleOverride as { title?: unknown } | undefined;
+  return o && typeof o.title === "string" && o.title.trim() ? o.title : null;
+}
+
+/** metadata.needsJd for an insufficient JD (keeps the original `since`); {} when the JD is enough. */
+function needsJdPatch(metadata: Record<string, unknown> | null | undefined, jd: JdSufficiency, revision: number): Record<string, unknown> {
+  if (jd.sufficient) return {};
+  const prev = metadata?.needsJd as { since?: string } | undefined;
+  return { needsJd: { since: prev?.since || new Date().toISOString(), reason: jd.reason, words: jd.words, revision } };
+}
+
+/**
+ * The JD the position was scored on is gone (a title-only JD was replaced, the
+ * role retitled, the body rewritten): mark evaluations superseded and queue a
+ * forced re-triage. A passing triage re-queues evaluate through autopilot.
+ * Only triaged/review positions: a live process keeps its scores.
+ */
+export async function requeueScoring(positionId: string, opts: { revision: number; reason: string }) {
+  const pos = await getPosition(positionId);
+  if (!pos || !["triaged", "review"].includes(pos.status) || pos.listingStatus === "closed" || pos.metadata?.quarantined) return { skipped: true as const };
+  const db = await getDb();
+  const now = new Date().toISOString();
+  const evs = await db.select({ id: evaluations.id, kind: evaluations.kind, json: evaluations.json }).from(evaluations)
+    .where(and(eq(evaluations.positionId, pos.id), inArray(evaluations.kind, ["evaluate", "jd_review"])));
+  const stale = evs.filter((e) => !(e.json as { superseded?: unknown } | null)?.superseded);
+  for (const e of stale) {
+    await db.update(evaluations).set({ json: { ...(e.json || {}), superseded: { at: now, reason: opts.reason, byRevision: opts.revision } } }).where(eq(evaluations.id, e.id));
+  }
+  const { enqueueJob } = await import("./jobs.js");
+  const triage = await enqueueJob("triage", { positionId: pos.id, force: true, reason: opts.reason }, { dedupeKey: `triage:${pos.id}`, priority: 30 });
+  await addEvent({
+    positionId: pos.id,
+    kind: "harness",
+    title: `Re-scoring queued: ${opts.reason.replace(/_/g, " ")}`,
+    body: stale.length ? `Superseded ${stale.length} evaluation(s) scored on the earlier JD.` : undefined,
+    metadata: { reason: opts.reason, revision: opts.revision, superseded: stale.map((e) => e.id), triageJobId: triage.id },
+  });
+  return { skipped: false as const, superseded: stale.map((e) => e.id), triageJobId: triage.id };
+}
+
 /**
  * Apply a fresh ATS snapshot to an existing position. Writes a jd_revision only
  * when content/title/comp/status actually changed. A closed listing gets exactly
@@ -671,7 +738,7 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
         lastCheckedAt: now,
         metadata: {
           ...(pos.metadata || {}),
-          lastAtsFetch: { at: now.toISOString(), provider: opts.job.provider, listingStatus: opts.job.listingStatus, rejected: blocked, ...(softNotFoundSince ? { softNotFoundSince } : {}) },
+          lastAtsFetch: { at: now.toISOString(), provider: opts.job.provider, listingStatus: opts.job.listingStatus, rejected: blocked, ...fetchFailureOf(opts.job), ...(softNotFoundSince ? { softNotFoundSince } : {}) },
         },
       })
       .where(eq(positions.id, pos.id));
@@ -690,7 +757,11 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
     return { changed: false as const, revision: null, rejected: blocked };
   }
 
-  const title = preferJobTitle(isNoiseJobTitle(opts.job.title) ? "" : opts.job.title, pos.title, { slug: pos.slug, companySlug: pos.company.slug });
+  // The posting's own title (recorded on the revision) and the position's title, which
+  // follows it unless a person set the title by hand (metadata.titleOverride).
+  const atsTitle = preferJobTitle(isNoiseJobTitle(opts.job.title) ? "" : opts.job.title, pos.title, { slug: pos.slug, companySlug: pos.company.slug });
+  const titleOverride = titleOverrideOf(pos.metadata);
+  const title = titleOverride ? pos.title : atsTitle;
   const incomingShell = isNoiseJobTitle(opts.job.title);
   const descriptionText = (opts.job.descriptionText || "").trim();
   const locationRaw = cleanLocation(opts.job.locationRaw);
@@ -715,7 +786,7 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
         ...(visible ? { updatedAt: now } : {}),
         metadata: {
           ...(pos.metadata || {}),
-          lastAtsFetch: { at: now.toISOString(), provider: opts.job.provider, listingStatus: opts.job.listingStatus },
+          lastAtsFetch: { at: now.toISOString(), provider: opts.job.provider, listingStatus: opts.job.listingStatus, ...fetchFailureOf(opts.job) },
         },
         ...extra,
       })
@@ -729,7 +800,7 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
   }
 
   const hash = contentHash({
-    title,
+    title: atsTitle,
     descriptionText: descriptionText || (incomingShell ? "__shell_skip__" : ""),
     salaryRaw,
     locationRaw,
@@ -760,14 +831,16 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
     listing_status: pos.listingStatus,
   };
   const after = {
-    title,
+    title: atsTitle,
     location_raw: locationRaw || before.location_raw,
     salary_raw: salaryRaw ?? "",
     description_text: bodyText,
     listing_status: observedStatus,
   };
   const diffs = fieldDiffs(before, after, ["title", "location_raw", "salary_raw", "description_text", "listing_status"]).filter(
-    (d) => !(d.path === "title" && isShellJobTitle(String(d.after ?? "")) && !isShellJobTitle(String(d.before ?? ""))) && !isBadgeBookkeepingDiff(d),
+    (d) => !(d.path === "title" && isShellJobTitle(String(d.after ?? "")) && !isShellJobTitle(String(d.before ?? ""))) && !isBadgeBookkeepingDiff(d)
+      // Whitespace, tracking params, page date stamps, reordered blocks: not a new revision.
+      && !(d.path === "description_text" && isCosmeticTextChange(d.before, d.after)),
   );
   if (!diffs.length && nextRev > 1) {
     await touch({
@@ -800,7 +873,7 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
     contentHash: hash,
     changeKind: change_kind,
     material,
-    title,
+    title: atsTitle,
     locationRaw: loc || null,
     descriptionText: bodyText,
     salaryMin: salary.min ?? pos.salaryMin,
@@ -816,10 +889,22 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
   });
 
   const listingStatus = listingClosed ? "closed" : observedStatus === "open" ? (material && pos.listingStatus !== "closed" ? "changed" : "open") : pos.listingStatus || "unknown";
+  // Enough JD to score? A closure keeps whatever flag the open listing had.
+  const prevJd = jdSufficiency(before.title, before.description_text);
+  const jd = listingClosed ? prevJd : jdSufficiency(atsTitle, bodyText);
+  const jdArrived = !listingClosed && nextRev > 1 && !prevJd.sufficient && jd.sufficient;
+  const retitled = title !== pos.title && Boolean(pos.title.trim());
+  const nextSlug = retitled ? slugForRetitle({ id: pos.id, slug: pos.slug, title: pos.title, companySlug: pos.company.slug }, title, [prevRev?.title]) : null;
+  const metadata: Record<string, unknown> = {
+    ...(nextSlug ? withPrevious(pos.metadata, pos.slug) : pos.metadata || {}),
+    ...needsJdPatch(pos.metadata, jd, nextRev),
+  };
+  if (jd.sufficient) delete metadata.needsJd;
   await db
     .update(positions)
     .set({
       title,
+      ...(nextSlug ? { slug: nextSlug } : {}),
       primaryUrl: nextUrl,
       atsProvider: opts.job.provider || pos.atsProvider,
       atsJobId: opts.job.jobId || pos.atsJobId,
@@ -842,7 +927,7 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
       closedAt: listingStatus === "closed" ? pos.closedAt || now : null,
       firstSeenAt: pos.firstSeenAt || now,
       metadata: {
-        ...(pos.metadata || {}),
+        ...metadata,
         requisitionId: opts.job.requisitionId || requisitionId(bodyText),
         ats: {
           provider: opts.job.provider,
@@ -858,7 +943,7 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
           questions: (opts.job.questions || []).slice(0, 40),
           fetchedAt: now.toISOString(),
         },
-        lastAtsFetch: { at: now.toISOString(), provider: opts.job.provider, listingStatus: opts.job.listingStatus },
+        lastAtsFetch: { at: now.toISOString(), provider: opts.job.provider, listingStatus: opts.job.listingStatus, ...fetchFailureOf(opts.job) },
       },
       updatedAt: now,
     })
@@ -873,12 +958,27 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
   jdChanges.labels({ change_kind, material: String(material) }).inc();
   watchChecks.labels({ outcome: listingClosed ? "closed" : nextRev === 1 ? "first_seen" : "changed" }).inc();
   log.info("jd.revision", { positionId: pos.id, revision: nextRev, changeKind: change_kind, material, closed: listingClosed, source: opts.source || "scan", fields: diffs.map((d) => d.path) });
-  await afterAtsFetch(pos.id, opts.job, facts);
-  if (nextRev === 1 || material || (!prevRev?.descriptionText?.trim() && bodyText.trim())) {
-    const { enqueuePositionDecision } = await import("./decision-events.js");
-    await enqueuePositionDecision(pos.id, nextRev);
+  if (nextSlug) {
+    await addEvent({ positionId: pos.id, kind: "repair", title: `Slug follows title: ${pos.slug} → ${nextSlug}`, actor: "system", metadata: { from: pos.slug, to: nextSlug } });
   }
-  if (material && nextRev > 1) {
+  if (titleOverride && atsTitle !== titleOverride && prevRev?.title !== atsTitle) {
+    await addEvent({ positionId: pos.id, kind: "harness", title: "Posting retitled; kept the title set by hand", body: `posting: ${atsTitle.slice(0, 200)}; kept: ${pos.title.slice(0, 200)}` });
+  }
+  if (!jd.sufficient && !listingClosed && (prevJd.sufficient || nextRev === 1)) {
+    await addEvent({ positionId: pos.id, kind: "harness", title: "Needs JD: too little description to score", body: `${jd.words} words beyond the title (${jd.reason}). Triage, evaluation and research wait for a fuller JD.` });
+  }
+  await afterAtsFetch(pos.id, opts.job, facts);
+  if (jd.sufficient && (nextRev === 1 || material || jdArrived)) {
+    const { enqueuePositionDecision } = await import("./decision-events.js");
+    await enqueuePositionDecision(pos.id, nextRev, { changeKind: jdArrived ? "jd_arrived" : change_kind });
+  }
+  // Earlier scoring described a different JD: the real one arrived, the role was
+  // retitled, or the body was rewritten. Re-triage and supersede the evaluation.
+  const rewritten = material && nextRev > 1 && change_kind === "content" && jdSubstantiallyRewritten(before.description_text, bodyText);
+  if (jd.sufficient && (jdArrived || (material && nextRev > 1 && change_kind === "title") || rewritten)) {
+    await requeueScoring(pos.id, { revision: nextRev, reason: jdArrived ? "jd_arrived" : change_kind === "title" ? "retitled" : "jd_rewritten" });
+  }
+  if (material && nextRev > 1 && jd.sufficient) {
     // dynamic import: autopilot depends on this module
     const { afterJdChange } = await import("./autopilot.js");
     await afterJdChange({ positionId: pos.id, status: pos.status, changeKind: change_kind, revision: nextRev });
@@ -1223,6 +1323,7 @@ export async function upsertFromJob(
   if (aliasOf) ingestQuality.labels({ reason: "aggregator_duplicate" }).inc();
 
   const hash = contentHash({ title: job.title, descriptionText: job.descriptionText, salaryRaw: job.salaryRaw, locationRaw: job.locationRaw });
+  const jd = jdSufficiency(job.title, job.descriptionText);
   // Posting identity comes from the ATS id or canonical URL, never JD text.
   // Identical descriptions are grouped for display without discarding their links.
 
@@ -1273,6 +1374,8 @@ export async function upsertFromJob(
     lastChangedAt: now,
     metadata: {
       dataRepairVersion: 1,
+      ...needsJdPatch(null, jd, 1),
+      ...fetchFailureMetadata(job),
       requisitionId: job.requisitionId || requisitionId(job.descriptionText),
       ...(aggregatorMeta ? { aggregator: aggregatorMeta } : {}),
       ...(aliasOf ? { duplicateOfId: aliasOf.id } : {}),
@@ -1320,10 +1423,15 @@ export async function upsertFromJob(
     // An alias needs no decision of its own: the original carries it.
     return { position: (await getPosition(posId))!, created: true, revived: false };
   }
+  if (!jd.sufficient) {
+    await addEvent({ positionId: posId, kind: "harness", title: "Needs JD: too little description to score", body: `${jd.words} words beyond the title (${jd.reason}). Triage, evaluation and research wait for a fuller JD.` });
+  }
   const createdPos = (await getPosition(posId))!;
   await afterAtsFetch(posId, job, facts);
-  const { enqueuePositionDecision } = await import("./decision-events.js");
-  await enqueuePositionDecision(posId, 1);
+  if (jd.sufficient) {
+    const { enqueuePositionDecision } = await import("./decision-events.js");
+    await enqueuePositionDecision(posId, 1);
+  }
   return { position: createdPos, created: true, revived: false };
 }
 
@@ -1512,13 +1620,60 @@ export async function repairGreenhouseEmployment(): Promise<{ checked: number; u
   return { checked: open.length, updated, failed };
 }
 
-/** Fetch the ATS page for a position and apply. */
+/** First-snapshot lastAtsFetch carrying the fetcher's failure, if any. */
+function fetchFailureMetadata(job: AtsJob): Record<string, unknown> {
+  const f = fetchFailureOf(job);
+  return f.failure ? { lastAtsFetch: { at: new Date().toISOString(), provider: job.provider, listingStatus: job.listingStatus, ...f } } : {};
+}
+
+/** The fetcher's structured "loaded but empty" verdict, for metadata.lastAtsFetch. */
+function fetchFailureOf(job: AtsJob): { failure?: AtsFetchFailure } {
+  const failure = (job.rawPayload as { fetchFailure?: AtsFetchFailure } | undefined)?.fetchFailure;
+  return failure && typeof failure === "object" && typeof failure.reason === "string" ? { failure } : {};
+}
+
+/**
+ * A fetch that threw: store the structured reason in metadata.lastAtsFetch and
+ * the timeline, keep every field of the position, and return the error to rethrow.
+ */
+export async function recordAtsFetchFailure(positionId: string, error: unknown, source = "refresh"): Promise<AtsFetchError> {
+  const pos = await getPosition(positionId);
+  const failure = classifyFetchError(error, { url: pos?.primaryUrl || undefined, provider: pos?.atsProvider || undefined });
+  if (!pos) return failure;
+  const db = await getDb();
+  const now = new Date();
+  await db
+    .update(positions)
+    .set({
+      updatedAt: now,
+      metadata: { ...(pos.metadata || {}), lastAtsFetch: { at: now.toISOString(), provider: pos.atsProvider, listingStatus: pos.listingStatus, source, error: failure.toJSON() } },
+    })
+    .where(eq(positions.id, pos.id));
+  await addEvent({
+    positionId: pos.id,
+    kind: "harness",
+    title: `JD fetch failed: ${failure.reason}${failure.httpStatus ? ` (HTTP ${failure.httpStatus})` : ""}`.slice(0, 300),
+    body: failure.message.slice(0, 1000),
+    metadata: { source, ...failure.toJSON() },
+  });
+  log.warn("jd.fetch_failed", { positionId: pos.id, source, reason: failure.reason, httpStatus: failure.httpStatus, causeCode: failure.causeCode });
+  return failure;
+}
+
+/** Fetch the ATS page for a position and apply. A failed fetch throws an AtsFetchError with a reason. */
 export async function refreshPosition(idOrSlug: string, source = "refresh", opts: { force?: boolean } = {}) {
   const pos = await getPosition(idOrSlug);
   if (!pos) throw new Error("position not found");
   if (!pos.primaryUrl) throw new Error("position has no URL");
-  const job = await fetchJobFromUrl(pos.primaryUrl);
-  return applySnapshot({ positionId: pos.id, job, source, force: opts.force });
+  let job: AtsJob;
+  try {
+    job = await fetchJobFromUrl(pos.primaryUrl);
+  } catch (e) {
+    throw await recordAtsFetchFailure(pos.id, e, source);
+  }
+  const result = await applySnapshot({ positionId: pos.id, job, source, force: opts.force });
+  const { failure } = fetchFailureOf(job);
+  return failure ? { ...result, fetchFailure: failure } : result;
 }
 
 /**

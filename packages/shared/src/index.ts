@@ -23,6 +23,7 @@ export * from "./search.js";
 export * from "./job-recovery.js";
 export * from "./decisions.js";
 export * from "./page-signature.js";
+export * from "./jd-sufficiency.js";
 export * from "./snapshot-guard.js";
 export * from "./llm-health.js";
 export * from "./aggregator.js";
