@@ -121,3 +121,28 @@ describe("isPlaceholderJobId", () => {
     expect(isPlaceholderJobId("greenhouse", "5779695004")).toBe(false);
   });
 });
+
+describe("boardIndexUrl", () => {
+  it("recognises ATS board roots and bare careers pages", async () => {
+    const { boardIndexUrl } = await import("./detect.js");
+    expect(boardIndexUrl("https://boards.greenhouse.io/acme-example")).toEqual({ provider: "greenhouse", boardToken: "acme-example", scannable: true });
+    expect(boardIndexUrl("https://jobs.ashbyhq.com/acme-example")).toEqual({ provider: "ashby", boardToken: "acme-example", scannable: true });
+    expect(boardIndexUrl("https://jobs.lever.co/acme-example")).toEqual({ provider: "lever", boardToken: "acme-example", scannable: true });
+    expect(boardIndexUrl("https://apply.workable.com/acme-example/")).toEqual({ provider: "workable", boardToken: "acme-example", scannable: false });
+    expect(boardIndexUrl("https://www.acme-example.com/careers")).toMatchObject({ provider: "unknown" });
+    expect(boardIndexUrl("https://www.acme-example.com/en/jobs/")).toMatchObject({ provider: "unknown" });
+  });
+
+  it("never flags a single posting", async () => {
+    const { boardIndexUrl } = await import("./detect.js");
+    for (const url of [
+      "https://boards.greenhouse.io/acme-example/jobs/1234567",
+      "https://jobs.ashbyhq.com/acme-example/c0ffee00-abcd-4ef0-9abc-deadbeefcafe",
+      "https://jobs.lever.co/acme-example/0d6c2b8e-1111-4222-8333-944455556666",
+      "https://apply.workable.com/acme-example/j/AB12CD34EF/",
+      "https://www.acme-example.com/careers?gh_jid=1234567",
+      "https://www.acme-example.com/careers/platform-engineer",
+      "https://weworkremotely.com/remote-jobs/acme-example-senior-devops-engineer",
+    ]) expect(boardIndexUrl(url), url).toBeNull();
+  });
+});

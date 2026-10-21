@@ -8,6 +8,7 @@ import {
 } from "./detect.js";
 import type { AtsJob, BoardJobSummary, DetectedAts } from "./types.js";
 import { greenhouseQuestionPrompts, parseApplicationQuestions, type QuestionPrompt } from "./application-form.js";
+import { AtsFetchError, classifyFetchError, httpFailure } from "./fetch-error.js";
 
 const UA =
   process.env.ATS_USER_AGENT ||
@@ -358,7 +359,7 @@ export async function fetchGreenhouseJob(
     };
   }
   if (!ok) {
-    throw new Error(`greenhouse job fetch failed: ${status}`);
+    throw httpFailure(status, { url, provider: "greenhouse" });
   }
   const data = JSON.parse(body) as {
     id: number;
@@ -509,7 +510,7 @@ export async function fetchInhireJob(tenant: string, jobId: string, url?: string
     signal: AbortSignal.timeout(25_000),
   });
   if (res.status === 404) return { ...base, title: "", listingStatus: "closed", rawPayload: { source: "inhire_api", httpStatus: 404 } };
-  if (!res.ok) throw new Error(`inhire fetch failed: ${res.status}`);
+  if (!res.ok) throw httpFailure(res.status, { url: pageUrl, provider: "inhire" });
   const d = (await res.json()) as {
     tenantName?: string; displayName?: string; description?: string; status?: string; workplaceType?: string;
     location?: string; locationComplement?: string; contractType?: string[]; publishedAt?: string; jobId?: string;
@@ -546,7 +547,7 @@ export async function fetchRecruiteeJob(company: string, slug: string, url?: str
   const base = { provider: "recruitee" as const, boardToken: company, jobId: slug, externalIdentity: `recruitee:${company}:${slug}`, url: pageUrl };
   const { status, body, ok } = await fetchText(`https://${company}.recruitee.com/api/offers/${encodeURIComponent(slug)}`, { accept: "application/json" });
   if (status === 404) return { ...base, title: "", listingStatus: "closed", rawPayload: { source: "recruitee_api", httpStatus: 404 } };
-  if (!ok) throw new Error(`recruitee fetch failed: ${status}`);
+  if (!ok) throw httpFailure(status, { url: `https://${company}.recruitee.com/api/offers/${slug}`, provider: "recruitee" });
   type Offer = {
     id?: number; slug?: string; title?: string; description?: string; requirements?: string; status?: string;
     location?: string; city?: string; country?: string; remote?: boolean; company_name?: string;
@@ -586,6 +587,70 @@ export async function fetchRecruiteeJob(company: string, slug: string, url?: str
     updatedAt: offer.updated_at,
     listingStatus: offer.status && offer.status !== "published" ? "closed" : "open",
     rawPayload: { source: "recruitee_api", status: offer.status, offerId: offer.id },
+  };
+}
+
+type WorkablePlace = { city?: string | null; region?: string | null; country?: string | null; countryCode?: string | null } | null | undefined;
+
+function workablePlace(place: WorkablePlace): string | undefined {
+  if (!place || typeof place !== "object") return undefined;
+  const parts = [place.city, place.region, place.country].map((p) => (typeof p === "string" ? p.trim() : "")).filter(Boolean);
+  return parts.length ? [...new Set(parts)].join(", ") : undefined;
+}
+
+const WORKABLE_CLOSED_STATE_RE = /^(closed|archived|draft|expired|filled|deleted)$/i;
+
+/**
+ * Workable public job API: GET https://apply.workable.com/api/v2/accounts/{account}/jobs/{shortcode}.
+ * 404 → closed. Any other failure throws, and fetchJobFromUrl falls back to the page.
+ * Fields are read defensively: description/requirements/benefits are HTML blocks.
+ */
+export async function fetchWorkableJob(account: string, shortcode: string, url?: string): Promise<AtsJob> {
+  const pageUrl = url || `https://apply.workable.com/${account}/j/${shortcode}/`;
+  const base = { provider: "workable" as const, boardToken: account, jobId: shortcode, externalIdentity: `workable:${account}:${shortcode}`, url: pageUrl };
+  const apiUrl = `https://apply.workable.com/api/v2/accounts/${encodeURIComponent(account)}/jobs/${encodeURIComponent(shortcode)}`;
+  const { status, body, ok } = await fetchText(apiUrl, { accept: "application/json" });
+  if (status === 404) return { ...base, title: "", listingStatus: "closed", rawPayload: { source: "workable_api", httpStatus: 404 } };
+  if (!ok) throw httpFailure(status, { url: apiUrl, provider: "workable" });
+  const d = JSON.parse(body) as {
+    shortcode?: string; title?: string; description?: string; requirements?: string; benefits?: string;
+    location?: WorkablePlace; locations?: WorkablePlace[]; remote?: boolean; workplace?: string;
+    type?: string; employment_type?: string; department?: string | string[]; state?: string;
+    published?: string; published_on?: string; created_at?: string; company?: { name?: string } | string;
+  };
+  if (d.shortcode && d.shortcode.toLowerCase() !== shortcode.toLowerCase()) {
+    // Never accept a different posting than the one asked for.
+    return { ...base, title: "", listingStatus: "unknown", rawPayload: { source: "workable_api", fetchFailed: "job_id_mismatch", got: d.shortcode } };
+  }
+  const title = (d.title || "").trim();
+  if (!title) throw new AtsFetchError({ reason: "parse_failed", message: "workable job API answered without a title", url: apiUrl, provider: "workable" });
+  const sections: Array<[string, string | undefined]> = [["", d.description], ["Requirements", d.requirements], ["Benefits", d.benefits]];
+  const descriptionHtml = sections
+    .filter(([, html]) => typeof html === "string" && html.trim())
+    .map(([heading, html]) => (heading ? `<h3>${heading}</h3>${html}` : html))
+    .join("\n");
+  const places = [d.location, ...(Array.isArray(d.locations) ? d.locations : [])].map(workablePlace).filter((p): p is string => Boolean(p));
+  const workplace = (d.workplace || "").toLowerCase().replace(/[\s-]+/g, "_");
+  const isRemote = d.remote === true || workplace === "remote" || undefined;
+  const locationRaw = [...new Set(places)].join(" · ") || (isRemote ? "Remote" : undefined);
+  const employment = d.employment_type || ({ full: "Full-time", part: "Part-time", contract: "Contract", temporary: "Temporary", internship: "Internship" } as Record<string, string>)[(d.type || "").toLowerCase()] || d.type;
+  const company = typeof d.company === "string" ? d.company : d.company?.name;
+  return {
+    ...base,
+    title,
+    company: company?.trim() || undefined,
+    applyUrl: pageUrl,
+    locationRaw,
+    descriptionHtml: descriptionHtml || undefined,
+    descriptionText: descriptionHtml ? stripHtml(descriptionHtml) : undefined,
+    salaryRaw: descriptionHtml ? extractSalaryRaw(stripHtml(descriptionHtml)) : undefined,
+    employmentType: employment || undefined,
+    workplaceType: workplace ? workplace.replace("on_site", "onsite") : isRemote ? "remote" : undefined,
+    isRemote,
+    departments: (Array.isArray(d.department) ? d.department : d.department ? [d.department] : []).filter((x): x is string => typeof x === "string" && Boolean(x.trim())),
+    postedAt: postingDate(d.published || d.published_on || d.created_at),
+    listingStatus: WORKABLE_CLOSED_STATE_RE.test((d.state || "").trim()) ? "closed" : "open",
+    rawPayload: { source: "workable_api", provider: "workable", httpStatus: status, state: d.state ?? null },
   };
 }
 
@@ -835,7 +900,7 @@ export async function fetchLeverJob(company: string, jobId: string): Promise<Ats
       listingStatus: "closed",
     };
   }
-  if (!ok) throw new Error(`lever job fetch failed: ${status}`);
+  if (!ok) throw httpFailure(status, { url, provider: "lever" });
   const data = JSON.parse(body) as {
     id: string;
     text: string;
@@ -941,7 +1006,7 @@ export async function fetchGenericUrl(url: string, opts: { render?: HtmlRenderer
       listingStatus: "closed",
     };
   }
-  if (!ok) throw new Error(`url fetch failed: ${status}`);
+  if (!ok) throw httpFailure(status, { url });
   const plain = extractFromHtml(url, body, status);
   // Workday embeds the posting state in the shell — no render needed to know it's gone.
   if (/\.myworkdayjobs\.com\//i.test(url) && /postingAvailable:\s*false/.test(body)) {
@@ -1035,6 +1100,40 @@ function skippedPlaceholder(detected: DetectedAts, url: string): AtsJob {
  */
 export async function fetchJobFromUrl(url: string, opts: { render?: HtmlRenderer } = {}): Promise<AtsJob> {
   const detected = detectAts(url);
+  try {
+    return withShellFailure(await fetchDetected(url, detected, opts));
+  } catch (e) {
+    throw classifyFetchError(e, { url, provider: detected.provider });
+  }
+}
+
+/** Providers whose public pages never carry the posting without a session. */
+const SESSION_ONLY_PROVIDERS = new Set(["linkedin", "indeed"]);
+
+/** A 200 page that yielded neither a title nor a body: say why instead of returning silence. */
+function withShellFailure(job: AtsJob): AtsJob {
+  const rp = (job.rawPayload || {}) as { source?: string; shellOnly?: boolean; fetchFailure?: unknown };
+  if (rp.fetchFailure || job.listingStatus === "closed") return job;
+  if (job.title.trim() || (job.descriptionText || "").trim()) return job;
+  if (rp.source !== "html" && !rp.shellOnly) return job;
+  const reason = SESSION_ONLY_PROVIDERS.has(job.provider) ? "unsupported_provider" : "parse_failed";
+  const httpStatus = typeof (rp as { httpStatus?: unknown }).httpStatus === "number" ? (rp as { httpStatus: number }).httpStatus : undefined;
+  return {
+    ...job,
+    rawPayload: {
+      ...(job.rawPayload || {}),
+      fetchFailure: {
+        reason,
+        message: reason === "unsupported_provider" ? `${job.provider} pages need a signed-in session; paste the JD or use the employer's ATS link` : "the page loaded but carried no job title or description",
+        ...(httpStatus != null ? { httpStatus } : {}),
+        url: job.url,
+        provider: job.provider,
+      },
+    },
+  };
+}
+
+async function fetchDetected(url: string, detected: DetectedAts, opts: { render?: HtmlRenderer }): Promise<AtsJob> {
 
   if (isPlaceholderAtsDetection(detected)) {
     return skippedPlaceholder(detected, url);
@@ -1056,6 +1155,15 @@ export async function fetchJobFromUrl(url: string, opts: { render?: HtmlRenderer
   if (detected.provider === "inhire" && detected.boardToken && detected.jobId) {
     return fetchInhireJob(detected.boardToken, detected.jobId, url);
   }
+  // Workable: the public job API has the full JD; the page often carries only the title.
+  let apiFallback: string | undefined;
+  if (detected.provider === "workable" && detected.boardToken && detected.jobId) {
+    try {
+      return await fetchWorkableJob(detected.boardToken, detected.jobId, url);
+    } catch (e) {
+      apiFallback = classifyFetchError(e, { provider: "workable" }).message.slice(0, 200);
+    }
+  }
 
   // Recruitee offer pages render client-side; the public offers API has the posting.
   if (detected.provider === "recruitee" && detected.boardToken && detected.jobId) {
@@ -1075,6 +1183,7 @@ export async function fetchJobFromUrl(url: string, opts: { render?: HtmlRenderer
     rawPayload: {
       ...(generic.rawPayload || {}),
       detected,
+      ...(apiFallback ? { apiFallback } : {}),
     },
   };
 }
@@ -1346,9 +1455,9 @@ export async function fetchBambooHrJob(token: string, jobId: string): Promise<At
   if (status === 404) {
     return { provider: "bamboohr", boardToken: token, jobId, externalIdentity: `bamboohr:${token}:${jobId}`, title: "", url: pageUrl, listingStatus: "closed" };
   }
-  if (!ok) throw new Error(`bamboohr job ${token}/${jobId}: ${status}`);
+  if (!ok) throw httpFailure(status, { url: pageUrl, provider: "bamboohr" });
   const opening = (JSON.parse(body) as { result?: { jobOpening?: BambooOpening & { description?: string; jobOpeningStatus?: string } } }).result?.jobOpening;
-  if (!opening) throw new Error(`bamboohr job ${token}/${jobId}: empty`);
+  if (!opening) throw new AtsFetchError({ reason: "parse_failed", message: `bamboohr job ${token}/${jobId}: empty response`, url: pageUrl, provider: "bamboohr" });
   const place = bambooHrPlace(opening, opening.jobOpeningName || "");
   const html = opening.description || "";
   return {

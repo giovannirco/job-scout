@@ -243,15 +243,20 @@ export function detectAts(url: string): DetectedAts {
     }
 
     // ── Workable ────────────────────────────────────────────────────────────
-    // https://apply.workable.com/{company}/j/{id}/
-    if (host.includes("workable.com")) {
-      m = path.match(/\/([^/]+)\/j\/([^/]+)/i) || path.match(/\/([^/]+)\/([^/]+)/);
+    // https://apply.workable.com/{account}/j/{shortcode}/   (a job)
+    // https://apply.workable.com/{account}/                  (the account's board)
+    // https://{account}.workable.com/j/{shortcode}           (legacy hosted page)
+    if (host === "workable.com" || host.endsWith(".workable.com")) {
+      const parts = path.split("/").filter(Boolean);
+      const legacy = host !== "apply.workable.com" && !/^(www|jobs)\./.test(host);
+      const account = legacy ? host.split(".")[0] : parts[0] && !/^(api|j)$/i.test(parts[0]) ? parts[0] : undefined;
+      m = path.match(/\/j(?:obs)?\/([A-Za-z0-9]{4,})(?:\/|$)/);
       return {
         provider: "workable",
-        boardToken: m?.[1],
-        jobId: m?.[2],
+        boardToken: account,
+        jobId: m?.[1],
         url,
-        confidence: m?.[2] ? "high" : "medium",
+        confidence: account && m ? "high" : "medium",
       };
     }
 
@@ -367,4 +372,49 @@ export function externalIdentityFromDetect(d: DetectedAts): string | undefined {
   if (d.boardToken && d.jobId) return `${d.provider}:${d.boardToken}:${d.jobId}`;
   if (d.jobId) return `${d.provider}:${d.jobId}`;
   return undefined;
+}
+
+/** Providers job-scout can scan as a board (listBoard). */
+const SCANNABLE_BOARDS = new Set(["greenhouse", "ashby", "lever", "bamboohr"]);
+
+const CAREERS_ROOT_RE = /^\/(?:[a-z]{2}(?:[-_][a-z]{2})?\/)?(?:careers?|jobs?|openings|open-positions|positions|vacancies|vagas|carreiras|trabalhe-conosco|join-us|work-with-us|jobs-at-[a-z0-9-]+)\/?$/i;
+const JOB_QUERY_KEYS = ["gh_jid", "jobid", "job_id", "job", "jid", "jk", "vjk", "id", "req", "requisitionid", "token", "currentjobid", "position", "posting", "opening", "vacancy", "ashby_jid"];
+
+export type BoardIndexUrl = {
+  provider: string;
+  boardToken?: string;
+  /** True when job-scout can scan this board (suggest adding it as a board source). */
+  scannable: boolean;
+};
+
+/**
+ * A URL that addresses a careers board / index page, not one posting:
+ * an ATS account root (boards.greenhouse.io/acme, jobs.ashbyhq.com/acme,
+ * jobs.lever.co/acme, apply.workable.com/acme/) or a bare /careers or /jobs page.
+ * Narrow on purpose: anything carrying a job id is never an index.
+ */
+export function boardIndexUrl(url: string): BoardIndexUrl | null {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return null;
+  }
+  const host = u.hostname.toLowerCase().replace(/^www\./, "");
+  const parts = u.pathname.split("/").filter(Boolean);
+  const keys = [...u.searchParams.keys()].map((k) => k.toLowerCase());
+  if (keys.some((k) => JOB_QUERY_KEYS.includes(k))) return null;
+  // SPA careers pages route single postings in the fragment (/careers#/job/123).
+  if (/\d{3,}|[0-9a-f]{8}-/i.test(u.hash)) return null;
+  const root = (provider: string, token: string | undefined): BoardIndexUrl | null =>
+    token ? { provider, boardToken: token, scannable: SCANNABLE_BOARDS.has(provider) } : null;
+  if (/(^|\.)greenhouse\.io$/.test(host) && parts.length === 1 && !GH_BAD_TOKENS.has(parts[0]!.toLowerCase())) return root("greenhouse", parts[0]);
+  if (host === "jobs.ashbyhq.com" && parts.length === 1) return root("ashby", parts[0]);
+  if (/^jobs(\.eu)?\.lever\.co$/.test(host) && parts.length === 1) return root("lever", parts[0]);
+  if (host === "apply.workable.com" && parts.length === 1 && parts[0] !== "api") return root("workable", parts[0]);
+  if (host === "jobs.smartrecruiters.com" && parts.length === 1) return root("smartrecruiters", parts[0]);
+  if (host.endsWith(".bamboohr.com") && (parts.length === 0 || (parts.length === 1 && /^(careers|jobs)$/i.test(parts[0]!)))) return root("bamboohr", host.split(".")[0]);
+  if (host.endsWith(".inhire.app") && (parts.length === 0 || (parts.length === 1 && /^vagas$/i.test(parts[0]!)))) return root("inhire", host.split(".")[0]);
+  if (CAREERS_ROOT_RE.test(u.pathname)) return { provider: "unknown", scannable: false };
+  return null;
 }
