@@ -175,7 +175,7 @@ export const jdChanges = new client.Counter({
 });
 export const watchChecks = new client.Counter({
   name: `${P}watch_checks_total`,
-  help: "Watch checks by outcome (unchanged, changed, closed, error).",
+  help: "Watch checks by outcome (unchanged, changed, closed, first_seen, rejected).",
   labelNames: ["outcome"],
   registers: [registry],
 });
