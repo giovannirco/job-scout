@@ -180,11 +180,17 @@ function hasBulletRun(text: string): boolean {
 
 /**
  * A diff that completes a bad first snapshot: our own "changed" badge flipping
- * back to the board's open status, a trailing space, an empty location filling
- * in, or careers-page chrome giving way to the same JD.
+ * back to the board's open status, an unknown listing status or geo class being
+ * learned, a trailing space, an empty location filling in, or careers-page
+ * chrome giving way to the same JD.
  */
 export function isSnapshotCompletionDiff(d: FieldDiff): boolean {
   if (d.path === "listing_status" && d.before === "changed" && d.after === "open") return true;
+  // A record that never had a listing (a manual or URL-less filing) learning its status and
+  // geo for the first time; a first read that says closed stays material.
+  const unknown = (v?: string | null) => !(v || "").trim() || v === "unknown";
+  if (d.path === "listing_status" && unknown(d.before) && d.after !== "closed") return true;
+  if ((d.path === "geo_class" || d.path === "remote_class") && unknown(d.before)) return true;
   if (d.path === "title" && (d.before || "").trim() === (d.after || "").trim()) return true;
   if (d.path === "location_raw") {
     const before = (d.before || "").trim();

@@ -84,8 +84,8 @@ Positions are drained first; evaluations start on the page that returns the last
 |--|--|
 | `upsert_career_ops_stamp` | store tracker id / score / status / report path on `positions.metadata.careerOps` |
 | `list_career_ops_stamps` | every position carrying a stamp |
-| `reconcile_career_ops` | bulk URL-first reconciliation. Dry run by default |
-| `create_position_from_career_ops` | position for a tracker row job-scout does not know; fetches the URL when reachable, else a manual record titled from the tracker role |
+| `reconcile_career_ops` | bulk reconciliation: tracker id stamp first, then posting URL, then (no URL) exact unique company + title. Dry run by default. On a real run, URL-less rows that match nothing become manual positions (`created`; dry run: `wouldCreate`), and a URL that appears later for a stamped URL-less position is set on it (`urlSet`) |
+| `create_position_from_career_ops` | create or link the position for one tracker row. `url` is optional: a row without one becomes a manual position keyed by company + role and stamped with `trackerId`; re-runs link it (`via: trackerId` or `company_title`), and a URL supplied later is set on that same position (`urlSet: true`; `urlConflict` when another position holds it). With a URL it fetches when reachable, else a manual record titled from the tracker role |
 | `write_resume_eval` | store an evaluation produced elsewhere as an `evaluate` record and stamp it |
 
 ### Compatibility aliases
@@ -104,7 +104,7 @@ Other statuses (applied, interview, rejected, …) apply normally. Tokens with a
 
 ## External tracker integration
 
-The `career_ops` tools support synchronizing an external application tracker. They store a tracker reference on each position and reconcile rows by posting URL. Preview reconciliation before applying it. The tracker format and synchronization client belong to the integration using these tools.
+The `career_ops` tools support synchronizing an external application tracker. They store a tracker reference on each position and reconcile rows by posting URL. Preview reconciliation before applying it. Rows without a posting URL (recruiter leads, referrals, closed postings) are accepted: they become manual positions with `primaryUrl: null`, matched on later runs by the `trackerId` stamp first and then by exact company + role among URL-less positions, so a re-run never duplicates them. When the tracker row gains a URL, the same position takes it through the listing-correction path of `update_position` (public URL guard, ATS identity) instead of a new position being created; watch checks skip a position until it has a URL. The tracker format and synchronization client belong to the integration using these tools.
 
 Status mapping: Evaluated → review/materials · Applied → applied · Responded → screen · Interview → interview · Offer → offer · Rejected → rejected.
 

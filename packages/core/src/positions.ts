@@ -1252,11 +1252,17 @@ export async function trimStoredTitles(): Promise<{ updated: number }> {
 
 export async function upsertFromJob(
   job: AtsJob,
-  opts: { status?: PositionStatus; source?: string; companyName?: string; reviveArchived?: boolean } = {},
+  opts: {
+    status?: PositionStatus; source?: string; companyName?: string; reviveArchived?: boolean;
+    /** A manual record with no posting URL yet (a career-ops tracker row): always a new position, primaryUrl null. */
+    allowMissingUrl?: boolean;
+  } = {},
 ): Promise<{ position: NonNullable<Awaited<ReturnType<typeof getPosition>>>; created: boolean; revived: boolean }> {
   job = { ...job, title: cleanJobTitle(job.title) };
   const db = await getDb();
-  if (!job.url?.trim() || isPlaceholderAtsUrl(job.url)) {
+  const urlless = Boolean(opts.allowMissingUrl) && !job.url?.trim();
+  if (urlless) job = { ...job, url: "", provider: "other", jobId: undefined, externalIdentity: undefined };
+  else if (!job.url?.trim() || isPlaceholderAtsUrl(job.url)) {
     ingestQuality.labels({ reason: "placeholder_url" }).inc();
     log.warn("ingest.rejected", { reason: "placeholder_url", url: job.url });
     throw new Error("placeholder or invalid posting URL");
@@ -1296,7 +1302,7 @@ export async function upsertFromJob(
   if (!existing && job.url) {
     existing = (await db.select({ id: positions.id }).from(positions).where(eq(positions.primaryUrl, job.url)).limit(1))[0];
   }
-  if (!existing) {
+  if (!existing && !urlless) {
     // An alias must be the same employer, and two unparseable URLs ("" === "") are not a match.
     const aliases = await db
       .select({ id: positions.id, externalIdentity: positions.externalIdentity, url: positions.primaryUrl, status: positions.status, companyName: companies.name })
@@ -1368,7 +1374,7 @@ export async function upsertFromJob(
       ? `aggregator_duplicate: ${aggregator} repost of ${aliasOf.slug}`.slice(0, 300)
       : job.listingStatus === "closed" && ["triaged", "review"].includes(opts.status || "triaged") ? "listing_closed" : null,
     closedAt: job.listingStatus === "closed" ? now : null,
-    primaryUrl: job.url,
+    primaryUrl: job.url || null,
     atsProvider: job.provider,
     atsJobId: job.jobId,
     atsBoardToken: job.boardToken,
@@ -1384,7 +1390,8 @@ export async function upsertFromJob(
     salaryRaw: job.salaryRaw || null,
     employmentType: job.employmentType,
     source: opts.source || "scan",
-    contentHash: hash,
+    // No URL and no JD: a hash of the title alone would group distinct tracker rows as duplicates.
+    contentHash: urlless ? null : hash,
     listingStatus: job.listingStatus || "unknown",
     firstSeenAt: now,
     lastCheckedAt: now,
@@ -1401,7 +1408,7 @@ export async function upsertFromJob(
         provider: job.provider,
         boardToken: job.boardToken,
         jobId: job.jobId,
-        applyUrl: job.applyUrl || job.url,
+        applyUrl: job.applyUrl || job.url || null,
         departments: job.departments || [],
         offices: job.offices || [],
         workplaceType: job.workplaceType || null,

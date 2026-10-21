@@ -150,6 +150,19 @@ describe("formatting-only description (F-23)", () => {
     expect(m.change_kind).toBe("noise_rebase");
   });
 
+  it("a URL-less record reading its first listing is not an employer edit", () => {
+    const m = classifyMateriality([
+      { path: "location_raw", before: null, after: "Remote" },
+      { path: "description_text", before: null, after: "The board job description." },
+      { path: "listing_status", before: "unknown", after: "open" },
+      { path: "geo_class", before: "unknown", after: "ambiguous_remote" },
+      { path: "remote_class", before: "unknown", after: "ambiguous_remote" },
+    ]);
+    expect(m.material).toBe(false);
+    expect(classifyMateriality([{ path: "listing_status", before: "unknown", after: "closed" }])).toMatchObject({ material: true, change_kind: "closed" });
+    expect(classifyMateriality([{ path: "geo_class", before: "worldwideish", after: "hard_geo" }]).material).toBe(true);
+  });
+
   it("a later salary edit stays material", () => {
     const m = classifyMateriality([
       { path: "salary_raw", before: "USD 100000-120000", after: "USD 140000-160000" },

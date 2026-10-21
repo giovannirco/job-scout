@@ -51,6 +51,10 @@ import {
   mapCareerOpsStatus,
   careerOpsDropStatus,
   noteCareerOpsDrop,
+  groupingRows,
+  matchCareerOpsRow,
+  createManualCareerOpsPosition,
+  setCareerOpsUrl,
 } from "@job-scout/core";
 import { GeoClass, log as rootLog, Workplace } from "@job-scout/shared";
 import { env } from "../env.js";
@@ -554,7 +558,7 @@ export function createJobScoutMcpServer() {
 
   server.registerTool(
     "reconcile_career_ops",
-    { title: "Reconcile career-ops export", description: "Bulk URL-first reconciliation. Dry run by default; exact title fallback only without URL and when unique. Report existence is supplied by the client that owns the files; otherwise unverified.", inputSchema: ReconcileInput },
+    { title: "Reconcile career-ops export", description: "Bulk reconciliation of tracker rows (trackerId, company, title, optional url). Dry run by default. Matching, in order: the position already stamped with the row's trackerId, then the posting URL, then (rows without a URL only) an exact, unique company + title. A row without a URL that matches nothing is created as a manual position stamped with its trackerId on a real run (created; dry run lists it in wouldCreate), so re-running never duplicates it. A URL that appears later for a stamped URL-less position is set on that same position (urlSet); a URL another position holds is a conflict. Report existence is supplied by the client that owns the files; otherwise unverified.", inputSchema: ReconcileInput },
     async (a) => text(await reconcileCareerOps(a)),
   );
 
@@ -576,20 +580,43 @@ export function createJobScoutMcpServer() {
 
   server.registerTool(
     "create_position_from_career_ops",
-    { title: "Create from career-ops", description: "Create a position for a tracker row that job-scout does not know. Fetches the URL when reachable; falls back to a manual record.", inputSchema: { url: z.string(), company: z.string(), role: z.string(), score: z.number().optional(), status: z.string().optional(), reportPath: z.string().optional(), trackerId: z.string().optional(), verbose: z.boolean().optional().describe("Return the full position detail (JD text, revisions, evaluations) instead of the compact summary") } },
+    { title: "Create from career-ops", description: "Create or link the position for one career-ops tracker row. Matching, in order: the position already stamped with trackerId (unless it holds a different posting URL than the one given), then the posting URL (fetched when reachable; a manual record titled from the role when not), then, without a URL, the one manual URL-less position with the same company and role. A row with no URL (recruiter lead, referral, closed posting) becomes a manual position keyed by company + role and stamped with trackerId, so re-running it links the same position (via). When a URL arrives later for a stamped URL-less position, it is set on that same position as a listing correction (urlSet: true; refresh_jd then reads the JD); a URL another position already holds is reported in urlConflict instead of merged. Always stamps careerOps (trackerId, score, status, reportPath). Pass trackerId whenever the tracker has one.", inputSchema: { url: z.string().optional().describe("Posting URL; omit or leave empty for a tracker row without one"), company: z.string(), role: z.string(), score: z.number().optional(), status: z.string().optional(), reportPath: z.string().optional(), trackerId: z.string().optional().describe("Tracker row id: the key that links a URL-less row to its position on re-runs"), verbose: z.boolean().optional().describe("Return the full position detail (JD text, revisions, evaluations) instead of the compact summary") } },
     async (a) => {
       try {
-        let position;
+        const url = a.url?.trim() || undefined;
+        let position: { id: string; status: string; title: string | null; primaryUrl?: string | null } | null | undefined;
         let fetchFailure: Record<string, unknown> | undefined;
-        try {
-          // source=career-ops: a revive of an archived row here is the sync, not a person.
-          position = (await intakeUrl(a.url, { companyName: a.company, status: "review", source: "career-ops" })).position;
-        } catch (intakeError) {
-          // Never silent: the manual record carries the fetch reason (metadata.lastAtsFetch + response).
-          fetchFailure = { message: intakeError instanceof Error ? intakeError.message : String(intakeError), ...errorDetails(intakeError) };
-          const r = await upsertFromJob({ provider: "other", title: a.role, company: a.company, url: a.url, listingStatus: "unknown" }, { source: "career-ops", companyName: a.company, status: "review" });
-          position = r.position;
-          if (r.created) await recordAtsFetchFailure(position.id, intakeError, "career-ops");
+        let via: string = url ? "url" : "created";
+        let manualRecord = false;
+        let urlSet = false;
+        let urlConflict: string | undefined;
+        const linked = matchCareerOpsRow(await groupingRows(), { trackerId: a.trackerId, company: a.company, title: a.role, url });
+        if (linked && "ambiguous" in linked) {
+          return text({ error: "ambiguous_tracker_row: several positions match this tracker row; pass the posting URL or fix the trackerId stamps", positionIds: linked.ambiguous }, true);
+        }
+        if (linked) {
+          via = linked.via;
+          if (url && !linked.primaryUrl) {
+            const r = await setCareerOpsUrl(linked.id, url);
+            if ("urlSet" in r) urlSet = true;
+            else urlConflict = r.conflict;
+          }
+          position = await getPositionDetail(linked.id);
+        } else if (url) {
+          try {
+            // source=career-ops: a revive of an archived row here is the sync, not a person.
+            position = (await intakeUrl(url, { companyName: a.company, status: "review", source: "career-ops" })).position;
+          } catch (intakeError) {
+            // Never silent: the manual record carries the fetch reason (metadata.lastAtsFetch + response).
+            fetchFailure = { message: intakeError instanceof Error ? intakeError.message : String(intakeError), ...errorDetails(intakeError) };
+            manualRecord = true;
+            const r = await upsertFromJob({ provider: "other", title: a.role, company: a.company, url, listingStatus: "unknown" }, { source: "career-ops", companyName: a.company, status: "review" });
+            position = r.position;
+            if (r.created) await recordAtsFetchFailure(position.id, intakeError, "career-ops");
+          }
+        } else {
+          manualRecord = true;
+          position = await createManualCareerOpsPosition({ company: a.company, title: a.role });
         }
         if (!position) throw new Error("position missing");
         const mapped = mapCareerOpsStatus(a.status);
@@ -601,7 +628,9 @@ export function createJobScoutMcpServer() {
         if (Object.keys(patch).length) await patchPosition(position.id, patch, "career-ops");
         const stamp = await stampCareerOps(position.id, { trackerId: a.trackerId, score: a.score, status: a.status, reportPath: a.reportPath });
         const detail = await getPositionDetail(position.id);
-        return text({ position: a.verbose || !detail ? detail : positionSummary(detail), stamp, ...(fetchFailure ? { manualRecord: true, fetchFailure } : {}) });
+        return text({ position: a.verbose || !detail ? detail : positionSummary(detail), stamp, via,
+          ...(manualRecord ? { manualRecord: true } : {}), ...(fetchFailure ? { fetchFailure } : {}),
+          ...(urlSet ? { urlSet: true } : {}), ...(urlConflict ? { urlConflict } : {}) });
       } catch (e) {
         return errText(e);
       }
