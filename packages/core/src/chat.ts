@@ -285,7 +285,7 @@ const LOCAL_TOOLS: LocalTool[] = [
       const { intakeUrl } = await import("./scan.js");
       const r = await intakeUrl(str(a.url), { companyName: str(a.company) || undefined });
       if (!r.position) throw new Error("position missing");
-      return { slug: r.position.slug, title: r.position.title, company: r.position.company?.name, created: r.created, revived: r.revived, triageJobId: r.triageJobId, url: r.position.primaryUrl };
+      return { slug: r.position.slug, title: r.position.title, company: r.position.company.name, created: r.created, revived: r.revived, triageJobId: r.triageJobId, url: r.position.primaryUrl };
     },
   },
   {
@@ -443,14 +443,16 @@ function systemPrompt(brief: string, ctx: string, opts: { writes: boolean; brows
 function toAgentMessages(rows: ChatMessageRow[]): AgentMessage[] {
   const out: AgentMessage[] = [];
   for (const m of rows) {
-    if (m.role === "user") out.push({ role: "user", content: m.content });
-    else if (m.role === "assistant")
+    // Rows come from the thread's jsonb column, so the role is checked as a plain string.
+    const role: string = m.role;
+    if (role === "user") out.push({ role: "user", content: m.content });
+    else if (role === "assistant")
       out.push({
         role: "assistant",
         content: m.content || null,
         tool_calls: m.toolCalls?.length ? m.toolCalls.map((t) => ({ id: t.id, type: "function", function: { name: t.name, arguments: JSON.stringify(t.args) } })) : undefined,
       });
-    else if (m.role === "tool" && m.toolCallId) out.push({ role: "tool", tool_call_id: m.toolCallId, content: m.content });
+    else if (role === "tool" && m.toolCallId) out.push({ role: "tool", tool_call_id: m.toolCallId, content: m.content });
   }
   return out;
 }
@@ -494,7 +496,7 @@ export async function runChatTurn(threadId: string, userText: string, emit: (e: 
       const { tools } = await mcp.listTools();
       browserTools = tools
         .filter((t) => browserToolAllowed(t.name, ctx.writes))
-        .map((t) => ({ name: t.name, description: (t.description || t.name).slice(0, 600), parameters: t.inputSchema || { type: "object", properties: {} } }));
+        .map((t) => ({ name: t.name, description: (t.description || t.name).slice(0, 600), parameters: (t.inputSchema as typeof t.inputSchema | undefined) || { type: "object", properties: {} } }));
     } catch (e) {
       log.warn("chat.browser_mcp.list_tools_failed", { err: e });
     }

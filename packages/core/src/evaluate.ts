@@ -208,7 +208,7 @@ export async function runCompanyResearch(companyIdOrSlug: string, positionId?: s
     event: "company_research",
     title: company.name,
     company: company.name,
-    extra: res.data.oneLiner ?? null,
+    extra: res.data.oneLiner,
     slug: null,
     positionId: positionId ?? null,
     companyId: company.id,

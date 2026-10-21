@@ -250,7 +250,7 @@ export async function upsertLead(input: LeadInput & { id?: string; message?: Lea
     existing = (await db.select().from(leads).where(eq(leads.id, input.id)).limit(1)).at(0) ?? null;
     if (!existing) return null;
   }
-  const merged = { ...(existing || {}), ...Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined)) } as LeadInput;
+  const merged = { ...(existing || {}), ...Object.fromEntries(Object.entries(input as Record<string, unknown>).filter(([, v]) => v !== undefined)) } as LeadInput;
   const dedupeKey = existing?.mergedIntoId ? null : leadDedupeKey(merged);
   if (!existing && dedupeKey) existing = (await db.select().from(leads).where(eq(leads.dedupeKey, dedupeKey)).limit(1)).at(0) ?? null;
   if (!existing && !trimOrNull(input.recruiterName) && !trimOrNull(input.recruiterProfileUrl) && !trimOrNull(input.recruiterEmail) && !trimOrNull(input.recruiterCompany)) {
@@ -446,7 +446,7 @@ export async function mergeLeads(targetId: string, sourceIds: string[], actor = 
   await db.update(interviews).set({ leadId: targetId }).where(inArray(interviews.leadId, ids));
   await db.update(outreachEvents).set({ leadId: targetId }).where(inArray(outreachEvents.leadId, ids));
   await db.update(leads).set({ status: "closed", closedReason: "merged", mergedIntoId: targetId, dedupeKey: null, updatedAt: new Date() }).where(inArray(leads.id, ids));
-  await db.update(leads).set({ ...patch, metadata: { ...target.metadata, mergedFrom: uniq([...((target.metadata?.mergedFrom as string[]) || []), ...ids]), mergedBy: actor } }).where(eq(leads.id, targetId));
+  await db.update(leads).set({ ...patch, metadata: { ...target.metadata, mergedFrom: uniq([...((target.metadata.mergedFrom as string[] | undefined) || []), ...ids]), mergedBy: actor } }).where(eq(leads.id, targetId));
   const positionId = patch.positionId ?? target.positionId;
   if (positionId) await attachPosition(targetId, positionId);
   await retriage(targetId);

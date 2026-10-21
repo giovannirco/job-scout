@@ -123,5 +123,5 @@ export async function repostFor(row: Pick<GroupRow, "id" | "company" | "title" |
     && (p.locationRaw || "").toLowerCase().trim() === (row.locationRaw || "").toLowerCase().trim()
     && normalizePostingUrl(p.primaryUrl) !== normalizePostingUrl(row.primaryUrl)
     && (!p.externalIdentity || canonicalExternalIdentity(p.externalIdentity) !== canonicalExternalIdentity(row.externalIdentity)));
-  return candidates.sort((a, b) => Number(protectedStatus(b)) - Number(protectedStatus(a)) || (b.firstSeenAt?.getTime() || 0) - (a.firstSeenAt?.getTime() || 0))[0];
+  return candidates.sort((a, b) => Number(protectedStatus(b)) - Number(protectedStatus(a)) || (b.firstSeenAt?.getTime() || 0) - (a.firstSeenAt?.getTime() || 0)).at(0);
 }

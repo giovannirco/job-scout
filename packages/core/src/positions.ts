@@ -645,10 +645,10 @@ export async function stampCareerOps(idOrSlug: string, stamp: Record<string, unk
   // Record job-scout's own stage at stamp time so a later status change shows as drift.
   const next = { ...stamp, syncedAt: now, jsStatus: pos.status, jsStatusAt: now };
   // The stamp is the sync's own echo: it leaves updatedAt alone so list_changes does not hand it back.
-  const [updated] = await db
+  const updated = (await db
     .update(positions)
     .set({ metadata: sql`jsonb_set(coalesce(${positions.metadata}, '{}'::jsonb), '{careerOps}', coalesce(${positions.metadata}->'careerOps', '{}'::jsonb) || ${JSON.stringify(next)}::jsonb)` })
-    .where(eq(positions.id, pos.id)).returning();
+    .where(eq(positions.id, pos.id)).returning()).at(0);
   const meta = (updated?.metadata || {}) as Record<string, unknown>;
   return meta.careerOps;
 }
@@ -923,7 +923,7 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
       title,
       ...(nextSlug ? { slug: nextSlug } : {}),
       primaryUrl: nextUrl,
-      atsProvider: opts.job.provider || pos.atsProvider,
+      atsProvider: unverified(opts.job).provider || pos.atsProvider,
       atsJobId: opts.job.jobId || pos.atsJobId,
       atsBoardToken: opts.job.boardToken || pos.atsBoardToken,
       externalIdentity: opts.job.externalIdentity || pos.externalIdentity,
@@ -1250,6 +1250,14 @@ export async function trimStoredTitles(): Promise<{ updated: number }> {
   return { updated };
 }
 
+/**
+ * Adapters fill these AtsJob basics from provider JSON (and tracker rows from hand-entered data),
+ * so read them as possibly missing even though the type promises them.
+ */
+function unverified(job: AtsJob): Partial<Pick<AtsJob, "url" | "provider" | "listingStatus">> {
+  return job;
+}
+
 export async function upsertFromJob(
   job: AtsJob,
   opts: {
@@ -1260,9 +1268,9 @@ export async function upsertFromJob(
 ): Promise<{ position: NonNullable<Awaited<ReturnType<typeof getPosition>>>; created: boolean; revived: boolean }> {
   job = { ...job, title: cleanJobTitle(job.title) };
   const db = await getDb();
-  const urlless = Boolean(opts.allowMissingUrl) && !job.url?.trim();
+  const urlless = Boolean(opts.allowMissingUrl) && !unverified(job).url?.trim();
   if (urlless) job = { ...job, url: "", provider: "other", jobId: undefined, externalIdentity: undefined };
-  else if (!job.url?.trim() || isPlaceholderAtsUrl(job.url)) {
+  else if (!unverified(job).url?.trim() || isPlaceholderAtsUrl(job.url)) {
     ingestQuality.labels({ reason: "placeholder_url" }).inc();
     log.warn("ingest.rejected", { reason: "placeholder_url", url: job.url });
     throw new Error("placeholder or invalid posting URL");
@@ -1293,7 +1301,7 @@ export async function upsertFromJob(
   }
   const company = await resolveCompanyForName(companyName);
   const externalIdentity =
-    canonicalExternalIdentity(job.externalIdentity || (job.provider && job.jobId ? `${job.provider}:${job.boardToken || company.slug}:${job.jobId}` : null));
+    canonicalExternalIdentity(job.externalIdentity || (unverified(job).provider && job.jobId ? `${job.provider}:${job.boardToken || company.slug}:${job.jobId}` : null));
   job.externalIdentity = externalIdentity || undefined;
 
   let existing = externalIdentity
@@ -1392,7 +1400,7 @@ export async function upsertFromJob(
     source: opts.source || "scan",
     // No URL and no JD: a hash of the title alone would group distinct tracker rows as duplicates.
     contentHash: urlless ? null : hash,
-    listingStatus: job.listingStatus || "unknown",
+    listingStatus: unverified(job).listingStatus || "unknown",
     firstSeenAt: now,
     lastCheckedAt: now,
     lastChangedAt: now,
@@ -1491,7 +1499,7 @@ async function afterAtsFetch(positionId: string, job: AtsJob, facts?: ReturnType
     }));
   const db = await getDb();
   const prev = (pos.metadata || {}) as Record<string, unknown>;
-  const ats = { ...((prev.ats as Record<string, unknown>) || {}), workplaceType: job.workplaceType ?? null, isRemote: job.isRemote ?? null };
+  const ats = { ...((prev.ats as Record<string, unknown> | undefined) || {}), workplaceType: job.workplaceType ?? null, isRemote: job.isRemote ?? null };
   const changed = f.workplace !== pos.workplace || f.geoClass !== pos.geoClass || f.remoteClass !== pos.remoteClass
     || Boolean(job.employmentType && job.employmentType !== pos.employmentType);
   await db

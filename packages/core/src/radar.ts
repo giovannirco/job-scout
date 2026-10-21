@@ -101,7 +101,7 @@ export async function listDiscovery(q: {
       .from(discoveryFeed)
       .where(where)
   )[0]?.c ?? 0;
-  const last = rows[rows.length - 1];
+  const last = rows.at(-1);
   return {
     items: rows.map(({ rn: _rn, ...item }) => item),
     page,

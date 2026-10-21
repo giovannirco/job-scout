@@ -6,7 +6,7 @@ import { retentionDeleted } from "./metrics.js";
 const log = rootLog.child({ scope: "retention" });
 
 function count(r: unknown): number | null {
-  const x = r as { rowCount?: number; affectedRows?: number };
+  const x = r as { rowCount?: number; affectedRows?: number } | null | undefined;
   return typeof x?.rowCount === "number" ? x.rowCount : typeof x?.affectedRows === "number" ? x.affectedRows : null;
 }
 

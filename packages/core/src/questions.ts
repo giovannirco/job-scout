@@ -116,7 +116,7 @@ export async function harvestFromJob(positionId: string, job: AtsJob): Promise<{
   const db = await getDb();
   const pos = (await db.select({ metadata: positions.metadata }).from(positions).where(eq(positions.id, positionId)).limit(1)).at(0);
   const prev = (pos?.metadata || {}) as Record<string, unknown>;
-  const forms = { ...((prev.forms as Record<string, unknown>) || {}) };
+  const forms = { ...((prev.forms as Record<string, unknown> | undefined) || {}) };
   if (job.formHarvestError) forms.harvestError = job.formHarvestError;
   else if (successful) delete forms.harvestError;
   forms.harvestedAt = new Date().toISOString();

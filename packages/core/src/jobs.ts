@@ -54,8 +54,8 @@ export async function claimNextJob(types?: JobType[]): Promise<JobRow | null> {
     )
     returning *
   `);
-  const rows = (res as unknown as { rows?: Record<string, unknown>[] }).rows ?? (res as unknown as Record<string, unknown>[]);
-  const r = rows?.[0];
+  const rows = (res as unknown as { rows?: Record<string, unknown>[] }).rows ?? (res as unknown as Record<string, unknown>[] | undefined);
+  const r = rows?.at(0);
   if (!r) return null;
   return camelJob(r);
 }
@@ -66,8 +66,8 @@ function camelJob(r: Record<string, unknown>): JobRow {
     type: r.type as JobType,
     status: r.status as string,
     priority: r.priority as number,
-    payload: (r.payload as Record<string, unknown>) ?? {},
-    result: (r.result as Record<string, unknown>) ?? {},
+    payload: (r.payload as Record<string, unknown> | null) ?? {},
+    result: (r.result as Record<string, unknown> | null) ?? {},
     error: (r.error as string | null) ?? null,
     attempts: r.attempts as number,
     runAfter: new Date(r.run_after as string),

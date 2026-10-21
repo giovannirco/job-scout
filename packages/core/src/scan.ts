@@ -710,7 +710,7 @@ export async function followUpIntake(
       positionId: position.id,
       companyId: position.companyId,
       score: position.triageScore ?? 0,
-      verdict: (position.triageVerdict as "pass" | "marginal" | "fail") || "fail",
+      verdict: (position.triageVerdict as "pass" | "marginal" | "fail" | null) || "fail",
       status: position.status as PositionStatus,
     });
   }
@@ -832,7 +832,7 @@ export async function refetchBlankGreenhouseFilings(): Promise<{ checked: number
     try {
       const result = await intakeUrl(row.url!, { companyName: row.company, source: "scan:discovery" });
       if ("skipped" in result && result.skipped) withdrawn++;
-      else if (result.position) updated++;
+      else if (intakeLanded(result)) updated++;
     } catch (e) {
       failed++;
       failedIds.push(row.id);
@@ -866,7 +866,7 @@ export async function refetchDisagreeingRegions(): Promise<{ checked: number; up
     try {
       const result = await intakeUrl(row.url!, { companyName: row.company, source: "scan:discovery" });
       if ("skipped" in result && result.skipped) withdrawn++;
-      else if (result.position) updated++;
+      else if (intakeLanded(result)) updated++;
     } catch (e) {
       failed++;
       failedIds.push(row.id);
@@ -895,7 +895,7 @@ export async function reclassifyUsPlaceLists(): Promise<{ positions: number; dis
     const location = (row.location || "").trim();
     if (!location || classificationOverride(row.metadata).geoClass) continue;
     const next = geoClass(location, row.workplace === "remote" ? "remote" : row.workplace || "");
-    if (!next || next === row.geo) continue;
+    if (next === row.geo) continue;
     await db.update(positions).set({ geoClass: next }).where(eq(positions.id, row.id));
     positionCount++;
   }
@@ -908,7 +908,7 @@ export async function reclassifyUsPlaceLists(): Promise<{ positions: number; dis
     const location = (row.location || "").trim();
     if (!location) continue;
     const next = geoClass(location);
-    if (!next || next === row.geo) continue;
+    if (next === row.geo) continue;
     await db.update(discoveryFeed).set({ geoClass: next }).where(eq(discoveryFeed.id, row.id));
     discovery++;
   }
@@ -939,7 +939,7 @@ export async function refetchJunkPlaceFilings(): Promise<{ titled: number; check
     try {
       const result = await intakeUrl(row.url!, { companyName: row.company, source: "scan:discovery" });
       if ("skipped" in result && result.skipped) withdrawn++;
-      else if (result.position) updated++;
+      else if (intakeLanded(result)) updated++;
     } catch (e) {
       failed++;
       failedIds.push(row.id);
@@ -971,6 +971,11 @@ export class BoardIndexError extends Error {
 }
 
 /** Manual intake: URL -> position (status triaged) -> triage job. Board / index pages are refused. */
+/** upsertFromJob asserts the re-read position (`!`); a row deleted mid-intake can still come back missing. */
+function intakeLanded(result: { position: unknown }): boolean {
+  return Boolean(result.position);
+}
+
 export async function intakeUrl(url: string, opts: { companyName?: string; status?: "triaged" | "review"; source?: string } = {}) {
   const fromScan = (opts.source || "").startsWith("scan:");
   const index = boardIndexUrl(url);
