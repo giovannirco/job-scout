@@ -4,7 +4,7 @@ Develop and build from the public repository. Keep PostgreSQL/PGlite data, profi
 
 ## Upgrading to 2.14
 
-2.13.0 and 2.13.1 need no migration. 2.14.0 adds one, `0007_recruiter_leads`, and 2.14.1 none. The API, worker and CronJobs apply it at startup.
+2.13.0 and 2.13.1 need no migration. 2.14.0 adds one, `0007_recruiter_leads`, and 2.14.1 none. The API, worker and CronJobs apply it at startup. From 2.14.2 an advisory lock lets only one of them migrate at a time, so they can roll out in any order ([DEPLOY › Migrations](./DEPLOY.md#migrations)); when deploying 2.14.0 or 2.14.1 directly, let the api become ready before the worker and the next CronJob start.
 
 - **Additive migration.** `0007` creates `leads`, adds nullable `interviews.lead_id` and `outreach_events.lead_id`/`direction`/`body`, indexes, foreign keys and a position-or-lead check, and drops `NOT NULL` on `interviews.position_id`. Nothing is renamed or dropped. See [DATA-MODEL › leads](./DATA-MODEL.md#leads).
 - **Rollback is image-only.** 2.13.x runs unchanged on the migrated schema, so roll back by redeploying the previous image; do not reverse the migration. Data written by the newer release (leads, rounds on a lead) stays in place and is ignored by 2.13.x.

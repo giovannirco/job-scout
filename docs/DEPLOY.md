@@ -77,7 +77,7 @@ TLS terminates at your proxy or gateway; production session cookies are `Secure`
 
 ## Migrations
 
-There is no separate migration job. The api, the worker and each CronJob run pending migrations at startup, then create missing profile and settings rows; an existing installation's data is not otherwise changed. Migrations are not serialized across processes, so for a release that adds one, let the api roll out first and confirm it is ready before the worker and the next CronJob start (or run `pnpm db:migrate` once against the database beforehand). Release notes and [UPGRADING](./UPGRADING.md) say when a release carries a migration and whether rollback is image-only. Data repairs never run at startup; run them explicitly as described in UPGRADING.
+There is no separate migration job. The api, the worker and each CronJob run pending migrations at startup, then create missing profile and settings rows; an existing installation's data is not otherwise changed. On Postgres each run holds a session-level advisory lock (`pg_advisory_lock`) for its duration, so processes that start together apply a migration once, one after another, and the others find nothing left to do; the api, worker and CronJobs can roll out in any order. `pnpm db:migrate` takes the same lock. A process that dies mid-run loses its session and with it the lock. PGlite is single-process and needs no lock. Release notes and [UPGRADING](./UPGRADING.md) say when a release carries a migration and whether rollback is image-only. Data repairs never run at startup; run them explicitly as described in UPGRADING.
 
 ## Verify
 

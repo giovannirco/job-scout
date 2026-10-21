@@ -81,6 +81,11 @@ export async function getSql(): Promise<{
   throw new Error("database not initialized");
 }
 
+/** The node-postgres pool, or null on PGlite / before getDb(). */
+export function getPool(): pg.Pool | null {
+  return _pool;
+}
+
 /** pg pool counters for metrics (zeros on PGlite). */
 export function poolStats(): { total: number; idle: number; waiting: number } {
   return _pool ? { total: _pool.totalCount, idle: _pool.idleCount, waiting: _pool.waitingCount } : { total: 0, idle: 0, waiting: 0 };
