@@ -8,7 +8,7 @@ flowchart LR
   Agents[MCP clients<br/>job search assistants] -->|/mcp| API
   API --> PG[(Postgres)]
   Worker --> PG
-  Worker --> ATS[Greenhouse · Ashby · Lever · BambooHR · RemoteOK · Remotive · WWR RSS · HTML]
+  Worker --> ATS[Greenhouse · Ashby · Lever · BambooHR · InHire · Recruitee · Workable · RemoteOK · Remotive · WWR RSS · HTML]
   Worker --> LLM[OpenAI-compatible gateway]
   Worker -->|sendText| WAHA[a WAHA server]
   WAHA -->|webhook message| API
@@ -43,6 +43,7 @@ Both api and worker import `@job-scout/core`; there is no HTTP between them, the
 | `form_answers` | you, Autopilot preset after evaluate | draft answers on `application_questions`. Nothing is submitted |
 | `interview_brief` | a stored transcript, you, MCP | markdown debrief → `interviews.ai_brief_*`. Skipped when no model key is set |
 | `retention` | scheduler / CronJob | prune snapshots, jobs, discovery rows, deltas, LLM runs per Settings › System |
+| `jev_check` | first JD / material JD change with Jev triage enabled | record a Jev job-fit answer; never changes scores or stages ([JEV](./JEV.md)) |
 
 ## Packages
 
@@ -50,7 +51,7 @@ Both api and worker import `@job-scout/core`; there is no HTTP between them, the
 |--|--|
 | `packages/shared` | pure code: gate, settings schema + defaults, notify routing/allowlist/quiet hours, classify (craft/geo/remote), salary parsing, hashing, types, the JSON logger (`log.ts`) |
 | `packages/db` | drizzle schema, migrations, client (Postgres via `pg`, or PGlite when `DATABASE_URL` is unset); includes `notification_outbox` |
-| `packages/ats` | URL detection and fetchers for Greenhouse, Ashby, Lever, BambooHR, Remote OK, Remotive, and We Work Remotely; `fetchJobFromUrl(url, { render })` accepts a renderer for JS-only pages. BambooHR reads the public `careers/list` and `careers/{id}/detail` JSON |
+| `packages/ats` | URL detection, board listers (Greenhouse, Ashby, Lever, BambooHR, Remote OK, Remotive, We Work Remotely) and single-posting fetchers (those ATSs plus InHire, Recruitee and Workable through their public posting APIs; others through HTML + JSON-LD). `fetchJobFromUrl(url, { render })` accepts a renderer for JS-only pages. BambooHR reads the public `careers/list` and `careers/{id}/detail` JSON; Ashby liveness and pay come from its posting API. Fetch failures are classified (`fetch-error.ts`: `http_status` `blocked` `timeout` `network` `parse_failed` `unsupported_provider`) |
 | `packages/llm` | OpenAI-compatible client: `chatJson` (json_schema with lenient fallback), `chatDocument` (markdown + trailing JSON), `chatStream` (tool calls); prompts as code; the scout brief |
 | `packages/core` | everything with a database: positions, companies, scan/watch, triage/evaluate/materials, autopilot hooks, approvals, chat agent, WAHA sender + notify outbox + WhatsApp inbox, browser client, settings, retention, radar; `metrics.ts` is the Prometheus registry every module increments |
 | `apps/api` | routes by resource, auth, envelope, MCP server |
@@ -61,7 +62,7 @@ Both api and worker import `@job-scout/core`; there is no HTTP between them, the
 
 | owner | data |
 |--|--|
-| **Postgres** | positions, JD revisions, evaluations, materials, timeline, boards/snapshots/deltas, discovery feed, jobs, LLM runs, settings, approvals, chat threads, notification outbox |
+| **Postgres** | positions, JD revisions, evaluations, materials, timeline, interviews, recruiter leads and their outreach log, boards/snapshots/deltas, discovery feed, jobs, LLM runs, Jev decision runs, settings, approvals, chat threads, notification outbox |
 | **Settings row** | one JSON document (`settings` table) validated by `packages/shared/src/settings.ts`: gate, triage thresholds, per-operation models, autopilot policy, chat permissions, WhatsApp notifications, retention, scan cadence |
 | **WhatsApp** | optional WAHA server. `WAHA_BASE_URL` / `WAHA_SESSION` plus Secret keys `WAHA_API_KEY` and `WAHA_WEBHOOK_KEY`. Outbound = worker `sendText` flush of `notification_outbox`. Inbound = `POST /api/v1/webhooks/waha` (`message` only). Groups are whatever chat ids you save in Settings |
 | **External tracker** | optional. Positions can store a link in `positions.metadata.careerOps` |
@@ -97,9 +98,24 @@ sequenceDiagram
 
 Policy: `packages/shared/src/notify.ts`. Sender: `packages/core/src/waha.ts`. Outbox: `packages/core/src/notify.ts` (`flushNotify` claims a pending row via `provider_ref` before `sendText` so the API and worker cannot double-send). Inbox: `packages/core/src/whatsapp-inbox.ts` (`handleWahaWebhookEvent`). When configuring WAHA, preserve any other webhooks already attached to the session.
 
+## JD snapshots
+
+Every board scan, watch check, refresh and intake goes through `applySnapshot` (`packages/core/src/positions.ts`). `snapshotBlockReason` refuses a fetched posting before it can replace the stored JD:
+
+| refusal | when | `force` lifts it |
+|--|--|--|
+| `not_a_jd:<signature>:<where>` | JS wall, loading placeholder, ATS vendor boilerplate or soft-404 page (`packages/shared/src/page-signature.ts`). A text-only "not found" page closes a listing only on a second observation at least 30 minutes later | no |
+| `failed_fetch:<why>` | the fetcher flagged the response (for example a job id mismatch) | no |
+| `identity_mismatch:<why>` | the posting belongs to another company or ATS job | no |
+| `frozen:interview` / `frozen:offer` | the position is at interview or offer; a closed listing still closes | yes |
+| `watch_disabled` | an automatic watch on a non-hot position with `watchEnabled: false`; closure still applies | yes |
+
+Refusals are recorded in `metadata.lastAtsFetch`, logged as `jd.snapshot_rejected` and counted as `watch_checks_total{outcome="rejected"}`. A JD too short to score is stored with `metadata.needsJd`; triage, evaluation and research wait for the real one and run when it arrives. Without a hand-set title a retitle is followed and the slug moves (old slugs stay in `metadata.previousSlugs`). Cosmetic churn (whitespace, decoded HTML entities, a location that only gains detail) is not a material change, and an automatic `jd_review` runs at most once a day per position for description edits. Intake refuses careers board and index URLs (`board_index`) and suggests adding the board instead.
+
 ## Failure behaviour
 
 - LLM gate errors (operation disabled, no model, cap or budget reached) are not job failures: the job is parked and retried in an hour.
+- A provider-wide LLM failure (`auth`, `quota`, `upgrade_required`, `outage`) parks LLM jobs without spending attempts until a call succeeds; see [OBSERVABILITY › LLM outages](./OBSERVABILITY.md#llm-outages).
 - Transient AI errors and temporary scan fetch failures retry up to 3 attempts with linear backoff. Blocked, invalid and missing source URLs require inspection.
 - Postgres pool errors are logged, not fatal; the client reconnects.
 - A worker killed mid-job leaves the row `running`; the next worker requeues it after 30 min, and a graceful shutdown releases it immediately.

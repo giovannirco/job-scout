@@ -8,7 +8,7 @@ Three signals, all picked up by the cluster's Grafana k8s-monitoring stack (Allo
 | Logs | One JSON object per line on stdout/stderr (`packages/shared/src/log.ts`) | Alloy tails every container in the namespace → Loki; query with `{namespace="job-scout"} \| json` |
 | Request traces / RED at the edge | Beyla (cluster-wide eBPF) and Envoy access logs | Already there; the dashboard reads `http_server_request_duration_seconds{namespace="job-scout"}` |
 
-The dashboard lives in the repo at `deploy/helm/job-scout/dashboards/job-scout.json` and is shipped by the chart as a `grafana_dashboard=1` ConfigMap (folder **job-scout**, uid `job-scout`).
+The dashboard lives in the repo at `deploy/helm/job-scout/dashboards/job-scout.json`; with `dashboard.enabled=true` (default `false`) the chart ships it as a `grafana_dashboard=1` ConfigMap (folder **job-scout**, uid `job-scout`).
 
 ## Metrics
 
@@ -41,9 +41,9 @@ The dashboard lives in the repo at `deploy/helm/job-scout/dashboards/job-scout.j
 | `job_scout_scheduler_runs_total` | `task status` | In-process ticks (`requeue-stale` always; others only with `WORKER_SCHEDULER=1`) |
 | `job_scout_board_scans_total` | `provider status` | Board scans |
 | `job_scout_scan_listings_total` | `provider outcome` | `seen` `gate_pass` `gate_fail` `created` `updated` `closed` |
-| `job_scout_ingest_quality_total` | `reason` | Ingest rejected or repaired (`placeholder_url`, `unresolved_company`, `aggregator_unresolved`, `aggregator_duplicate`, `junk_title`, `triage_zero_score`) |
+| `job_scout_ingest_quality_total` | `reason` | Ingest rejected or repaired (`placeholder_url`, `board_index`, `unresolved_company`, `aggregator_unresolved`, `aggregator_duplicate`, `junk_title`, `triage_zero_score`) |
 | `job_scout_jd_changes_total` | `change_kind material` | JD revisions written |
-| `job_scout_watch_checks_total` | `outcome` | `unchanged` `changed` `closed` `first_seen` |
+| `job_scout_watch_checks_total` | `outcome` | `unchanged` `changed` `closed` `first_seen` `rejected` (snapshot refused by a [JD guard](./ARCHITECTURE.md#jd-snapshots)) |
 | `job_scout_autopilot_actions_total` | `hook action` | `enqueue_evaluate`, `enqueue_company_research`, `enqueue_materials`, `enqueue_jd_review`, `approval`, `noop` |
 | `job_scout_approvals_resolved_total` | `kind decision` | Inbox decisions |
 | `job_scout_chat_turns_total` | `scope status` | Chat agent turns (`ok` `error` `aborted`) |
@@ -103,7 +103,7 @@ Shape:
 
 ```json
 {"ts":"2026-09-03T21:28:32.626Z","level":"info","component":"worker","version":"2.8.4","scope":"worker",
- "msg":"job.ok","jobId":"job_YNy_9tr9vrwt","type":"triage","attempt":1,"positionId":"pos_bk_o9LPC1cTL","ms":1779,"verdict":"fail","score":2.8}
+ "msg":"job.ok","jobId":"job_example000000","type":"triage","attempt":1,"positionId":"pos_example000000","ms":1779,"verdict":"fail","score":2.8}
 ```
 
 `msg` is a stable dotted event name, never free text. Events you will grep for:
@@ -112,12 +112,16 @@ Shape:
 |---|---|
 | `http.request` | every `/api/*` and `/mcp` request (method, route, status, ms, requestId, user) — health/ready/metrics are logged only on ≥ 400 |
 | `http.unhandled` | Hono `onError` |
+| `mcp.transport.error` | MCP transport errors |
 | `mcp.tool` | every MCP tool call (tool, status, ms, compact args) |
 | `job.ok` / `job.failed` | worker loop (type, ms, outcome, gate code, error) |
 | `scheduler.ok` / `scheduler.failed` | in-process ticks |
 | `llm.call` / `llm.call.failed` | each model call (operation, model, tokens, ms) |
 | `scan.board.done` / `scan.board.failed` / `scan.listing.failed` | board scans |
 | `jd.revision` | a JD revision was written (changeKind, material, closed, fields) |
+| `jd.snapshot_rejected` / `jd.snapshot_not_found` / `jd.fetch_failed` | a fetched posting refused by a JD guard (reason) / a soft-404 observation / a failed ATS fetch (reason, httpStatus) |
+| `llm.health.failing` / `llm.health.recovered` / `llm.parked_released` | provider outage detected / cleared / parked LLM jobs released |
+| `triage.tz_policy`, `scan.regate` | timezone-only flags removed from a triage result / recent discovery rows re-gated after a filter change |
 | `autopilot.hook` / `autopilot.hook.failed` | what each hook decided (`actions`) |
 | `approval.resolved` | inbox decision |
 | `chat.turn` / `chat.turn.failed` / `chat.tool` | chat agent |

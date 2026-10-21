@@ -19,6 +19,8 @@ Today brings together decisions, approvals, changed job descriptions and upcomin
 - Previous job descriptions remain available, with differences between versions. Text cleaned up by the app is labeled separately from employer changes.
 - Unknown compensation stays unknown. Scores reflect the profile used when they were generated; stale scores need refreshing after profile changes.
 - AI suggestions to change status and automatically drafted materials require review in the Inbox. Updating filters can archive untouched scan results.
+- Triage archives a role only for a hard disqualifier (residency, work authorization, onsite/hybrid, posted pay under your floor). A role you restore stays restored.
+- Recruiter leads track a pitch that has no job description yet: the recruiter, the role, stated terms, open questions and the message log. Nothing is sent.
 - Optional WhatsApp notifications go to the chats configured in Settings. The inbound chat can inspect positions and save job URLs.
 
 ## Scope

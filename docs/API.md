@@ -7,7 +7,7 @@ Base `/api/v1`. Every response is an envelope:
 { "ok": false, "error": { "code": "NOT_FOUND", "message": "…", "details": {} }, "meta": { "requestId": "…" } }
 ```
 
-Codes: `UNAUTHORIZED` `NOT_FOUND` `VALIDATION_ERROR` `LLM_GATE` `INTERNAL`. Long-running actions return `202` with a `jobId`. `LLM_GATE` is a model call refused before it runs (no key, disabled, cap, or budget).
+Codes: `UNAUTHORIZED` `FORBIDDEN` (missing scope) `NOT_FOUND` `VALIDATION_ERROR` `CONFLICT` `LLM_GATE` `INTERNAL`. Long-running actions return `202` with a `jobId`. `LLM_GATE` is a model call refused before it runs (no key, disabled, cap, or budget).
 
 ## Auth
 
@@ -37,12 +37,12 @@ A configured `API_TOKEN_SEED` is an admin credential; there is no built-in seed.
 
 | method | path | notes |
 |--|--|--|
-| GET | `/positions` | `status` (`hot` · `active` · `all` · comma list), `verdict` (`none` is unscored), `minScore`, `q` (title, company, location, team), `company`, `geoClass` (`home` keeps a listing that fits the profile market or names the profile city), `workplace`, `listingStatus`, `watch`, `sort` (`updated_desc` `score_desc` `company` `status` `first_seen_desc` `posted_desc` `posted_asc` `last_changed_desc` `title` `workplace` `geo` `location`), `page`/`pageSize` or `cursor`. Slim rows. The desk opens an unscored list on `posted_desc` |
-| POST | `/positions` | `{url, companyName?, status?}` — fetch the JD, create or refresh, enqueue triage. `201` when created |
+| GET | `/positions` | `status` (`hot` · `active` · `all` · comma list), `verdict` (`none` is unscored), `minScore`, `q` (title, company, location, team), `company`, `geoClass` (`home` keeps a listing that fits the profile market or names the profile city), `workplace`, `listingStatus`, `watch`, `sort` (`updated_desc` `score_desc` `company` `status` `first_seen_desc` `posted_desc` `posted_asc` `last_changed_desc` `title` `workplace` `geo` `location`), `listingStatus`, `needsJd=true` (stored with too little JD to score), `includeArchived=true`, `collapseFamilies=true`, `staleProfile=true`, `page`/`pageSize` or `cursor`. Slim rows. The desk opens an unscored list on `posted_desc` |
+| POST | `/positions` | `{url, companyName?, status?}` — fetch the JD, create or refresh, enqueue triage. `201` when created. A careers board or index URL is refused (`details.reason` `board_url`/`board_title`, `suggestion`, `boardSuggestion`); a failed fetch carries `details.reason` (`http_status` `blocked` `timeout` `network` `parse_failed` `unsupported_provider`), `httpStatus`, `causeCode` |
 | GET | `/positions/:idOrSlug` | full detail: company, JD text, revisions, evaluations, materials, careerOps stamp |
-| PATCH | `/positions/:idOrSlug` | `title status priority primaryUrl resumeSurface nextAction notes watchEnabled appliedAt equityNotes archiveReason geoNotes metadata` — status changes write a timeline event; `applied` stamps `appliedAt` |
+| PATCH | `/positions/:idOrSlug` | `title status priority primaryUrl workplace geoClass resumeSurface nextAction notes watchEnabled appliedAt equityNotes archiveReason geoNotes metadata` — status changes write a timeline event; `applied` stamps `appliedAt`; `materials` needs materials on file (see [MCP › Materials rule](./MCP.md#write)). `title`, `primaryUrl`, `workplace` and `geoClass` are listing corrections (see [MCP › Listing corrections](./MCP.md#write)) |
 | POST | `/positions/:idOrSlug/archive` | `{reason?}` |
-| POST | `/positions/:idOrSlug/refresh` | re-fetch the JD now (revision if changed) |
+| POST | `/positions/:idOrSlug/refresh` | re-fetch the JD now (revision if changed). Refused with `frozen:interview` / `frozen:offer` unless `{force: true}`; see [Upgrading](./UPGRADING.md#jd-refresh-at-interview-and-offer) |
 | POST | `/positions/:idOrSlug/notes` | `{title?, body?}` → timeline note |
 | POST | `/positions/:idOrSlug/actions/:action` | `action` ∈ `triage evaluate materials company_research jd_review form_answers listing_classify`; body `{force?, surface?}`; enqueues (`202`) or runs inline with `?sync=1`. No model key returns `VALIDATION_ERROR`. A synchronous run the model gate refuses returns `LLM_GATE` |
 | GET | `/positions/:idOrSlug/questions?sort=` | application prompts and drafted answers |
@@ -55,7 +55,8 @@ A configured `API_TOKEN_SEED` is an admin credential; there is no built-in seed.
 | POST | `/positions/:idOrSlug/materials` | `{kind, bodyMarkdown, title?, notes?, pdfBase64?, pdfFileName?}` — store a hand-edited version |
 | GET | `/positions/materials/:materialId` | |
 | PUT | `/positions/:idOrSlug/career-ops` | merge a career-ops stamp into `metadata.careerOps` |
-| POST | `/positions/reconcile-career-ops` | bulk URL-first reconciliation. Dry run unless the body says otherwise |
+| POST | `/positions/reconcile-career-ops` | `{rows, dryRun?}` bulk reconciliation, same rules as MCP [`reconcile_career_ops`](./MCP.md#career-ops-bridge). Dry run unless `dryRun: false` |
+| GET / POST | `/positions/refresh-stale-triage` | stale-score status / `{limit?, dryRun?}` queue score-only refreshes (see below) |
 | GET / POST | `/positions/:idOrSlug/people` | company-scoped contacts `{name, title?, linkedinUrl?, email?, notes?}` |
 | DELETE | `/positions/:idOrSlug/people/:personId` | 404 if the person is not on this company |
 | GET / POST | `/positions/:idOrSlug/interviews` | list is slim (metadata + char counts). POST body: `stage`, `title`, interviewer, `scheduledAt`/`occurredAt`, `status` `pending\|completed\|cancelled`, `outcome` `advanced\|hold\|rejected\|cancelled\|unclear`, notes/review/transcript markdown. A transcript queues `interview_brief` unless `skipBrief` |
@@ -127,7 +128,7 @@ Recruiter leads: a recruiter pitching a role with no job URL, pay band or named 
 
 | method | path | notes |
 |--|--|--|
-| GET / PATCH | `/settings` | the whole document / deep-merge a partial (`gate`, `triage`, `scan`, `retention`, `llm.operations`, `autopilot`, `chat`, `notifications`) |
+| GET / PATCH | `/settings` | the whole document / deep-merge a partial (`gate`, `triage`, `scan`, `retention`, `llm.operations`, `autopilot`, `chat`, `notifications`, `jev`). `triage.staleSweepEnabled` (default `true`) and `triage.staleSweepMaxRows` (default 20, max 25) control the scheduled stale-triage sweep; `notifications.events.llm_health` the outage/recovery alert |
 | GET | `/settings/notifications` | channels, events, quiet hours, chat model, `wahaConfigured` |
 | POST | `/settings/notifications/test` | `{channel}` `desk` `new` `process` `research` `chat` — enqueue a test WhatsApp send |
 | GET / PATCH | `/settings/profile` | identity, master resume, surfaces, scout brief. Optional `metadata.acceptableTzRange` `{ min, max }` (UTC offsets): a listing's timezone window outside it is one soft flag (-0.5 max); unset, timezone windows only inform. A timezone window never disqualifies |
@@ -145,6 +146,13 @@ Recruiter leads: a recruiter pitching a role with no job URL, pay band or named 
 | GET | `/settings/system/jobs?status=&type=&limit=` | queue rows |
 | POST | `/settings/system/jobs` | `{type, payload}` enqueue anything (admin) |
 | POST | `/settings/system/retention` | run retention now |
+| POST | `/settings/system/jobs/:id/retry` | retry one failed scan (see below); `CONFLICT` when it cannot be retried |
+| POST | `/settings/system/watches` | queue due watch checks (`202`) |
+| GET | `/settings/jev` | Jev settings, credential availability, today's usage ([JEV](./JEV.md)) |
+| GET | `/settings/jev/runs?positionId=` | recent decision runs |
+| POST | `/settings/jev/preview` | `{recipe, positionId?, fresh?}`; `recipe` `triage` `ranking` `evaluation_check` `materials_check` `connection_test`. Calls OpenRouter |
+| POST | `/settings/jev/rank` | `{limit?}` (1–20, default 10) rank the review queue |
+| PATCH | `/settings/jev/runs/:id` | `{feedback}` `agree` / `disagree` / `null` |
 | GET / POST | `/settings/tokens` | `{name, scopes}` — plaintext shown once |
 | DELETE | `/settings/tokens/:id` | |
 
@@ -166,7 +174,7 @@ B=http://localhost:8080/api/v1; H='Authorization: Bearer dev-agent-token'
 
 # add a position from a URL (fetch → gate → triage)
 curl -s -X POST $B/positions -H "$H" -H 'content-type: application/json' \
-  -d '{"url":"https://job-boards.greenhouse.io/postscript/jobs/8637343002"}'
+  -d '{"url":"https://job-boards.greenhouse.io/example/jobs/1234567"}'
 
 # PASS verdicts waiting for a decision, best first
 curl -s "$B/positions?status=triaged&verdict=pass&sort=score_desc" -H "$H"

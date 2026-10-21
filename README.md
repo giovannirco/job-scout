@@ -6,10 +6,10 @@ This is a self-hosted app for one person and one database. You review drafts and
 
 ## What it does
 
-- **Discovery:** scans Greenhouse, Ashby, Lever and BambooHR boards, plus selected public job feeds. Rejected listings remain visible with the filter reason.
-- **Pipeline:** tracks reviews, applications, interviews and follow-ups. Related postings can share one row with their available locations.
+- **Discovery:** scans Greenhouse, Ashby, Lever and BambooHR boards, plus selected public job feeds. Single postings can also be added from InHire, Recruitee, Workable and other career pages. Rejected listings remain visible with the filter reason.
+- **Pipeline:** tracks reviews, applications, interviews and follow-ups. Related postings can share one row with their available locations. Recruiter messages that have no job description yet are tracked as leads until they become a position.
 - **AI assistance:** scores jobs against your profile, evaluates roles, researches companies, and drafts resumes, cover letters and form answers. Each operation has its own model and daily limit.
-- **Job history:** records changes to descriptions, compensation, location and availability.
+- **Job history:** records changes to descriptions, compensation, location and availability. Loading pages, error pages and other companies' postings never replace a stored description, and the description is frozen once you interview.
 - **Chat and MCP:** lets an assistant inspect your pipeline and work with individual positions. Optional browser integration reads public job pages.
 
 Without a model key, scanning, filtering and the application tracker still work. AI features stay disabled. Scores and drafts need your review; a high score does not establish eligibility or guarantee an interview.
@@ -41,7 +41,7 @@ docker compose up --build
 
 Compose includes PostgreSQL and reads `.env`. It publishes the app on loopback at port 8080 with development authentication. The model gateway is separate: set `COMPOSE_OPENAI_BASE_URL` if it is not reachable on the host at port 8317.
 
-For a server installation, build the image from `deploy/Dockerfile` and use the chart under `deploy/helm/job-scout`. Keep credentials, profiles and deployment-specific values outside the public repository.
+For a server installation, build the image from `deploy/Dockerfile` and use the chart under `deploy/helm/job-scout`; see [Deploy](docs/DEPLOY.md). Keep credentials, profiles and deployment-specific values outside the public repository.
 
 ## Daily use
 
@@ -64,11 +64,11 @@ Optional WhatsApp integration routes alerts to chats you configure and supports 
 ```sh
 pnpm test
 pnpm typecheck
-pnpm lint
+pnpm lint:strict
 pnpm build
 ```
 
-Application tests live beside the source in `*.test.ts` files. Database repair logic lives in `packages/core/src/repairs.ts`, with its command entrypoint in `packages/core/src/cli/repair-data.ts`. Run `pnpm db:repair --list` to see available repairs and read [Upgrading](docs/UPGRADING.md) before using them.
+Application tests live beside the source in `*.test.ts` files. Database repair logic lives in `packages/core/src/repairs.ts`, with its command entrypoint in `packages/core/src/cli/repair-data.ts`. Run `pnpm db:repair --list` to see available repairs. Targeted repair commands (`pnpm db:repair-*`, `pnpm db:retriage-timezone`) live in `packages/core/src/cli/` and are dry runs unless given `--apply`. Read [Upgrading](docs/UPGRADING.md) before using any of them.
 
 | Directory | Contents |
 | --- | --- |
@@ -85,4 +85,4 @@ Application tests live beside the source in `*.test.ts` files. Database repair l
 
 ## Documentation
 
-[Product](docs/PRODUCT.md) · [Architecture](docs/ARCHITECTURE.md) · [AI](docs/AI.md) · [Jev](docs/JEV.md) · [Data model](docs/DATA-MODEL.md) · [API](docs/API.md) · [MCP](docs/MCP.md) · [Monitoring](docs/OBSERVABILITY.md) · [Security](docs/SECURITY.md) · [Contributing](docs/PUBLIC-CONTRIBUTING.md)
+[Product](docs/PRODUCT.md) · [Deploy](docs/DEPLOY.md) · [Upgrading](docs/UPGRADING.md) · [Architecture](docs/ARCHITECTURE.md) · [AI](docs/AI.md) · [Jev](docs/JEV.md) · [Data model](docs/DATA-MODEL.md) · [API](docs/API.md) · [MCP](docs/MCP.md) · [Monitoring](docs/OBSERVABILITY.md) · [Security](docs/SECURITY.md) · [Contributing](docs/PUBLIC-CONTRIBUTING.md)

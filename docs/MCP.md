@@ -31,24 +31,24 @@ Positions are drained first; evaluations start on the page that returns the last
 | tool | |
 |--|--|
 | `server_info` | identity, version, endpoints, LLM usage, `llmHealth` (failing operations and kind: `auth` `quota` `upgrade_required` `outage`) |
-| `market_summary` | counts by status/verdict, discovery lanes for the last N hours, LLM usage |
-| `list_positions` | lean rows; `status` (comma list, `hot`, `active`, `all`), `verdict`, `q`, `company`, `minScore`, `sort`, `fields`, cursor pagination. See [Paging](#paging) |
-| `get_position` | full detail: company, current JD text, revisions, evaluations, materials |
-| `scout_context` | everything to reason about one role: position, triage JSON, JD text, latest evaluation summary, profile brief |
-| `get_evaluation` | latest markdown + JSON for `evaluate` / `jd_review` / `company_research` |
+| `market_summary` | counts by status/verdict, discovery lanes and LLM usage for the last `hours` (default 24) |
+| `list_positions` | lean rows; `status` (comma list, `hot`, `active`, `all`), `verdict` (`none` is unscored), `q`, `company`, `minScore`, `listingStatus`, `geoClass`, `includeArchived`, `includeDuplicates`, `collapseFamilies`, `staleProfile`, `sort`, `fields`, `pageSize` (≤ 200, default 50), `cursor`. See [Paging](#paging) |
+| `get_position` | full detail: company, current JD text, revisions, evaluations, materials. `includeJd: false` replaces the JD text with its length |
+| `scout_context` | everything to reason about one role (`positionId`, `slug` or a `q` search): position, triage JSON, JD text, latest evaluation summary, and the profile facts triage uses (scout brief, background, resume) |
+| `get_evaluation` | latest markdown + JSON for `kind` `evaluate` (default) / `jd_review` / `company_research` |
 | `get_materials` | current resume + cover markdown |
-| `work_queue` | decision lanes: PASS awaiting a decision, review (including a deliberate operator override), applied, marginal, failed triage that has no operator override, `needsJd` (triaged/review rows stored with too little JD to score), and `leads` (active recruiter leads, each with a `bucket`, `call_soon` first; see [Recruiter leads](#recruiter-leads)). Closed rows are left out. Compact summaries; `lane`, `page`, `limit` (default 20 per lane), with totals and `nextPage` in `pagination`. Use `get_position` / `get_lead` for full details |
-| `list_discovery` | `lane`, `hours`, `q`, `reason` prefix; cursor pagination |
-| `list_companies` / `get_company` | companies with counts / detail with positions and latest research |
+| `work_queue` | decision lanes (`decide` `review` `applied` `marginal` `failedReview` `needsJd` `leads`): PASS awaiting a decision, review (including a deliberate operator override), applied, marginal, failed triage that has no operator override, `needsJd` (triaged/review rows stored with too little JD to score), and `leads` (active recruiter leads, each with a `bucket`, `call_soon` first; see [Recruiter leads](#recruiter-leads)). Closed rows are left out. Compact summaries; `lane`, `page`, `limit` (default 20 per lane), with totals and `nextPage` in `pagination`. Use `get_position` / `get_lead` for full details |
+| `list_discovery` | `lane` (`passed` `filtered` `marginal` `all`), `hours`, `q`, `reason` prefix, `pageSize`, `cursor` |
+| `list_companies` / `get_company` | companies with counts (`q`, `withPositions`, `pageSize`) / detail with positions and latest research |
 | `get_profile` / `get_identity` | operator profile / identity + master resume + scout brief markdown |
-| `list_activity` | timeline events, optionally for one position |
+| `list_activity` | timeline events, optionally for one position (`idOrSlug`, `limit` ≤ 200) |
 | `list_changes` | lean positions, then evaluations, changed after an ISO `since` — the sync primitive. `limit` rows per page (default 200), `cursor`, `fields`. See [Changes](#changes) |
 | `list_processes` | live loops (applied/screen/interview/offer) with round timeline |
-| `list_all_interviews` | every round across positions and recruiter leads (`lane`, `q`, `stage`); slim. A lead round has `positionId: null`, `leadId`, `leadRole` and `leadStatus` |
+| `list_all_interviews` | every round across positions and recruiter leads (`lane` `all` `upcoming` `completed` `needs_brief`, `q`, `stage`); slim. A lead round has `positionId: null`, `leadId`, `leadRole` and `leadStatus` |
 | `list_leads` | lean recruiter-lead rows, latest activity first: `status` (comma list or `all`), `lane` (`call_soon` `needs_reply` `waiting` `stalled`), `q`, `includeClosed`, `pageSize`, `cursor` (see [Paging](#paging)). No contacts or message bodies |
 | `get_lead` | one lead: contact, stated terms, thread URLs, `leadTriage`, `bucket`, message log (redacted) and rounds |
 | `list_interviews` | rounds for a position (slim: metadata + char counts, not transcript bodies) |
-| `get_interview` | one round with notes, review, transcript, AI brief |
+| `get_interview` | one round (`idOrSlug`, `interviewId`) with notes, review, transcript, AI brief |
 | `list_questions` | ATS form prompts and drafted answers for a position |
 | `screen_recruiter_threat` | structured risk verdict for inbound recruiter outreach: `domainOrEmail`, optional `messageText`. Checks the operator blocklist (`THREAT_BLOCKLIST_DOMAINS`, empty by default), registered-domain age via a public RDAP lookup at `rdap.org`, free-mail senders and installer/script lures. Message text is untrusted input and is not echoed back. A failed RDAP lookup skips that signal |
 
@@ -56,29 +56,30 @@ Positions are drained first; evaluations start on the page that returns the last
 
 | tool | |
 |--|--|
-| `intake` | create/refresh a position from a job URL; queues triage when a model key is set. Board/careers index URLs are refused with `code: "board_index"` and a board suggestion. A JD too short to score is stored with `metadata.needsJd` and triage waits for the full JD |
+| `intake` | create/refresh a position from a job `url` (`company`, `status` `triaged`/`review` optional); queues triage when a model key is set. Board/careers index URLs are refused with `code: "board_index"` and a board suggestion. A JD too short to score is stored with `metadata.needsJd` and triage waits for the full JD |
 | `refresh_jd` | re-fetch the ATS page; revision if changed. A failed fetch returns `reason` (`http_status`, `blocked`, `timeout`, `network`, `parse_failed`, `unsupported_provider`) with `httpStatus`/`causeCode`, also stored in `metadata.lastAtsFetch`. Refused with `frozen:<status>` at interview/offer unless `force: true` (explicit operator refresh) |
 | `update_position` | PATCH status, priority, notes, nextAction, resumeSurface, watchEnabled, appliedAt, and the listing corrections below (`title`, `primaryUrl`, `workplace`, `geoClass`, `geoNotes`). The career-ops guard below applies to a `skip`/`archived` status; the other fields still apply. `status: materials` follows the materials rule below |
 | `set_position_status` | any pipeline status; `archived` requires a reason. Subject to the career-ops guard below; optional `actor` names the calling agent (see [Attribution](#attribution)); `materials` follows the materials rule below |
-| `log_activity` | append a timeline note |
+| `log_activity` | append a timeline note (`title`, optional `body`, `kind`, `idOrSlug`; global without a position) |
 | `upsert_lead` | create or update a recruiter lead; dedupes on recruiter × pitched role (see [Recruiter leads](#recruiter-leads)). `id` patches that lead, including `status`. Optional `message` logs the first message |
 | `log_lead_message` | append `inbound` / `outbound` / `note` to the lead's outreach log; phone numbers and emails in `body` are redacted before storage |
 | `promote_lead` | link `positionIdOrSlug`, or create a position from `url` (`fetch: false` for a manual record; a failed fetch falls back to one). The lead becomes `promoted` and its rounds and messages are linked |
 | `link_lead_position` | attach a lead to an existing position without changing its status |
 | `merge_leads` | merge `sourceIds` into `id`; sources are closed with `mergedIntoId`, nothing is deleted |
 | `upsert_interview` | create/patch a screen or interview (transcript queues an AI brief unless `skipBrief`). Pass `leadId` instead of `idOrSlug` for a recruiter screening before there is a position (no brief, no alert). `status` is `pending` (default), `completed` or `cancelled`; `scheduled` and `upcoming` are stored as `pending`, `canceled` as `cancelled`, `done` as `completed`. `outcome` is `advanced` `hold` `rejected` `cancelled` `unclear` |
-| `brief_interview` | queue or `sync` the `interview_brief` model vs JD + company pack. A transcript does not queue a brief when no model key is set |
+| `brief_interview` | queue (default) or `sync: true` the `interview_brief` model vs JD + company pack (`idOrSlug`, `interviewId`). A transcript does not queue a brief when no model key is set |
 | `update_question` | set `answer` and/or `status` (`open` `answered` `skipped`) |
-| `run_llm` | run `triage` / `evaluate` / `materials` / `jd_review` / `form_answers` / `listing_classify` synchronously with the model from Settings › AI |
-| `run_discovery_radar` | enqueue board scans for due boards (`all=true` forces every enabled board) |
-| `promote_discovery` | create a position from a discovery row and triage it |
-| `retry_failed_llm` | re-enqueue latest failed LLM ops (`hours`, `scope=failed|failed_and_missing`) and release jobs parked during an LLM outage (`released`). Does not re-run successful evaluate/materials |
+| `run_llm` | run `operation` `triage` / `evaluate` / `materials` / `jd_review` / `form_answers` / `listing_classify` synchronously on `idOrSlug` with the model from Settings › AI. `force` re-runs a current triage score |
+| `refresh_stale_triage` | preview (default) or queue score-only refreshes of stale PASS decision candidates: `limit` 1–25, `dryRun` (see [Stale scores](#stale-scores)) |
+| `run_discovery_radar` | enqueue board scans for due boards (`all=true` forces every enabled board; `limit` ≤ 500) |
+| `promote_discovery` | create a position from a discovery row (`id`, or `url` + `company`) and triage it |
+| `retry_failed_llm` | re-enqueue latest failed LLM ops (`hours` ≤ 168, `scope=failed|failed_and_missing`, `operations`, `limit`) and release jobs parked during an LLM outage (`released`). Does not re-run successful evaluate/materials |
 
 **Write echoes.** `update_position`, `set_position_status`, `set_match_override` and `create_position_from_career_ops` return a compact position summary: `id`, `slug`, `title`, `company` (`slug`, `name`), `status`, `archiveReason`, `priority`, `primaryUrl`, `workplace`, `geoClass`, `geoNotes`, `listingStatus`, `nextAction`, `notes` (cut at 2,000 chars), `resumeSurface`, `watchEnabled`, `appliedAt`, `lastChangedAt`, `updatedAt`, the career-ops `trackerId`/`status`/`score` when stamped, `classificationOverride` when set, and `statusApplied`/`statusNote` when the career-ops guard declined a status. `triageJson`, `metadata`, JD text and revisions are not echoed. Pass `verbose: true` for the full row (`create_position_from_career_ops`: the full `get_position` detail). `upsert_interview` returns the round's metadata with `notesChars`, `notesMarkdownChars`, `reviewChars`, `transcriptChars`, `aiBriefChars` and `briefJobId`; `verbose: true` returns the bodies, and `get_interview` reads them later.
 
 **Listing corrections.** `update_position` fixes listing facts that were parsed wrong, so callers no longer need "fields are wrong, ignore" notes. Each change is recorded as an `edit` timeline event with the old and new value.
 
-- `title`: must not be empty. The position is reslugged from company and title; the old slug goes into `metadata.previousSlugs` and keeps resolving in every tool. A later ATS snapshot can still replace a hand-set title.
+- `title`: must not be empty. The position is reslugged from company and title; the old slug goes into `metadata.previousSlugs` and keeps resolving in every tool. A title set by a person or operator agent is kept in `metadata.titleOverride`: later ATS snapshots record the posting's title on the revision but leave the position's title alone (a `Posting retitled; kept the title set by hand` timeline entry notes the difference). A title written by an automated actor (career-ops sync, scans) does not pin it. Without an override, a retitle on the board is followed and the slug moves with it.
 - `primaryUrl`: must be a public `http(s)` URL (the same guard ATS fetches use: no localhost, private addresses or non-standard ports) that no other position uses, compared by exact URL, normalized posting URL and ATS identity. Errors start `invalid_url:` or `url_conflict:`. The ATS provider, board, job id and external identity are re-derived from the new URL as intake does, and the old URL is kept in `metadata.previousUrls` as history; intake does not resolve old URLs back to the position, since a corrected URL usually means the old one pointed at another posting. The JD is not re-fetched; call `refresh_jd` to read it from the new URL.
 - `workplace` (`remote` `hybrid` `onsite` `unknown`) and `geoClass` (`brazil_friendly` `worldwideish` `ambiguous_remote` `hard_geo` `unknown`): stored on the position and in `metadata.classificationOverride` (`workplace`, `geoClass`, `actor`, `at`). ATS snapshots, `listing_classify`, listing-fact backfills and repairs keep a person's value; `listing_classify` skips a position whose workplace and geo are both overridden. JD revisions still record what the listing says.
 - `geoNotes`: free text.
@@ -89,11 +90,11 @@ Positions are drained first; evaluations start on the page that returns the last
 
 | tool | |
 |--|--|
-| `upsert_career_ops_stamp` | store tracker id / score / status / report path on `positions.metadata.careerOps` |
-| `list_career_ops_stamps` | every position carrying a stamp |
+| `upsert_career_ops_stamp` | store `trackerId` / `score` / `status` / `reportPath` / `pdfPath` / `jdPath` on `positions.metadata.careerOps`. A `pdfPath` counts as materials for the [materials rule](#write) |
+| `list_career_ops_stamps` | every position carrying a stamp, with `stampState.stale` when the stamp names a different stage than the position |
 | `reconcile_career_ops` | bulk reconciliation: tracker id stamp first, then posting URL, then (no URL) exact unique company + title. Dry run by default. On a real run, URL-less rows that match nothing become manual positions (`created`; dry run: `wouldCreate`) unless the tracker dropped them (Discarded/SKIP/Withdrawn → `skippedDropped`), and a URL that appears later for a stamped URL-less position is set on it (`urlSet`) |
-| `create_position_from_career_ops` | create or link the position for one tracker row. A dropped row (Discarded/SKIP/Withdrawn) that matches nothing is not created (`skipped: true`, `reason: tracker_dropped`). `url` is optional: a row without one becomes a manual position keyed by company + role and stamped with `trackerId`; re-runs link it (`via: trackerId` or `company_title`), and a URL supplied later is set on that same position (`urlSet: true`; `urlConflict` when another position holds it). With a URL it fetches when reachable, else a manual record titled from the tracker role |
-| `write_resume_eval` | store an evaluation produced elsewhere as an `evaluate` record and stamp it |
+| `create_position_from_career_ops` | create or link the position for one tracker row (`company`, `role`, optional `url`, `trackerId`, `score`, `status`, `reportPath`, `verbose`). A dropped row (Discarded/SKIP/Withdrawn) that matches nothing is not created (`skipped: true`, `reason: tracker_dropped`). `url` is optional: a row without one becomes a manual position keyed by company + role and stamped with `trackerId`; re-runs link it (`via: trackerId` or `company_title`), and a URL supplied later is set on that same position (`urlSet: true`; `urlConflict` when another position holds it). With a URL it fetches when reachable, else a manual record titled from the tracker role |
+| `write_resume_eval` | store an evaluation produced elsewhere (`idOrSlug`, `score`, `summary`, optional `reasons`, `markdown`, `source`) as an `evaluate` record |
 
 ### Compatibility aliases
 
@@ -105,6 +106,7 @@ A career-ops tracker label never removes a role from the pipeline on its own. `u
 
 - the calling agent is the career-ops sync: the MCP actor is the API token name, so name the sync's token `career-ops` or `career-ops-…` (for example `career-ops-sync`);
 - or the call passes `source: "career-ops"` (`update_position`, `set_position_status`);
+- or the caller names itself `career-ops…` on any token (`X-Job-Scout-Actor`, `X-Agent-Name` or `actor`; see [Attribution](#attribution));
 - or the `note` starts with `career-ops` (`set_position_status`).
 
 Other statuses (applied, interview, rejected, …) apply normally. Tokens with any other name are treated as a person or operator agent: their skip/archive applies, and their restore of an archived or skipped role stops triage from re-archiving it until a person archives or skips it again.
@@ -161,6 +163,6 @@ curl -sS -X POST http://localhost:8080/mcp \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
 ```
 
-`refresh_stale_triage` previews the top stale PASS decision candidates by default (`limit` 1–25). Set `dryRun=false` to enqueue score-only refreshes without moving stages, running autopilot or sending notifications. `run_llm` with `operation=triage` now reruns stale or unknown-profile scores without requiring `force`; unchanged current-profile scores remain cached. The same score-only refresh also runs on a schedule: each `watch` tick (the CronJob, or the in-process scheduler) enqueues up to `triage.staleSweepMaxRows` (default 20, max 25) stale active positions of any verdict, oldest triage first. It leaves archived, closed, quarantined, career-ops-terminal and in-process (materials onward) positions alone, skips a position whose triage job ran in the last day, uses at most half of the triage daily cap that remains after today's runs and queued triage jobs, and does nothing while the provider is down or triage is gated. It also clears `changed` badges no material revision backs. Turn it off with `triage.staleSweepEnabled: false`.
+## Stale scores
 
-`scout_context` includes the same current profile facts used by triage, alongside the scout brief, background and resume.
+`refresh_stale_triage` previews the top stale PASS decision candidates by default (`limit` 1–25). Set `dryRun=false` to enqueue score-only refreshes without moving stages, running autopilot or sending notifications. `run_llm` with `operation=triage` now reruns stale or unknown-profile scores without requiring `force`; unchanged current-profile scores remain cached. The same score-only refresh also runs on a schedule: each `watch` tick (the CronJob, or the in-process scheduler) enqueues up to `triage.staleSweepMaxRows` (default 20, max 25) stale active positions of any verdict, oldest triage first. It leaves archived, closed, quarantined, career-ops-terminal and in-process (materials onward) positions alone, skips a position whose triage job ran in the last day, uses at most half of the triage daily cap that remains after today's runs and queued triage jobs, and does nothing while the provider is down or triage is gated. It also clears `changed` badges no material revision backs. Turn it off with `triage.staleSweepEnabled: false`.

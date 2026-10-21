@@ -34,7 +34,7 @@ PostgreSQL connections verify the server certificate and hostname by default, in
 
 1. Build the public checkout without credentials or personal data. `.env.*`, `.data`, `private/`, and `backups/` are ignored; never rely on ignore rules to sanitize an arbitrary copied private tree.
 2. Keep the existing private PostgreSQL database/PVC and a restorable backup. Repoint the deployment image to a reviewed public image while retaining that database. App migrations update schema; replacing the image does not require exporting a personal profile into source files.
-3. Supply `DATABASE_URL`, authentication credentials, integration keys, and (if needed) `PGSSL_CA` through the chart's `existingSecret` or a secret-management controller. Keep site-specific routes and private overrides in private GitOps configuration. Do not use public `secrets.create` values for real credentials.
+3. Supply `DATABASE_URL`, authentication credentials, integration keys, and (if needed) `PGSSL_CA` through the chart's `existingSecret` or a secret-management controller. Keep site-specific routes and private overrides in private GitOps configuration. Do not use public `secrets.create` values for real credentials. [DEPLOY](./DEPLOY.md) lists the keys the chart reads.
 4. For a new empty database, enter your profile through Settings after authenticating, or perform a separately reviewed private data import. Public defaults intentionally contain no operator profile.
 5. Verify login, private API rejection without credentials, DB readiness and worker operation in staging before switching traffic.
 

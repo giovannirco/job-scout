@@ -44,7 +44,7 @@ Requests have a timeout and do not retry automatically. Provider failures use no
 
 ## MCP
 
-`jev_status` reads settings and usage. `jev_history` reads recent summaries. `jev_preview` runs a check on a position and may incur a charge; it leaves application state unchanged apart from decision history.
+`jev_status` reads settings and usage. `jev_history` reads recent summaries (`positionId` optional, `limit` 1–20, default 5). `jev_preview` runs a check on a position (`positionId`, `recipe` `triage` `ranking` `evaluation_check` `materials_check`, `fresh` to skip the cache) and may incur a charge; it leaves application state unchanged apart from decision history. The UI uses the same operations under `/api/v1/settings/jev` ([API](./API.md#settings)).
 
 ## Design choices
 

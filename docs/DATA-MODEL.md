@@ -12,7 +12,7 @@ Schema: `packages/db/src/schema.ts` (drizzle). Migrations: `packages/db/migratio
 | **EvaluationKind** | `evaluate` · `jd_review` · `company_research` |
 | **ListingStatus** | `open` · `changed` · `closed` · `paused` |
 | **DiscoveryLane** | `passed` · `marginal` · `filtered` |
-| **JobType** | `board_scan` `watch_check` `scan_url` `triage` `evaluate` `materials` `company_research` `jd_review` `listing_classify` `form_answers` `interview_brief` `retention` |
+| **JobType** | `jev_check` `board_scan` `watch_check` `scan_url` `triage` `evaluate` `materials` `company_research` `jd_review` `listing_classify` `form_answers` `interview_brief` `retention` |
 | **LlmOperation** | `triage` `evaluate` `materials` `company_research` `jd_review` `chat` `listing_classify` `form_answers` `interview_brief` (+ `test`) |
 | **ApprovalKind / Status** | `status_suggestion` `materials_draft` `archive_suggestion` / `pending` `approved` `dismissed` `expired` |
 | **ChatScope** | `global` · `position` · `company` |
@@ -49,12 +49,13 @@ Schema: `packages/db/src/schema.ts` (drizzle). Migrations: `packages/db/migratio
 | table | what |
 |--|--|
 | `jobs` | the queue: `type`, `payload`, `status` (queued/running/succeeded/failed), `priority`, `dedupe_key`, `attempts`, `run_after`, `started_at`, `error`, `result` |
-| `llm_runs` | one row per model call: operation, model, tokens in/out, latency, ok/error, position/company |
-| `settings` | single JSON document (see `packages/shared/src/settings.ts`): `llm.operations`, `gate`, `triage`, `scan`, `retention`, `autopilot`, `chat`, `notifications` (WhatsApp channels/events/quiet hours/allowFrom), cached model catalog |
+| `llm_runs` | one row per model call: operation, model, tokens in/out, latency, ok/error, position/company. LLM health (`/health` `llm`, `server_info`, metrics) is derived from recent rows |
+| `decision_runs` | Jev decisions ([JEV](./JEV.md)): `recipe`, `position_id`, `mode`, `status`, `model`, `input_hash` (cache key), typed `result`/`summary`, `error`, `feedback` (`agree`/`disagree`). Pruned with LLM runs |
+| `settings` | single JSON document (see `packages/shared/src/settings.ts`): `llm.operations`, `gate`, `triage` (thresholds, `jdMaxChars`, `staleSweepEnabled`, `staleSweepMaxRows`), `scan`, `retention`, `autopilot`, `chat`, `notifications` (WhatsApp channels/events incl. `llm_health`/quiet hours/allowFrom), `jev`, `repairVersions`, cached model catalog |
 | `approvals` | autopilot inbox: `kind`, `status`, position/company, title/body, `payload` (e.g. `toStatus`, `materialIds`, `reason`), resolved by/at |
 | `chat_threads` | `scope`, position/company, model, `messages` JSON (user / assistant with tool calls / tool results, tokens). WhatsApp desk chat uses one global thread titled `WhatsApp · job-scout chat` |
 | `notification_outbox` | WhatsApp sends: `channel`, `event`, `chat_id`, `body`, `status` (`pending` `sent` `failed` `cancelled`), unique `dedupe_key`, `scheduled_for` (quiet hours), `provider_ref` |
-| `profiles` | you: identity, master resume, resume surfaces (`ai` / `sre` / `platform`), scout brief. A new profile stores an empty brief. A stored starter brief is preserved in the database but is not sent to the model |
+| `profiles` | you: identity, master resume, resume surfaces (`ai` / `sre` / `platform`), scout brief, cash floor (`cashFloorUsd`, used by the archive and lead pay checks). Optional `metadata.acceptableTzRange` `{min, max}` UTC offsets makes a timezone window outside it a soft flag. A new profile stores an empty brief. A stored starter brief is preserved in the database but is not sent to the model |
 | `api_tokens` | hashed Bearer tokens with scopes |
 
 ## `positions`
@@ -67,7 +68,7 @@ Schema: `packages/db/src/schema.ts` (drizzle). Migrations: `packages/db/migratio
 | triage | `triage_score` (1–5), `triage_verdict`, `triage_json`, `triaged_at`, `triage_model` |
 | comp | `salary_min/max/currency/period/raw`, `equity_notes` |
 | listing | `content_hash`, `listing_status`, `first_seen_at`, `last_checked_at`, `last_changed_at`, `closed_at`, `watch_enabled` |
-| links | `metadata` JSON — `careerOps { trackerId, score, status, reportPath, pdfPath, jdPath, stampedAt }` when the row is mirrored in career-ops |
+| metadata | `metadata` JSON, never in list rows. `careerOps { trackerId, score, status, reportPath, pdfPath, jdPath, stampedAt }` when mirrored in career-ops · `needsJd { since, reason, words, revision }` while the JD is too short to score (triage, evaluation and research wait) · `lastAtsFetch` (last fetch outcome: failure `reason`, `httpStatus`, `causeCode`, or a refused snapshot) · `previousSlugs` (still resolve) and `previousUrls` (history only) · `titleOverride` and `classificationOverride { workplace, geoClass, actor, at }` (hand corrections automation keeps) · `quarantined`, `repostOfId`, `duplicateOfId` |
 
 Evaluations, materials and JD text are not on the row; they hang off it by `position_id`, and the list endpoints return a slim projection (`PositionListRow` in `packages/shared/src/types.ts`).
 

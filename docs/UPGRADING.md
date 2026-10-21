@@ -2,6 +2,34 @@
 
 Develop and build from the public repository. Keep PostgreSQL/PGlite data, profiles, resumes, application history, transcripts, credentials and backups outside the public checkout and image. A new image can use the existing private database; personal settings belong in that database and credentials in an existing Kubernetes Secret/private GitOps configuration. An image update alone does not require publishing or re-entering your profile.
 
+## Upgrading to 2.14
+
+2.13.0 and 2.13.1 need no migration. 2.14.0 adds one, `0007_recruiter_leads`, and 2.14.1 none. The API, worker and CronJobs apply it at startup.
+
+- **Additive migration.** `0007` creates `leads`, adds nullable `interviews.lead_id` and `outreach_events.lead_id`/`direction`/`body`, indexes, foreign keys and a position-or-lead check, and drops `NOT NULL` on `interviews.position_id`. Nothing is renamed or dropped. See [DATA-MODEL › leads](./DATA-MODEL.md#leads).
+- **Rollback is image-only.** 2.13.x runs unchanged on the migrated schema, so roll back by redeploying the previous image; do not reverse the migration. Data written by the newer release (leads, rounds on a lead) stays in place and is ignored by 2.13.x.
+- **Materials rule.** `materials` now means materials exist: setting that status by API or MCP fails with `materials_missing` until the position has a non-failed resume or cover, or a career-ops stamp with `pdfPath` ([MCP › Write](./MCP.md#write)). Positions already sitting in `materials` without files are listed by `pnpm db:repair-materials-status`; `--apply` moves them back to the stage they came from.
+- **career-ops guard.** A career-ops sync can no longer skip or archive a role. Name the sync's API token `career-ops` or `career-ops-…` (or send `X-Job-Scout-Actor: career-ops…`) so its skip/archive requests are recorded as notes; other tokens count as a person. `create_position_from_career_ops` and `reconcile_career_ops` accept rows without a URL and never create positions for rows the tracker dropped. See [MCP › career-ops guard](./MCP.md#career-ops-skiparchive-guard).
+- **Archive policy.** Triage now archives only on hard disqualifiers and respects a person's restore ([AI › Archive policy](./AI.md#archive-policy)). Older archives are not changed automatically.
+- **Stale-triage sweep.** Each `watch` run re-triages up to `triage.staleSweepMaxRows` (default 20) stale active positions within half the remaining triage cap. Set `triage.staleSweepEnabled: false` to keep the old behavior.
+
+### Repair commands
+
+Each command prints its plan as JSON and writes nothing unless `--apply` is given. Back up the database, run the dry run, read the plan, then repeat with `--apply`. Stop other writers for large changes. Output can contain personal data; keep it private.
+
+| command | what | flags |
+|--|--|--|
+| `pnpm db:repair-triage-archives` | restore triage auto-archives whose reason is not a hard disqualifier; scores are kept. Also lists (never changes) skips driven by a career-ops drop label | `--days N` (default 30), `--apply` |
+| `pnpm db:retriage-timezone` | revive positions failed or archived on a timezone window alone and queue a forced triage through the worker | `--include id,id`, `--apply` |
+| `pnpm db:repair-materials-status` | move positions in `materials` with no materials on file back to their earlier stage | `--apply` |
+| `pnpm db:repair-last-good-jd` | restore a JD overwritten by a non-JD page from its last good revision | `--position <id>` with `--before`, `--supersede-from`, `--supersede-until`, `--supersede ev_a,ev_b`; or `--presets <file> <name>`; `--reslug`, `--live` (read-only title check), `--snapshot <get_position.json>` (plan only, no database), `--apply` |
+| `pnpm db:repair-prototype-slugs` | reslug companies and postings named after an `Object.prototype` key, including their `external_identity` | `--apply` |
+| `pnpm db:repair-title-slugs` | reslug positions whose slug came from an earlier or not-a-JD title | `--apply` |
+
+The presets file for `db:repair-last-good-jd` names real positions, so keep it outside the repository: a JSON object `{ "<name>": { positionId, before?, supersedeFrom?, supersedeUntil?, supersedeEvaluations?, enqueue?, reslug?, liveCheck? } }`. Reslugging commands keep each old slug in `metadata.previousSlugs`, so links keep resolving, and write a `repair` timeline event.
+
+`pnpm db:repair` is the separate audited runner described below: it uses `--preview`/`--apply` with a required `--report` file instead of the dry-run default.
+
 ## Existing installations
 
 Normal API/worker startup now runs schema migrations and initializes missing profile/settings rows. It does not run legacy data repairs or fetch job boards on an existing installation. Fresh installations still seed the generic source catalog. Do not run the old and new application versions against the same database during rehearsal.

@@ -1,4 +1,6 @@
+# Generic chart values. Keep real hostnames, registries and credentials in private overrides; see docs/DEPLOY.md.
 image:
+  # Your private registry path, e.g. registry.example.com/job-scout
   repository: job-scout
   tag: "2.14.1"
   pullPolicy: IfNotPresent
@@ -16,12 +18,15 @@ api:
 
 worker:
   replicas: 1
+  # false: the CronJobs below enqueue discovery/watch/retention (WORKER_SCHEDULER=0)
   inProcessScheduler: false
   nodeOptions: "--max-old-space-size=384"
   resources:
     requests: { cpu: 50m, memory: 256Mi }
     limits: { cpu: 500m, memory: 512Mi }
 
+# Each runs `once.ts <task>` with the app image; tasks: discovery, watch (also the stale-triage sweep), retention, stale-triage.
+# Every container (api, worker, cron) applies pending migrations at startup.
 cronJobs:
   discovery:
     enabled: true
@@ -49,10 +54,12 @@ metrics:
   scrapeInterval: 30s
   job: job-scout
 
+# Grafana dashboard ConfigMap (label grafana_dashboard: "1")
 dashboard:
   enabled: false
   folder: job-scout
 
+# Non-secret environment, rendered into a ConfigMap. Variables are documented in .env.example.
 env:
   AUTH_MODE: token
   PUBLIC_BASE_URL: http://localhost:8080
@@ -71,8 +78,11 @@ env:
   WAHA_BASE_URL: ""
   WAHA_SESSION: default
 
+# Secret with DATABASE_URL, AUTH_PASSWORD and/or API_TOKEN_SEED, OPENAI_API_KEY and optional integration keys.
 existingSecret: job-scout-secrets
+# Further Secrets mounted with optional: true
 extraSecrets: []
+# Test/local only: renders existingSecret from these values. Never commit real credentials.
 secrets:
   create: false
   databaseUrl: ""
