@@ -30,3 +30,9 @@ The companion security change documents authentication, certificate verification
 ## Prototype-key slugs
 
 Older builds looked company aliases up in a plain object, so a company named after an `Object.prototype` key (for example "Constructor") received a slug such as `function Object() { [native code] }`, and its postings inherited it. New rows are fixed. `pnpm db:repair-prototype-slugs` prints the affected companies and postings without writing; add `--apply` to reslug them. Each replaced slug is kept in `metadata.previousSlugs`, which position and company lookups still resolve, and every reslugged posting gets a `repair` timeline event. Back up the database first.
+
+## JD refresh at interview and offer
+
+From the interview stage on, the job description you interviewed for is the record. A board scan, watch check or plain `refresh_jd` is now refused with `frozen:interview` or `frozen:offer` and writes no revision; a closed listing still closes. An automatic watch also no longer rewrites a position outside the active stages whose `watchEnabled` is false (`watch_disabled`). To refresh such a description deliberately, call `refresh_jd` with `force: true` or `POST /positions/:id/refresh` with `{"force": true}`. Forcing never bypasses the not-a-JD, failed-fetch or identity guards. Because Jev checks follow JD revisions, an interview- or offer-stage position gets a new check only after a forced refresh.
+
+Posting URLs that differ only by a redundant `gh_jid` or `ashby_jid` parameter now count as the same posting, so re-ingesting one no longer creates a duplicate. Duplicates created earlier are left as they are; archive the extra copy after review. For `pnpm db:repair-last-good-jd`, `--reslug` renames a slug that was built from a not-a-JD title and keeps the old slug resolvable, and `--live` compares the live posting's title with the restored one without writing anything.
