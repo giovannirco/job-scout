@@ -106,6 +106,13 @@ describe("JD snapshot guards and last-good repair (isolated PGlite)", () => {
     expect(again).toMatchObject({ created: false, position: { id: a.id } });
   });
 
+  it("a Greenhouse URL with and without ?gh_jid= is one position", async () => {
+    const gh = "https://job-boards.greenhouse.io/acmepay/jobs/4012345";
+    const { position: a } = await upsertFromJob({ ...inhire("s18"), provider: "other", url: `${gh}?gh_jid=4012345` }, { status: "review" });
+    const again = await upsertFromJob({ ...inhire("s18"), provider: "other", url: gh });
+    expect(again).toMatchObject({ created: false, position: { id: a.id } });
+  });
+
   /** Move the recorded first soft-404 observation back in time (the confirm window is SOFT_404_CONFIRM_MS). */
   async function ageSoftNotFound(positionId: string, ms = SOFT_404_CONFIRM_MS + 60_000) {
     const db = await getDb();

@@ -25,6 +25,17 @@ describe("posting identity and eligibility", () => {
     expect(normalizePostingUrl("https://careers.acme.test/?jobId=123&utm_medium=y")).toContain("jobId=123");
     expect(canonicalExternalIdentity("greenhouse:gympass:123")).toBe("greenhouse:wellhub:123");
   });
+  it("treats gh_jid / ashby_jid as canonical when the path already names the job", () => {
+    const gh = "https://job-boards.greenhouse.io/acmepay/jobs/4012345";
+    expect(normalizePostingUrl(`${gh}?gh_jid=4012345`)).toBe(gh);
+    expect(normalizePostingUrl("https://boards.greenhouse.io/acmepay?gh_jid=4012345")).toBe(gh);
+    expect(normalizePostingUrl(`${gh}?gh_jid=4012345&gh_src=abc`)).toBe(normalizePostingUrl(gh));
+    expect(normalizePostingUrl("https://careers.acme.test/jobs/4012345?gh_jid=4012345")).toBe("https://careers.acme.test/jobs/4012345");
+    expect(normalizePostingUrl("https://careers.acme.test/openings/c0ffee00-abcd?ashby_jid=c0ffee00-abcd")).toBe("https://careers.acme.test/openings/c0ffee00-abcd");
+    // On a vanity page whose path carries no id the param is the only identity: keep it.
+    expect(normalizePostingUrl("https://careers.acme.test/open-roles?gh_jid=4012345")).toBe("https://careers.acme.test/open-roles?gh_jid=4012345");
+    expect(normalizePostingUrl("https://careers.acme.test/open-roles?gh_jid=4012345")).not.toBe(normalizePostingUrl("https://careers.acme.test/open-roles?gh_jid=4012346"));
+  });
   it("keeps levels and requisitions distinct", () => {
     expect(decisionTitle("Senior SRE - Remote")).toBe(decisionTitle("Sr. SRE (Brazil)"));
     expect(decisionTitle("Senior SRE")).not.toBe(decisionTitle("SRE"));

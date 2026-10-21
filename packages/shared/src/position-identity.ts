@@ -25,6 +25,19 @@ export function normalizePostingUrl(value?: string | null): string {
     for (const key of [...u.searchParams.keys()]) {
       if (/^(utm_.+|gh_src|source|ref|referrer|fbclid|gclid|lever-source|lever-origin)$/i.test(key)) u.searchParams.delete(key);
     }
+    // An ATS job-id param is redundant when the path already names that job: the same
+    // posting with and without `?gh_jid=` must normalize to one URL. On a vanity host
+    // whose path carries no id, the param IS the identity and stays.
+    if (/greenhouse\.io$/.test(u.hostname)) {
+      const ghJid = u.searchParams.get("gh_jid");
+      const board = u.pathname.match(/^\/([^/]+)\/?$/);
+      if (ghJid && /^\d+$/.test(ghJid) && board) u.pathname = `/${board[1]}/jobs/${ghJid}`;
+      u.searchParams.delete("gh_jid");
+    }
+    for (const key of ["gh_jid", "ashby_jid"]) {
+      const v = u.searchParams.get(key);
+      if (v && u.pathname.split("/").includes(v)) u.searchParams.delete(key);
+    }
     u.searchParams.sort();
     u.pathname = u.pathname.replace(/\/+$/, "");
     return u.toString().replace(/\/$/, "");
