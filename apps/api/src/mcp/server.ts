@@ -54,8 +54,24 @@ import { env } from "../env.js";
 import { text } from "./result.js";
 import { workQueue, WorkQueueInput } from "./work-queue.js";
 
-type ToolCtx = { authInfo?: { clientId?: string; scopes?: string[] }; http?: { authInfo?: { clientId?: string; scopes?: string[] } } };
-const agentOf = (ctx: ToolCtx) => ctx.http?.authInfo?.clientId || ctx.authInfo?.clientId || "mcp-client";
+type ToolAuth = { clientId?: string; scopes?: string[]; extra?: Record<string, unknown> };
+type ToolCtx = { authInfo?: ToolAuth; http?: { authInfo?: ToolAuth } };
+/**
+ * Who made the call. The bearer token's name (clientId) is shared by every
+ * agent using that token, so a caller can identify itself with the
+ * `X-Job-Scout-Actor` / `X-Agent-Name` header (authInfo.extra.actor) or an
+ * `actor` tool argument. Recorded as "<caller> via <token>" so the token stays
+ * auditable and a caller can never pass itself off as another actor.
+ */
+export function agentOf(ctx: ToolCtx, callerActor?: string | null): string {
+  const auth = ctx.http?.authInfo || ctx.authInfo;
+  const token = auth?.clientId || "mcp-client";
+  const fromHeader = auth?.extra?.actor;
+  const raw = callerActor || (typeof fromHeader === "string" ? fromHeader : "");
+  const caller = raw.replace(/[^\w.:@-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 64);
+  if (!caller || caller === token) return token;
+  return `${caller} via ${token}`;
+}
 
 const errText = (e: unknown) => text({ error: e instanceof Error ? e.message : String(e), code: e instanceof LlmGateError ? e.code : undefined }, true);
 
@@ -211,10 +227,10 @@ export function createJobScoutMcpServer() {
 
   server.registerTool(
     "set_position_status",
-    { title: "Set status", description: "Set pipeline status (triaged|review|materials|applied|screen|interview|offer|rejected|skip|archived). archived requires reason. A skip/archive from the career-ops sync (source=career-ops, or a note starting 'career-ops') is recorded as a note and not applied. materials is refused with a materials_missing error until the position has a resume/cover in job-scout or a career-ops stamp with pdfPath: create materials (run_llm materials) or upsert_career_ops_stamp with pdfPath first.", inputSchema: { idOrSlug: z.string(), status: z.string(), reason: z.string().optional(), note: z.string().optional(), source: z.string().optional() } },
+    { title: "Set status", description: "Set pipeline status (triaged|review|materials|applied|screen|interview|offer|rejected|skip|archived). archived requires reason. A skip/archive from the career-ops sync (source=career-ops, or a note starting 'career-ops') is recorded as a note and not applied. materials is refused with a materials_missing error until the position has a resume/cover in job-scout or a career-ops stamp with pdfPath: create materials (run_llm materials) or upsert_career_ops_stamp with pdfPath first.", inputSchema: { idOrSlug: z.string(), status: z.string(), reason: z.string().optional(), note: z.string().optional(), source: z.string().optional(), actor: z.string().optional().describe("Calling agent name for the audit trail, recorded as \"<actor> via <token name>\"") } },
     async (a, ctx) => {
       try {
-        const p = await setStatusFromCaller(a.idOrSlug, a.status, { actor: agentOf(ctx as ToolCtx), reason: a.reason, note: a.note, source: a.source });
+        const p = await setStatusFromCaller(a.idOrSlug, a.status, { actor: agentOf(ctx as ToolCtx, a.actor), reason: a.reason, note: a.note, source: a.source });
         return p ? text(p) : text({ error: "not found" }, true);
       } catch (e) {
         return errText(e);

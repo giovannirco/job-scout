@@ -78,7 +78,7 @@ export function createApp() {
     cors({
       origin: (origin) => allowedOrigin(origin) ? origin : undefined,
       credentials: true,
-      allowHeaders: ["Content-Type", "Authorization", "Mcp-Session-Id", "Mcp-Protocol-Version", "Mcp-Method", "Mcp-Name", "Last-Event-ID"],
+      allowHeaders: ["Content-Type", "Authorization", "Mcp-Session-Id", "Mcp-Protocol-Version", "Mcp-Method", "Mcp-Name", "Last-Event-ID", "X-Job-Scout-Actor", "X-Agent-Name"],
       allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     }),
   );

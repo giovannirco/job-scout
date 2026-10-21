@@ -165,11 +165,24 @@ export const AUTOMATED_ACTORS = ["system", "autopilot", "career-ops", "intake", 
 /** Kept for compatibility: matches the exact automated actor names and `scan:*`. */
 export const AUTOMATED_ACTOR = new RegExp(`^(${AUTOMATED_ACTORS.join("|")}|scan:.*)$`);
 
-/** A career-ops sync actor: "career-ops" or a token named "career-ops…" (e.g. "career-ops-sync"). */
-export const isCareerOpsActor = (actor: string | null | undefined) => /^career-ops\b/i.test(String(actor || "").trim());
+/** Split MCP caller attribution "<agent> via <token>" into its parts. */
+function actorParts(actor: string): { caller: string | null; token: string } {
+  const via = actor.lastIndexOf(" via ");
+  return via >= 0 ? { caller: actor.slice(0, via).trim(), token: actor.slice(via + 5).trim() } : { caller: null, token: actor };
+}
+
+/**
+ * A career-ops sync actor: "career-ops", a token named "career-ops…" (e.g.
+ * "career-ops-sync"), or a caller naming itself career-ops on any token
+ * ("career-ops via <token>").
+ */
+export const isCareerOpsActor = (actor: string | null | undefined) => {
+  const { caller, token } = actorParts(String(actor || "").trim());
+  return /^career-ops\b/i.test(token) || (caller != null && /^career-ops\b/i.test(caller));
+};
 
 /** True for the app itself or an automated sync; a missing actor is the app ("system"). */
 export function isAutomatedActor(actor: string | null | undefined): boolean {
   const a = String(actor || "system").trim();
-  return AUTOMATED_ACTOR.test(a) || isCareerOpsActor(a);
+  return AUTOMATED_ACTOR.test(actorParts(a).token) || isCareerOpsActor(a);
 }

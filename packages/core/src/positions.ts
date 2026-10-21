@@ -459,7 +459,10 @@ export async function patchPosition(idOrSlug: string, patch: Record<string, unkn
   }
   if (set.status) {
     const metadata = { ...(pos.metadata || {}), ...((set.metadata || {}) as Record<string, unknown>) };
-    const automated = /^(system|autopilot|career-ops|intake|scan(?::.*)?|triage|evaluate|import|seed)$/.test(actor);
+    // "<agent> via <token>" (MCP caller attribution) is automated when its token is.
+    const via = actor.lastIndexOf(" via ");
+    const principal = via >= 0 ? actor.slice(via + 5) : actor;
+    const automated = /^(system|autopilot|career-ops|intake|scan(?::.*)?|triage|evaluate|import|seed)$/.test(principal);
     if (set.status === "review" && !automated) metadata.reviewIntent = { kind: "operator", actor, at: new Date().toISOString() };
     else delete metadata.reviewIntent;
     if (set.status !== pos.status) {

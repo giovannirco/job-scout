@@ -15,7 +15,7 @@ const mcpCore: McpHttpHandler = createMcpHandler(() => createJobScoutMcpServer()
 
 const CORS: Record<string, string> = {
   "Access-Control-Allow-Methods": "POST, GET, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, Mcp-Session-Id, Mcp-Protocol-Version, Mcp-Method, Mcp-Name, Last-Event-ID",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, Mcp-Session-Id, Mcp-Protocol-Version, Mcp-Method, Mcp-Name, Last-Event-ID, X-Job-Scout-Actor, X-Agent-Name",
   "Access-Control-Expose-Headers": "Mcp-Session-Id, Mcp-Protocol-Version",
 };
 
@@ -32,7 +32,9 @@ export async function handleMcpHttp(request: Request, parsedBody?: unknown): Pro
       headers: { "Content-Type": "application/json", "WWW-Authenticate": 'Bearer realm="job-scout-mcp", error="invalid_token"', ...corsHeaders },
     });
   }
-  const authInfo: AuthInfo = { token: header.slice(7).trim(), clientId: user.name, scopes: user.scopes };
+  // Tokens are often shared by several agents; the caller may name itself (sanitized in agentOf).
+  const callerActor = request.headers.get("x-job-scout-actor") || request.headers.get("x-agent-name") || undefined;
+  const authInfo: AuthInfo = { token: header.slice(7).trim(), clientId: user.name, scopes: user.scopes, extra: callerActor ? { actor: callerActor } : undefined };
   let body = parsedBody;
   if (body === undefined && request.method !== "GET" && request.method !== "HEAD") {
     try {

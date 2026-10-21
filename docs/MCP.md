@@ -42,7 +42,7 @@ The API includes an MCP server for reading positions, managing the pipeline and 
 | `intake` | create/refresh a position from a job URL; queues triage when a model key is set |
 | `refresh_jd` | re-fetch the ATS page; revision if changed |
 | `update_position` | PATCH status, priority, notes, nextAction, resumeSurface, watchEnabled, appliedAt. The career-ops guard below applies to a `skip`/`archived` status; the other fields still apply. `status: materials` follows the materials rule below |
-| `set_position_status` | any pipeline status; `archived` requires a reason. Subject to the career-ops guard below; `materials` follows the materials rule below |
+| `set_position_status` | any pipeline status; `archived` requires a reason. Subject to the career-ops guard below; optional `actor` names the calling agent (see [Attribution](#attribution)); `materials` follows the materials rule below |
 | `log_activity` | append a timeline note |
 | `upsert_interview` | create/patch a screen or interview (transcript queues an AI brief unless `skipBrief`) |
 | `brief_interview` | queue or `sync` the `interview_brief` model vs JD + company pack. A transcript does not queue a brief when no model key is set |
@@ -100,6 +100,16 @@ Authorization = "Bearer <token from Settings › System>"
 ```
 
 Cursor / Claude Code: same URL and header in the MCP server list. Mint one token per client so they can be revoked independently.
+
+## Attribution
+
+Writes record an actor in the position timeline. By default it is the token's name. When several agents share one token, each can name itself with an `X-Job-Scout-Actor` header (or `X-Agent-Name`); `set_position_status` also accepts an `actor` argument, which takes precedence. The timeline then shows `<caller> via <token name>`, for example `pipeline-sync via shared-agent`. The caller name is reduced to letters, digits and `. _ : @ -`, capped at 64 characters, and the token name is always kept, so a header cannot impersonate another token or the operator. Automation rules still follow the token: a caller using an automated token stays automated.
+
+```toml
+[mcp_servers.job-scout.headers]
+Authorization = "Bearer <token from Settings › System>"
+X-Job-Scout-Actor = "pipeline-sync"
+```
 
 ## Verify
 

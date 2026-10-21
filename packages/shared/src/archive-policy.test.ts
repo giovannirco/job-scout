@@ -110,3 +110,14 @@ describe("automated actors", () => {
     expect(isCareerOpsActor("my-career-ops")).toBe(false);
   });
 });
+
+describe("actor attribution format", () => {
+  it("reads career-ops from either side of '<agent> via <token>'", () => {
+    expect(isCareerOpsActor("career-ops via shared-agent")).toBe(true);
+    expect(isCareerOpsActor("desk-agent via career-ops-sync")).toBe(true);
+    expect(isCareerOpsActor("desk-agent via shared-agent")).toBe(false);
+    expect(isAutomatedActor("career-ops via shared-agent")).toBe(true);
+    expect(isAutomatedActor("someone via scan:greenhouse")).toBe(true);
+    expect(isAutomatedActor("desk-agent via shared-agent")).toBe(false);
+  });
+});
