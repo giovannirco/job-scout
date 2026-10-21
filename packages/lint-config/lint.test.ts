@@ -15,6 +15,16 @@ describe("real typed lint gate", () => {
     expect(good.errorCount).toBe(0);
   });
 
+  it("reports async callbacks in void slots and dead conditions as errors", async () => {
+    const eslint = new ESLint({ cwd: root });
+    const [misused] = await eslint.lintText("setTimeout(async () => {}, 1);\n", { filePath });
+    expect(misused.messages).toEqual(expect.arrayContaining([expect.objectContaining({ ruleId: "@typescript-eslint/no-misused-promises", severity: 2 })]));
+    const [dead] = await eslint.lintText("export function f(xs: string[]) { return xs ? 1 : 0; }\n", { filePath });
+    expect(dead.messages).toEqual(expect.arrayContaining([expect.objectContaining({ ruleId: "@typescript-eslint/no-unnecessary-condition", severity: 2 })]));
+    const [good] = await eslint.lintText("export function g(xs: string[] | undefined) { setTimeout(() => void Promise.resolve(xs), 1); return xs ? 1 : 0; }\n", { filePath });
+    expect(good.errorCount).toBe(0);
+  });
+
   it("rejects named Node runtime imports in shared but allows namespace and type-only imports", async () => {
     const eslint = new ESLint({ cwd: root });
     const [bad] = await eslint.lintText('import { createHash } from "node:crypto";\n', { filePath });
