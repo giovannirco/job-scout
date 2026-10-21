@@ -12,6 +12,7 @@ import {
   summarizeDiffs,
   changeKindLabel,
   humanDiffSummary,
+  isLocationRefinement,
 } from "./hash.js";
 
 describe("contentHash", () => {
@@ -220,5 +221,36 @@ describe("material eligibility edits", () => {
   it.each([" US residents only.", " No visa sponsorship.", " Salary reduced to $80k."])("keeps a short addition material: %s", addition => {
     const before = "Build and maintain software systems. ".repeat(50);
     expect(classifyMateriality([{ path: "description_text", before, after: before + addition }])).toEqual({ material: true, change_kind: "content" });
+  });
+});
+
+describe("location refinement", () => {
+  const loc = (before: string, after: string, extra: Array<{ path: string; before: string; after: string }> = []) =>
+    classifyMateriality([{ path: "location_raw", before, after }, ...extra]);
+
+  it("a location that only gains detail is not material", () => {
+    expect(loc("Mexico City", "Mexico City, Mexico")).toEqual({ material: false, change_kind: "noise_rebase" });
+    expect(loc("Remote", "Remote · Argentina · Brazil")).toEqual({ material: false, change_kind: "noise_rebase" });
+    expect(loc("São Paulo", "São Paulo, Brazil")).toEqual({ material: false, change_kind: "noise_rebase" });
+    expect(loc("sao paulo", "São Paulo / SP | Brazil")).toEqual({ material: false, change_kind: "noise_rebase" });
+  });
+
+  it("stays material when the geo or remote class moved with it", () => {
+    expect(loc("Remote", "Remote · Argentina · Brazil", [{ path: "geo_class", before: "ambiguous_remote", after: "brazil_friendly" }])).toEqual({ material: true, change_kind: "geo" });
+    expect(loc("Remote", "Remote · Argentina · Brazil", [{ path: "remote_class", before: "ambiguous_remote", after: "brazil" }])).toEqual({ material: true, change_kind: "geo" });
+  });
+
+  it("a different place, a lost place or a token that only shares words is material", () => {
+    expect(loc("Berlin", "Paris")).toEqual({ material: true, change_kind: "geo" });
+    expect(loc("Mexico City, Mexico", "Mexico City")).toEqual({ material: true, change_kind: "geo" });
+    expect(loc("Remote", "Remote Canada only")).toEqual({ material: true, change_kind: "geo" });
+    expect(loc("Remote - US", "Remote - Canada")).toEqual({ material: true, change_kind: "geo" });
+  });
+
+  it("isLocationRefinement folds accents, case and punctuation", () => {
+    expect(isLocationRefinement("SÃO PAULO.", "São Paulo, Brazil")).toBe(true);
+    expect(isLocationRefinement("New York; NY", "New York - NY - United States")).toBe(true);
+    expect(isLocationRefinement("", "Remote")).toBe(false);
+    expect(isLocationRefinement("York", "New York")).toBe(false);
   });
 });

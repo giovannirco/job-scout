@@ -222,6 +222,29 @@ export function isSnapshotCompletionDiff(d: FieldDiff): boolean {
   return false;
 }
 
+/** Place tokens of a location: accents, case and punctuation folded, split on , · / | ; and -. */
+function locationTokens(text: string): string[] {
+  return (text || "")
+    .normalize("NFD")
+    .replace(/\p{M}+/gu, "")
+    .toLowerCase()
+    .split(/[,·/|;\-–—]+/)
+    .map((t) => t.replace(/[^\p{L}\p{N}]+/gu, " ").trim())
+    .filter(Boolean);
+}
+
+/**
+ * A location that only gains detail ("Mexico City" → "Mexico City, Mexico",
+ * "Remote" → "Remote · Argentina · Brazil"): every place token of `before`
+ * is still in `after`. The caller decides whether the geo/remote class moved.
+ */
+export function isLocationRefinement(before: string | null | undefined, after: string | null | undefined): boolean {
+  const b = locationTokens(before || "");
+  if (!b.length) return false;
+  const a = new Set(locationTokens(after || ""));
+  return b.every((t) => a.has(t));
+}
+
 /** Badge flips and trim-only titles are not a new snapshot. */
 export function isBadgeBookkeepingDiff(d: FieldDiff): boolean {
   if (d.path === "listing_status" && d.before === "changed" && d.after === "open") return true;
@@ -245,8 +268,12 @@ export function classifyMateriality(
   }
 
   const brokenPay = diffs.some((d) => d.path === "salary_raw" && /\[object Object\]/.test(d.before || ""));
+  // A location gaining detail is a refinement unless the geo/remote class moved with it
+  // (those diffs stay material on their own).
+  const classMoved = diffs.some((d) => d.path === "geo_class" || d.path === "remote_class");
   const meaningful = diffs.filter((d) => {
     if (brokenPay && d.path.startsWith("salary_")) return false;
+    if (d.path === "location_raw" && !classMoved && isLocationRefinement(d.before, d.after)) return false;
     return !isSnapshotCompletionDiff(d);
   });
   if (!meaningful.length) {

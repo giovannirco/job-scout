@@ -245,6 +245,30 @@ describe("JD ingestion gaps (isolated PGlite)", () => {
       expect((await jobsFor("jev_check", position.id)).map((j) => j.payload?.revision).sort()).toEqual([1, 2]);
     });
 
+    it("a location that only gains detail is a non-material revision that still stores the new location", async () => {
+      const { position } = await upsertFromJob(role("l1", { locationRaw: "Mexico City" }), { status: "applied" });
+      const db = await getDb();
+      await db.delete(jobs);
+      const r = await applySnapshot({ positionId: position.id, job: role("l1", { locationRaw: "Mexico City, Mexico" }) });
+      expect(r).toMatchObject({ changed: true, revision: 2 });
+      const [rev] = await revisionsOf(position.id);
+      expect(rev).toMatchObject({ revision: 2, changeKind: "noise_rebase", material: false, locationRaw: "Mexico City, Mexico" });
+      expect(await jobsFor("jd_review", position.id)).toHaveLength(0);
+      expect(await jobsFor("jev_check", position.id)).toHaveLength(0);
+      expect((await getPosition(position.id))!.listingStatus).toBe("open");
+    });
+
+    it("a refined location that moves the geo class stays a material geo change", async () => {
+      const { position } = await upsertFromJob(role("l2", { locationRaw: "Remote" }), { status: "applied" });
+      const db = await getDb();
+      await db.delete(jobs);
+      await applySnapshot({ positionId: position.id, job: role("l2", { locationRaw: "Remote · Argentina · Brazil" }) });
+      const [rev] = await revisionsOf(position.id);
+      expect(rev).toMatchObject({ revision: 2, changeKind: "geo", material: true, locationRaw: "Remote · Argentina · Brazil" });
+      expect((rev!.fieldDiffs as Array<{ path: string }>).map((d) => d.path)).toContain("geo_class");
+      expect(await jobsFor("jd_review", position.id)).toHaveLength(1);
+    });
+
     it("the fit check is rate-limited the same way; a location change bypasses the limit", async () => {
       const { position } = await upsertFromJob(role("c3"), { status: "triaged" });
       const first = await jobsFor("jev_check", position.id);

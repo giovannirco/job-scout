@@ -39,7 +39,7 @@ import {
   aggregatorHost, extractAggregatorEmployer, decisionTitle,
   isCosmeticTextChange, jdSufficiency, jdSubstantiallyRewritten, type JdSufficiency,
 } from "@job-scout/shared";
-import { positionSlugFor, slugForRetitle, withPrevious } from "./slug-repair.js";
+import { slugForRetitle, withPrevious } from "./slug-repair.js";
 import { resolveCompanyForName } from "./companies.js";
 import { addEvent } from "./timeline.js";
 import { hasMaterials, MaterialsMissingError, refreshedCareerOpsStamp } from "./pipeline-integrity.js";
@@ -858,17 +858,24 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
     watchChecks.labels({ outcome: "unchanged" }).inc();
     return { changed: false as const, revision: null };
   }
-  const { material, change_kind } = classifyMateriality(diffs, {
-    forceKind: nextRev === 1 ? "first_seen" : listingClosed ? "closed" : undefined,
-  });
   const loc = locationRaw || before.location_raw;
-  const computed = classifyListing({
-    locationRaw: loc,
+  const classifyInput = {
     workplaceType: opts.job.workplaceType,
     isRemote: opts.job.isRemote,
     company: pos.company.name,
     title,
     descriptionText: bodyText,
+  };
+  const computed = classifyListing({ ...classifyInput, locationRaw: loc });
+  // A location edit records whether it moved the geo/remote class (same classifier, same JD,
+  // only the location differs), so a location that merely gains detail stays non-material.
+  if (nextRev > 1 && diffs.some((d) => d.path === "location_raw")) {
+    const was = classifyListing({ ...classifyInput, locationRaw: before.location_raw });
+    if (was.geoClass !== computed.geoClass) diffs.push({ path: "geo_class", before: was.geoClass, after: computed.geoClass });
+    if (was.remoteClass !== computed.remoteClass) diffs.push({ path: "remote_class", before: was.remoteClass, after: computed.remoteClass });
+  }
+  const { material, change_kind } = classifyMateriality(diffs, {
+    forceKind: nextRev === 1 ? "first_seen" : listingClosed ? "closed" : undefined,
   });
   // The revision records what the listing says; the position keeps a person's workplace/geo call.
   const facts = applyClassificationOverride(pos.metadata, computed);
