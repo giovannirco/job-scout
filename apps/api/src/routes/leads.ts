@@ -19,7 +19,7 @@ export const leadsRoutes = new Hono();
 const actorOf = (c: Context) => (c.get("user") as { name?: string } | undefined)?.name || "operator";
 
 function failFrom(c: Context, e: unknown) {
-  const err = e as { message?: string; code?: string; leadId?: string };
+  const err = e as { message?: string; code?: string; leadId?: string } | null | undefined;
   if (err?.code === "not_found") return fail(c, "NOT_FOUND", err.message || "not found");
   if (err?.code === "duplicate_lead") return fail(c, "CONFLICT", err.message || "duplicate lead", { leadId: err.leadId });
   if (e instanceof CursorError) return fail(c, "VALIDATION_ERROR", e.message, { code: e.code });

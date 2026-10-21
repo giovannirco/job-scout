@@ -29,7 +29,11 @@ const QUIET_PATHS = new Set(["/api/v1/health", "/api/v1/ready", "/metrics", "/fa
 /** LLM section of /health, bounded so a slow database never fails the liveness probe. */
 async function healthLlm() {
   try {
-    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 1_500).unref?.());
+    const timeout = new Promise<null>((resolve) => {
+      // unref() is Node-only; other timer implementations may not have it.
+      const timer: { unref?: () => unknown } = setTimeout(() => resolve(null), 1_500);
+      timer.unref?.();
+    });
     const report = await Promise.race([getLlmHealth(), timeout]);
     return report ? publicLlmHealth(report) : { state: "unknown" as const };
   } catch {
@@ -102,7 +106,7 @@ export function createApp() {
   // Liveness stays HTTP 200: an LLM outage is "degraded", not a reason to restart the API.
   app.get("/api/v1/health", async (c) => {
     const llm = await healthLlm();
-    return ok(c, { status: llm?.state === "failing" ? "degraded" : "ok", version: env.version, llm });
+    return ok(c, { status: llm.state === "failing" ? "degraded" : "ok", version: env.version, llm });
   });
   app.get("/api/v1/ready", async (c) => {
     try {

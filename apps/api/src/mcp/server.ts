@@ -123,7 +123,7 @@ function instrumentTools(server: McpServer) {
     (original as unknown as (name: string, cfg: unknown, handler: Handler) => unknown)(name, cfg, async (...args: unknown[]) => {
       const t0 = Date.now();
       try {
-        const out = (await handler(...args)) as { isError?: boolean };
+        const out = (await handler(...args)) as { isError?: boolean } | null | undefined;
         const status = out?.isError ? "error" : "ok";
         const ms = Date.now() - t0;
         mcpCalls.labels({ tool: name, status }).inc();
