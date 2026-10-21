@@ -18,7 +18,7 @@ export function ProcessPage() {
   const [openRound, setOpenRound] = useState<string | null>(null);
   const list = useApi<ProcessRow[]>(["processes"], "/api/v1/processes", { refetchInterval: 30_000 });
   const rows = list.data || [];
-  const current = rows.find((r) => r.id === selectedId) || rows[0];
+  const current = rows.find((r) => r.id === selectedId) || rows.at(0);
   const setId = (id: string) => {
     setOpenRound(null);
     void navigate({ search: (prev) => ({ ...prev, id }) });

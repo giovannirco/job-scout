@@ -366,7 +366,7 @@ function AddUrlModal({ open, onClose, onCreated }: { open: boolean; onClose: () 
         method: "POST",
         body: JSON.stringify({ url: url.trim(), companyName: company.trim() || undefined }),
       });
-      const name = res.data.company?.name || "Position";
+      const name = (res.data.company as PositionRow["company"] | null | undefined)?.name || "Position";
       toast.success(res.meta.triageJobId ? `${name} added — triage queued` : `${name} added`);
       void qc.invalidateQueries({ queryKey: ["positions"] });
       void qc.invalidateQueries({ queryKey: ["today"] });

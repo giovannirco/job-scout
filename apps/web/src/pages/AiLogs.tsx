@@ -54,7 +54,7 @@ function Transcript({ title, body, truncated, chars: total }: { title: string; b
         </span>
       }
       actions={
-        <Btn variant="outline" onClick={() => void navigator.clipboard?.writeText(body)}>
+        <Btn variant="outline" onClick={() => void (navigator.clipboard as Clipboard | undefined)?.writeText(body)}>
           Copy
         </Btn>
       }

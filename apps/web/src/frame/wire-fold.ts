@@ -9,7 +9,7 @@ export type WireFoldRow = {
 export function foldWire<T extends WireFoldRow>(rows: T[]): { row: T; count: number }[] {
   const out: { row: T; count: number }[] = [];
   for (const row of rows) {
-    const prev = out[out.length - 1];
+    const prev = out.at(-1);
     if (prev && sameBurst(prev.row, row)) prev.count += 1;
     else out.push({ row, count: 1 });
   }

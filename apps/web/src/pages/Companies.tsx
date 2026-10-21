@@ -14,7 +14,7 @@ export function CompaniesPage() {
   const navigate = useNavigate({ from: "/companies" });
   const page = search.page || 1;
   const [q, setQ] = useState(search.q || "");
-  const [view, setView] = useState<"grid" | "table">(() => (localStorage.getItem("js_companies_view") as "grid" | "table") || "grid");
+  const [view, setView] = useState<"grid" | "table">(() => (localStorage.getItem("js_companies_view") as "grid" | "table" | null) || "grid");
   useEffect(() => setQ(search.q || ""), [search.q]);
   useEffect(() => localStorage.setItem("js_companies_view", view), [view]);
 

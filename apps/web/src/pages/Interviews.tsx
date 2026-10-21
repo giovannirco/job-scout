@@ -15,14 +15,14 @@ export function InterviewsPage() {
   const search = useSearch({ from: "/interviews" });
   const navigate = useNavigate({ from: "/interviews" });
   const qc = useQueryClient();
-  const lane = (search.lane as Lane) || "all";
+  const lane = (search.lane as Lane | undefined) || "all";
   const selected = search.id || "";
   // navigate() only resolves once the URL commits; route load errors render in the router's error boundary.
   const set = (patch: Partial<InterviewsSearch>) => void navigate({ search: (prev) => ({ ...prev, ...patch }) });
 
   const list = useApi<Interview[]>(["interviews-desk", lane, search.q, search.stage], `/api/v1/interviews${qs({ lane, q: search.q, stage: search.stage })}`, { refetchInterval: 30_000 });
   const rows = list.data || [];
-  const current = rows.find((r) => r.id === selected) || rows[0];
+  const current = rows.find((r) => r.id === selected) || rows.at(0);
 
   return (
     <Page wide>

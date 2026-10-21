@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { patch, useAction, type PipelineStatus } from "@/lib/api";
 import { Dot, TONE_CHIP, cn } from "@/ui/kit";
-import { STATUS_LABEL, STATUS_PATH, STATUS_TERMINAL, STATUS_TONE } from "./badges";
+import { STATUS_LABEL, STATUS_PATH, STATUS_TERMINAL, STATUS_TONE, statusTone } from "./badges";
 
 export function useStatusChange() {
   return useAction(
@@ -35,7 +35,7 @@ export function StatusMenu({ id, value, size = "sm", className, align = "left" }
     };
   }, [open]);
 
-  const tone = STATUS_TONE[value] || "neutral";
+  const tone = statusTone(value) || "neutral";
   const pick = (status: PipelineStatus) => {
     setOpen(false);
     if (status === value) return;

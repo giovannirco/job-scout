@@ -28,7 +28,7 @@ export function PositionPage() {
   const { id } = useParams({ from: "/positions/$id" });
   const search = useSearch({ from: "/positions/$id" });
   const navigate = useNavigate({ from: "/positions/$id" });
-  const tab = (search.tab as Tab) || "brief";
+  const tab = (search.tab as Tab | undefined) || "brief";
   // navigate() only resolves once the URL commits; route load errors render in the router's error boundary.
   const setTab = (t: Tab) => void navigate({ search: { tab: t === "brief" ? undefined : t }, replace: true });
 
@@ -508,7 +508,7 @@ function EvaluationTab({ p, hasEval, hasJdReview, noKey, onRun }: { p: PositionD
 
 function JdTab({ p }: { p: PositionDetail }) {
   const [rev, setRev] = useState<number | null>(null);
-  const currentRev = rev ?? p.revisions[0]?.revision ?? null;
+  const currentRev = rev ?? p.revisions.at(0)?.revision ?? null;
   const r = useApi<Revision>(["revision", p.id, currentRev], `/api/v1/positions/${p.id}/revisions/${currentRev}`, { enabled: currentRev != null });
 
   return (

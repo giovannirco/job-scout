@@ -11,7 +11,7 @@ export function InboxPage() {
   useChatScope({ scope: "global" });
   const search = useSearch({ from: "/inbox" });
   const navigate = useNavigate({ from: "/inbox" });
-  const filter = (search.status as Filter) || "pending";
+  const filter = (search.status as Filter | undefined) || "pending";
   // navigate() only resolves once the URL commits; route load errors render in the router's error boundary.
   const setFilter = (status: Filter) => void navigate({ search: (prev) => ({ ...prev, status: status === "pending" ? undefined : status }) });
   const q = useApi<Approval[]>(["approvals", filter, search.sort], `/api/v1/approvals?status=${filter}&limit=100${search.sort ? `&sort=${search.sort}` : ""}`, { refetchInterval: 30_000 });

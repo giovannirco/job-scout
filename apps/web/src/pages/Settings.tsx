@@ -370,7 +370,7 @@ function AiTab() {
   );
   const runs = { ...runsQuery, data: runsQuery.data?.items };
   const qc = useQueryClient();
-  const [draft, setDraft] = useState<Record<string, { model: string; enabled: boolean; dailyCap: number }>>({});
+  const [draft, setDraft] = useState<Partial<Record<string, { model: string; enabled: boolean; dailyCap: number }>>>({});
   const [fallback, setFallback] = useState("");
   const [testing, setTesting] = useState<string | null>(null);
 

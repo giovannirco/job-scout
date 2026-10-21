@@ -5,7 +5,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { ArrowRight, Check, Inbox, RadarIcon, RotateCcw, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
-import { ScoreMeter, STATUS_LABEL, STATUS_PATH, STATUS_TONE, StatusBadge } from "@/components/badges";
+import { ScoreMeter, STATUS_LABEL, STATUS_PATH, STATUS_TONE, StatusBadge, statusLabel } from "@/components/badges";
 import { InboxPanel } from "@/frame/Dock";
 import { openDock, useChatScope } from "@/frame/store";
 import { patch, post, useAction, useApi, type AutopilotState, type PipelineStatus, type SystemInfo, type TodayData, type TodaySlim } from "@/lib/api";
@@ -303,7 +303,8 @@ function Funnel({
 }: {
   byStatus: Record<string, number>;
   untriaged: number;
-  last30d: Record<string, number>;
+  /** Read defensively: the funnel renders zeros when a response omits the 30-day counts. */
+  last30d?: Record<string, number>;
   appliedThisWeek: number;
 }) {
   const navigate = useNavigate();
@@ -355,7 +356,7 @@ function Funnel({
         ))}
         {extra30.map(([s, n]) => (
           <span key={s}>
-            {n} {STATUS_LABEL[s as PipelineStatus]?.toLowerCase() || s}
+            {n} {statusLabel(s)?.toLowerCase() || s}
           </span>
         ))}
         <span className="text-fg">{appliedThisWeek || 0} applied this week</span>

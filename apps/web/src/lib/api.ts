@@ -105,7 +105,7 @@ export type PositionDetail = PositionRow & {
   equityNotes: string | null;
   employmentType: string | null;
   postedAt: string | null;
-  departments: string[];
+  departments: string[] | null;
   source: string | null;
   contentHash: string | null;
   lastCheckedAt: string | null;
@@ -113,7 +113,7 @@ export type PositionDetail = PositionRow & {
   nextAction: string | null;
   notes: string | null;
   resumeSurface: string | null;
-  metadata: Record<string, unknown>;
+  metadata: Record<string, unknown> | null;
   createdAt: string;
   company: {
     id: string;
@@ -491,7 +491,7 @@ export type CompanyDetail = {
   careersUrl: string | null;
   industryTags: string[] | null;
   overview: string | null;
-  metadata: Record<string, unknown>;
+  metadata: Record<string, unknown> | null;
   positions: { id: string; slug: string; title: string; status: PipelineStatus; triageScore: number | null; triageVerdict: Verdict | null; listingStatus: string | null; primaryUrl: string | null; salaryMin: number | null; salaryMax: number | null; salaryCurrency: string | null; salaryPeriod: string | null; locationRaw: string | null; firstSeenAt: string | null; postedAt: string | null; departments: string[] | null; updatedAt: string }[];
   research: Evaluation | null;
   boards: Board[];
@@ -554,7 +554,8 @@ export type Profile = {
 export type LlmStatus = {
   configured: boolean;
   baseUrl: string;
-  fallbackModel: string;
+  /** Read defensively: the UI keeps an empty fallback when a response omits it. */
+  fallbackModel?: string;
   operations: {
     id: string;
     model: string;

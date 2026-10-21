@@ -128,7 +128,7 @@ function Discovery({ search, set, summary }: { search: RadarSearch; set: (p: Par
       toast.success(promoteMessage({ created: res.meta.created, revived, triageJobId: res.meta.triageJobId }));
       void qc.invalidateQueries({ queryKey: ["radar"] });
       void qc.invalidateQueries({ queryKey: ["positions"] });
-      const slug = res.data?.slug;
+      const slug = (res.data as { slug?: string } | null | undefined)?.slug;
       if (slug) void navigate({ to: "/positions/$id", params: { id: slug } });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed");

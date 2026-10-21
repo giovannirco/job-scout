@@ -15,6 +15,11 @@ export const STATUS_TONE: Record<PipelineStatus, Tone> = {
   archived: "faint",
 };
 
+/** Statuses arrive from the API as plain strings; one this build does not know has no tone. */
+export function statusTone(status: string): Tone | undefined {
+  return (STATUS_TONE as Partial<Record<string, Tone>>)[status];
+}
+
 export const STATUS_LABEL: Record<PipelineStatus, string> = {
   triaged: "Triaged",
   review: "Review",
@@ -29,11 +34,16 @@ export const STATUS_LABEL: Record<PipelineStatus, string> = {
 };
 
 /** The forward path a position walks. Terminal states live outside it. */
+/** Label for a status string from the API; undefined when this build does not know it. */
+export function statusLabel(status: string): string | undefined {
+  return (STATUS_LABEL as Partial<Record<string, string>>)[status];
+}
+
 export const STATUS_PATH: PipelineStatus[] = ["triaged", "review", "materials", "applied", "screen", "interview", "offer"];
 export const STATUS_TERMINAL: PipelineStatus[] = ["rejected", "skip", "archived"];
 
 export function StatusBadge({ status, className }: { status: PipelineStatus | string; className?: string }) {
-  const tone = STATUS_TONE[status as PipelineStatus] || "neutral";
+  const tone = statusTone(status) || "neutral";
   return (
     <Chip tone={tone} className={cn(status === "rejected" && "line-through", className)} mono={false}>
       <Dot tone={tone} />

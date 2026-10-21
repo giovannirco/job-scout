@@ -48,7 +48,7 @@ export function Dock() {
 
 /* ------------------------------------------------------------------ wire */
 
-const KIND_TONE: Record<string, Tone> = {
+const KIND_TONE: Partial<Record<string, Tone>> = {
   triage: "accent",
   triaged: "accent",
   evaluate: "info",

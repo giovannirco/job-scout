@@ -114,7 +114,7 @@ export function ChatPanel() {
           return;
         }
         if (event === "delta") setStream((s) => (s ? { ...s, draft: s.draft + String(e.text || "") } : s));
-        else if (event === "tool_call") setStream((s) => (s ? { ...s, draft: "", tools: [...s.tools, { id: String(e.id), name: String(e.name), args: (e.args as Record<string, unknown>) || {} }], steps: s.steps + 1 } : s));
+        else if (event === "tool_call") setStream((s) => (s ? { ...s, draft: "", tools: [...s.tools, { id: String(e.id), name: String(e.name), args: (e.args as Record<string, unknown> | undefined) || {} }], steps: s.steps + 1 } : s));
         else if (event === "tool_result")
           setStream((s) => (s ? { ...s, tools: s.tools.map((t) => (t.id === e.id ? { ...t, ok: Boolean(e.ok), preview: String(e.preview || ""), ms: Number(e.ms || 0) } : t)) } : s));
         else if (event === "message") {
