@@ -41,7 +41,7 @@ The API includes an MCP server for reading positions, managing the pipeline and 
 | tool | |
 |--|--|
 | `intake` | create/refresh a position from a job URL; queues triage when a model key is set |
-| `refresh_jd` | re-fetch the ATS page; revision if changed |
+| `refresh_jd` | re-fetch the ATS page; revision if changed. Refused with `frozen:<status>` at interview/offer unless `force: true` (explicit operator refresh) |
 | `update_position` | PATCH status, priority, notes, nextAction, resumeSurface, watchEnabled, appliedAt. The career-ops guard below applies to a `skip`/`archived` status; the other fields still apply. `status: materials` follows the materials rule below |
 | `set_position_status` | any pipeline status; `archived` requires a reason. Subject to the career-ops guard below; optional `actor` names the calling agent (see [Attribution](#attribution)); `materials` follows the materials rule below |
 | `log_activity` | append a timeline note |

@@ -95,7 +95,8 @@ positionsRoutes.post("/:id/archive", async (c) => {
 
 positionsRoutes.post("/:id/refresh", async (c) => {
   try {
-    const r = await refreshPosition(c.req.param("id"), "manual");
+    const b = await body<{ force?: boolean }>(c);
+    const r = await refreshPosition(c.req.param("id"), "manual", { force: b.force === true });
     return ok(c, r);
   } catch (e) {
     return fail(c, "VALIDATION_ERROR", e instanceof Error ? e.message : String(e));

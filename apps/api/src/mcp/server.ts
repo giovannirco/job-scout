@@ -344,10 +344,14 @@ export function createJobScoutMcpServer() {
   );
   server.registerTool(
     "refresh_jd",
-    { title: "Refresh JD", description: "Re-fetch the ATS page and record a revision if it changed.", inputSchema: { idOrSlug: z.string() } },
+    {
+      title: "Refresh JD",
+      description: "Re-fetch the ATS page and record a revision if it changed. The JD is frozen from interview stage on (refusal `frozen:<status>`); pass force=true only when the operator explicitly asks to refresh it anyway.",
+      inputSchema: { idOrSlug: z.string(), force: z.boolean().optional().describe("Explicit operator refresh: override the interview/offer freeze") },
+    },
     async (a) => {
       try {
-        return text(await refreshPosition(a.idOrSlug, "mcp"));
+        return text(await refreshPosition(a.idOrSlug, "mcp", { force: a.force === true }));
       } catch (e) {
         return errText(e);
       }

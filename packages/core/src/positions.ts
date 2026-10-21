@@ -30,7 +30,8 @@ import {
   HOT_STATUSES,
   PipelineStatus,
   snapshotIdentityMismatch, snapshotPageVerdict, bodyNotFoundPlausible,
-  isNoiseJobTitle, cleanJobTitle, cleanLocation, canonicalExternalIdentity, normalizePostingUrl,
+  isNoiseJobTitle, cleanJobTitle, cleanLocation, canonicalExternalIdentity,
+  companiesMatch, jdRefreshFrozen, sameNormalizedUrl,
   searchWords, likeContains, homeMarket, listedAtHome,
   employerFromPosting, unresolvedCompany, UNRESOLVED_COMPANY, requisitionId,
 } from "@job-scout/shared";
@@ -531,7 +532,11 @@ export async function stampCareerOps(idOrSlug: string, stamp: Record<string, unk
  * when content/title/comp/status actually changed. A closed listing gets exactly
  * one `closed` revision.
  */
-export async function applySnapshot(opts: { positionId: string; job: AtsJob; source?: string }) {
+/**
+ * `force` is an explicit operator refresh: it overrides the interview/offer freeze and
+ * watchEnabled=false, never the not-a-JD, failed-fetch or identity guards.
+ */
+export async function applySnapshot(opts: { positionId: string; job: AtsJob; source?: string; force?: boolean }) {
   const db = await getDb();
   const pos = await getPosition(opts.positionId);
   if (!pos) throw new Error("position not found");
@@ -556,7 +561,7 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
       softNotFoundSince = undefined;
     }
   }
-  const blocked = snapshotBlockReason(pos, opts.job, { prevBody });
+  const blocked = snapshotBlockReason(pos, opts.job, { prevBody, source: opts.source || "scan", force: Boolean(opts.force) });
   if (blocked) {
     // Keep the last good revision: no jd_revision, no jd_change, no re-scoring. Record why.
     const now = new Date();
@@ -571,7 +576,10 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
         },
       })
       .where(eq(positions.id, pos.id));
-    await addEvent({
+    // A policy refusal (frozen stage, watch off) repeats on every scan/watch tick: log it once per run.
+    const policy = /^(frozen:|watch_disabled$)/.test(blocked);
+    const prevRejected = (pos.metadata?.lastAtsFetch as { rejected?: unknown } | undefined)?.rejected;
+    if (!policy || prevRejected !== blocked) await addEvent({
       positionId: pos.id,
       kind: "harness",
       title: `JD snapshot not applied: ${blocked}`.slice(0, 300),
@@ -973,11 +981,15 @@ function softNotFoundStreak(metadata: Record<string, unknown> | null | undefined
  *  - not a JD: JS wall, loading shell, placeholder or vendor boilerplate
  *  - failed fetch flagged by the fetcher (e.g. InHire job id mismatch)
  *  - identity: a different company or ATS posting (cross-company clobber)
+ *  - frozen: interview stage or later keeps the JD it was interviewed on (closure still applies)
+ *  - watch off: an automatic watch never rewrites a non-hot position with watchEnabled=false;
+ *    it only records closure
+ * `force` (explicit operator refresh) lifts only the last two.
  */
 export function snapshotBlockReason(
-  pos: { title?: string | null; primaryUrl?: string | null; atsProvider?: string | null; atsJobId?: string | null; externalIdentity?: string | null; company: { name: string } },
+  pos: { title?: string | null; status?: string | null; watchEnabled?: boolean | null; primaryUrl?: string | null; atsProvider?: string | null; atsJobId?: string | null; externalIdentity?: string | null; company: { name: string } },
   job: AtsJob,
-  opts: { prevBody?: string | null } = {},
+  opts: { prevBody?: string | null; source?: string; force?: boolean } = {},
 ): string | null {
   if (job.listingStatus !== "closed") {
     const page = snapshotPageVerdict(pos.title, job, opts);
@@ -989,7 +1001,11 @@ export function snapshotBlockReason(
     { companyName: pos.company.name, primaryUrl: pos.primaryUrl, atsProvider: pos.atsProvider, atsJobId: pos.atsJobId, externalIdentity: pos.externalIdentity },
     { company: job.company, url: job.url, provider: job.provider, jobId: job.jobId, externalIdentity: job.externalIdentity },
   );
-  return mismatch ? `identity_mismatch:${mismatch}` : null;
+  if (mismatch) return `identity_mismatch:${mismatch}`;
+  if (opts.force || job.listingStatus === "closed") return null;
+  if (jdRefreshFrozen(pos.status)) return `frozen:${pos.status}`;
+  if (opts.source === "watch" && pos.watchEnabled === false && !(HOT_STATUSES as readonly string[]).includes(String(pos.status || ""))) return "watch_disabled";
+  return null;
 }
 
 /** Create-or-update a position from an ATS job. New positions start as `triaged` (untriaged until the LLM runs). */
@@ -1043,13 +1059,17 @@ export async function upsertFromJob(
     existing = (await db.select({ id: positions.id }).from(positions).where(eq(positions.primaryUrl, job.url)).limit(1))[0];
   }
   if (!existing) {
-    const aliases = await db.select({ id: positions.id, externalIdentity: positions.externalIdentity, url: positions.primaryUrl, status: positions.status }).from(positions);
-    existing = aliases.filter(p => (externalIdentity && canonicalExternalIdentity(p.externalIdentity) === externalIdentity)
-      || normalizePostingUrl(p.url) === normalizePostingUrl(job.url))
+    // An alias must be the same employer, and two unparseable URLs ("" === "") are not a match.
+    const aliases = await db
+      .select({ id: positions.id, externalIdentity: positions.externalIdentity, url: positions.primaryUrl, status: positions.status, companyName: companies.name })
+      .from(positions)
+      .innerJoin(companies, eq(positions.companyId, companies.id));
+    existing = aliases.filter(p => companiesMatch(p.companyName, company.name)
+      && ((externalIdentity && canonicalExternalIdentity(p.externalIdentity) === externalIdentity) || sameNormalizedUrl(p.url, job.url)))
       .sort((a, b) => Number(["applied", "screen", "interview", "offer"].includes(b.status)) - Number(["applied", "screen", "interview", "offer"].includes(a.status)))[0];
   }
   if (existing) {
-    await applySnapshot({ positionId: existing.id, job, source: opts.source || "scan" });
+    await applySnapshot({ positionId: existing.id, job: { ...job, company: job.company || company.name }, source: opts.source || "scan" });
     let position = (await getPosition(existing.id))!;
     let revived = false;
     if (opts.reviveArchived && position.status === "archived" && position.listingStatus !== "closed") {
@@ -1327,12 +1347,12 @@ export async function repairGreenhouseEmployment(): Promise<{ checked: number; u
 }
 
 /** Fetch the ATS page for a position and apply. */
-export async function refreshPosition(idOrSlug: string, source = "refresh") {
+export async function refreshPosition(idOrSlug: string, source = "refresh", opts: { force?: boolean } = {}) {
   const pos = await getPosition(idOrSlug);
   if (!pos) throw new Error("position not found");
   if (!pos.primaryUrl) throw new Error("position has no URL");
   const job = await fetchJobFromUrl(pos.primaryUrl);
-  return applySnapshot({ positionId: pos.id, job, source });
+  return applySnapshot({ positionId: pos.id, job, source, force: opts.force });
 }
 
 /** Rows changed since a timestamp — for the career-ops sync skill. */

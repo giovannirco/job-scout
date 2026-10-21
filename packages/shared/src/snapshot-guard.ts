@@ -1,6 +1,19 @@
 import { canonicalCompanySlug } from "./company-alias.js";
 import { canonicalExternalIdentity, normalizePostingUrl } from "./position-identity.js";
 
+/** JD refresh is frozen from interview stage on: the JD you interviewed for is the record. */
+export const JD_FROZEN_STATUSES = ["interview", "offer"] as const;
+
+export function jdRefreshFrozen(status?: string | null): boolean {
+  return (JD_FROZEN_STATUSES as readonly string[]).includes(String(status || ""));
+}
+
+/** Alias match for upsert dedupe: two unparseable URLs ("" === "") never match each other. */
+export function sameNormalizedUrl(a?: string | null, b?: string | null): boolean {
+  const x = normalizePostingUrl(a);
+  return Boolean(x) && x === normalizePostingUrl(b);
+}
+
 function companyKey(name?: string | null): string {
   const raw = (name || "").trim();
   if (!raw || /^__unresolved__$/i.test(raw)) return "";

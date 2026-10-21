@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { bodyNotFoundPlausible, bodySignature, isJsWallText, snapshotPageVerdict, titleSignature, titleSimilarity } from "./page-signature.js";
-import { companiesMatch, snapshotIdentityMismatch } from "./snapshot-guard.js";
+import { companiesMatch, jdRefreshFrozen, sameNormalizedUrl, snapshotIdentityMismatch } from "./snapshot-guard.js";
 
 /** The exact text an InHire job page serves without JavaScript (tenant prefix synthetic). */
 const INHIRE_JS_WALL = "acmepay • • • … This website need Javascript. Please turn it on.";
@@ -133,5 +133,19 @@ describe("identity guard: canonical ATS identity wins over company names", () =>
   });
   it("a tenant-scoped requisition id alone does not override a company mismatch", () => {
     expect(snapshotIdentityMismatch({ companyName: "Acme Pay", atsProvider: "workday", atsJobId: "R12345" }, { company: "Globex Labs", provider: "workday", jobId: "R12345" })).toMatch(/^company:/);
+  });
+});
+
+describe("JD freeze and alias URL matching", () => {
+  it("freezes interview and offer only", () => {
+    expect(jdRefreshFrozen("interview")).toBe(true);
+    expect(jdRefreshFrozen("offer")).toBe(true);
+    expect(jdRefreshFrozen("applied")).toBe(false);
+    expect(jdRefreshFrozen(null)).toBe(false);
+  });
+  it("two unparseable URLs are not the same posting", () => {
+    expect(sameNormalizedUrl("", "")).toBe(false);
+    expect(sameNormalizedUrl(null, "not a url")).toBe(false);
+    expect(sameNormalizedUrl("https://jobs.acme.test/1?utm_source=x", "https://jobs.acme.test/1/")).toBe(true);
   });
 });

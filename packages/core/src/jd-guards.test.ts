@@ -65,6 +65,47 @@ describe("JD snapshot guards and last-good repair (isolated PGlite)", () => {
     expect((await getPosition(position.id))!.title).toBe("Site Reliability Engineer - Senior");
   });
 
+  it("the JD is frozen at interview/offer; only an explicit force refresh rewrites it, a closure still applies", async () => {
+    const { position } = await upsertFromJob(inhire("p15"), { status: "interview" });
+    const before = await counts(position.id);
+    const edited = inhire("p15", { title: "Cloud Platform Engineer IV", descriptionText: `${JD} Now also owns the data platform.` });
+    const r = await applySnapshot({ positionId: position.id, job: edited, source: "watch" });
+    expect(r).toMatchObject({ changed: false, rejected: "frozen:interview" });
+    expect(await counts(position.id)).toEqual(before);
+    expect((await getPosition(position.id))!.title).toBe("Cloud Platform Engineer III");
+    // The same refusal on the next tick is not logged again.
+    await applySnapshot({ positionId: position.id, job: edited, source: "scan" });
+    const db = await getDb();
+    const frozenEvents = (await db.select().from(timelineEvents).where(eq(timelineEvents.positionId, position.id))).filter((e) => e.title.includes("frozen:interview"));
+    expect(frozenEvents).toHaveLength(1);
+    const forced = await applySnapshot({ positionId: position.id, job: edited, source: "manual", force: true });
+    expect(forced).toMatchObject({ changed: true });
+    expect((await getPosition(position.id))!.title).toBe("Cloud Platform Engineer IV");
+    // force never lifts the identity guard.
+    const other = await applySnapshot({ positionId: position.id, job: { ...edited, company: "Globex Labs", url: "https://jobs.globex.test/sre-1" }, force: true });
+    expect(other).toMatchObject({ rejected: expect.stringMatching(/^identity_mismatch:/) });
+    await applySnapshot({ positionId: position.id, job: inhire("p15", { title: "", descriptionText: "", listingStatus: "closed" }), source: "watch" });
+    expect((await getPosition(position.id))!.listingStatus).toBe("closed");
+  });
+
+  it("an automatic watch never rewrites a non-hot position with watchEnabled=false", async () => {
+    const { position } = await upsertFromJob(inhire("q16"), { status: "triaged" });
+    expect(position.watchEnabled).toBe(false);
+    const edited = inhire("q16", { descriptionText: `${JD} Pager rotation is one week in six.` });
+    const r = await applySnapshot({ positionId: position.id, job: edited, source: "watch" });
+    expect(r).toMatchObject({ changed: false, rejected: "watch_disabled" });
+    expect((await applySnapshot({ positionId: position.id, job: edited, source: "scan" })).changed).toBe(true);
+  });
+
+  it("upsert alias dedupe requires the same employer", async () => {
+    const { position: a } = await upsertFromJob({ ...inhire("r17"), provider: "other", company: "Initech", url: "https://jobs.shared-board.test/openings/42?utm_source=feed" }, { status: "review" });
+    const { position: b, created } = await upsertFromJob({ ...inhire("r17"), provider: "other", company: "Umbrella Analytics", url: "https://jobs.shared-board.test/openings/42" });
+    expect(created).toBe(true);
+    expect(b.id).not.toBe(a.id);
+    const again = await upsertFromJob({ ...inhire("r17"), provider: "other", company: "Initech", url: "https://jobs.shared-board.test/openings/42/" });
+    expect(again).toMatchObject({ created: false, position: { id: a.id } });
+  });
+
   /** Move the recorded first soft-404 observation back in time (the confirm window is SOFT_404_CONFIRM_MS). */
   async function ageSoftNotFound(positionId: string, ms = SOFT_404_CONFIRM_MS + 60_000) {
     const db = await getDb();

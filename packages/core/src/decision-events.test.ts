@@ -61,7 +61,10 @@ describe("automatic Jev checks", () => {
   it("checks material changes in an interview without advancing the stage, and skips older queued revisions", async () => {
     const job = role("changed"); const { position } = await upsertFromJob(job, { status: "interview" });
     const old = (await checks())[0];
-    await applySnapshot({ positionId: position.id, job: { ...job, locationRaw: "Remote Canada only" }, source: "watch" });
+    // The JD is frozen at interview: an automatic watch refuses, an explicit operator refresh applies.
+    expect(await applySnapshot({ positionId: position.id, job: { ...job, locationRaw: "Remote Canada only" }, source: "watch" })).toMatchObject({ rejected: "frozen:interview" });
+    expect(await checks()).toHaveLength(1);
+    await applySnapshot({ positionId: position.id, job: { ...job, locationRaw: "Remote Canada only" }, source: "manual", force: true });
     const rows = await checks(); expect(rows).toHaveLength(2);
     const fetcher = vi.fn().mockImplementation(async () => Response.json(answer)); vi.stubGlobal("fetch", fetcher);
     expect(await processJob(old)).toMatchObject({ skipped: "revision_superseded" });
@@ -70,7 +73,7 @@ describe("automatic Jev checks", () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(JSON.parse(fetcher.mock.calls[0][1].body).state.listing.location).toContain("Canada");
     expect((await getPosition(position.id))?.status).toBe("interview");
-    await applySnapshot({ positionId: position.id, job: { ...job, locationRaw: "Remote Canada only" }, source: "watch" });
+    await applySnapshot({ positionId: position.id, job: { ...job, locationRaw: "Remote Canada only" }, source: "manual", force: true });
     expect(await checks()).toHaveLength(2);
   });
 
