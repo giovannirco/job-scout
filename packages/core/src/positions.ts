@@ -29,7 +29,7 @@ import {
   summarizeDiffs,
   HOT_STATUSES,
   PipelineStatus,
-  snapshotIdentityMismatch, snapshotPageVerdict,
+  snapshotIdentityMismatch, snapshotPageVerdict, bodyNotFoundPlausible,
   isNoiseJobTitle, cleanJobTitle, cleanLocation, canonicalExternalIdentity, normalizePostingUrl,
   searchWords, likeContains, homeMarket, listedAtHome,
   employerFromPosting, unresolvedCompany, UNRESOLVED_COMPANY, requisitionId,
@@ -545,7 +545,8 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
   if (page?.refuse && page.signature === "not_found") {
     const streak = softNotFoundStreak(pos.metadata);
     softNotFoundSince = streak ?? new Date().toISOString();
-    if (streak && Date.now() - Date.parse(streak) >= SOFT_404_CONFIRM_MS) {
+    // A not-found title over a full-length JD body is a refusal, never a closure.
+    if (streak && Date.now() - Date.parse(streak) >= SOFT_404_CONFIRM_MS && bodyNotFoundPlausible(prevBody, opts.job.descriptionText)) {
       log.warn("jd.snapshot_not_found", { positionId: pos.id, where: page.where, url: opts.job.url, since: streak });
       opts = { ...opts, job: { ...opts.job, listingStatus: "closed", title: "", descriptionText: "", locationRaw: undefined, salaryRaw: pos.salaryRaw || undefined, rawPayload: { ...(opts.job.rawPayload || {}), closedReason: "not_found_page", softNotFoundSince: streak } } };
       softNotFoundSince = undefined;

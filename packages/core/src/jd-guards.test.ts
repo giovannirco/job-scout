@@ -92,6 +92,16 @@ describe("JD snapshot guards and last-good repair (isolated PGlite)", () => {
     expect(after.title).toBe("Cloud Platform Engineer III");
   });
 
+  it("a not-found title over a full-length JD body is refused but never closes", async () => {
+    const { position } = await upsertFromJob(inhire("n14"), { status: "review" });
+    const odd = inhire("n14", { title: "Page not found | Acme Pay" });
+    await applySnapshot({ positionId: position.id, job: odd });
+    await ageSoftNotFound(position.id);
+    const r = await applySnapshot({ positionId: position.id, job: odd });
+    expect(r).toMatchObject({ rejected: expect.stringMatching(/^not_a_jd:not_found:title/) });
+    expect((await getPosition(position.id))!).toMatchObject({ listingStatus: "open", status: "review", title: "Cloud Platform Engineer III" });
+  });
+
   it("a good fetch between soft-404s resets the streak", async () => {
     const { position } = await upsertFromJob(inhire("k11"), { status: "review" });
     await applySnapshot({ positionId: position.id, job: soft404("k11") });
