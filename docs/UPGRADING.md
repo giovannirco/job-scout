@@ -26,3 +26,7 @@ The companion security change documents authentication, certificate verification
 ## Selecting independent repairs
 
 `pnpm db:repair --list` prints the available names without running them. Use `--steps titles,entities,salary-object` with either `--preview` or `--apply` to review a bounded subset. Selected steps retain their canonical order; unknown or empty names are rejected before database writes. Only selected steps receive completion markers, and all selected steps still commit or roll back together. Use identical selections for preview and apply. This lets local corrections proceed independently when a remote ATS record is unavailable; inspect dependencies and the report before selecting a subset.
+
+## Prototype-key slugs
+
+Older builds looked company aliases up in a plain object, so a company named after an `Object.prototype` key (for example "Constructor") received a slug such as `function Object() { [native code] }`, and its postings inherited it. New rows are fixed. `pnpm db:repair-prototype-slugs` prints the affected companies and postings without writing; add `--apply` to reslug them. Each replaced slug is kept in `metadata.previousSlugs`, which position and company lookups still resolve, and every reslugged posting gets a `repair` timeline event. Back up the database first.

@@ -39,3 +39,4 @@ export * from "./decisions.js";
 export * from "./decision-events.js";
 export * from "./jd-repair.js";
 export * from "./pipeline-integrity.js";
+export * from "./slug-repair.js";

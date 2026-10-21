@@ -483,7 +483,7 @@ export function splitDocument(text: string, sectionNames: string[]): { markdown:
       }
     }
   }
-  const sections: Record<string, string> = {};
+  const sections: Record<string, string> = Object.create(null) as Record<string, string>;
   if (sectionNames.length) {
     const re = /^=== SECTION:\s*([^=]+?)\s*===\s*$/gim;
     const marks: { name: string; start: number; end: number }[] = [];

@@ -287,14 +287,15 @@ export async function listPositions(q: ListPositionsQuery) {
 
 export async function getPosition(idOrSlug: string) {
   const db = await getDb();
-  const row = (
-    await db
-      .select({ position: positions, company: companies })
-      .from(positions)
-      .innerJoin(companies, eq(positions.companyId, companies.id))
-      .where(or(eq(positions.id, idOrSlug), eq(positions.slug, idOrSlug)))
-      .limit(1)
-  )[0];
+  const find = (where: SQL | undefined) => db
+    .select({ position: positions, company: companies })
+    .from(positions)
+    .innerJoin(companies, eq(positions.companyId, companies.id))
+    .where(where)
+    .limit(1);
+  // Slugs replaced by a repair stay resolvable through metadata.previousSlugs.
+  const row = (await find(or(eq(positions.id, idOrSlug), eq(positions.slug, idOrSlug))))[0]
+    ?? (await find(sql`jsonb_exists(coalesce(${positions.metadata}->'previousSlugs', '[]'::jsonb), ${idOrSlug})`))[0];
   if (!row) return null;
   return { ...row.position, company: row.company };
 }

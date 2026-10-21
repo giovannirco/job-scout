@@ -1,10 +1,22 @@
 /** Known company slug aliases → canonical slug (prevent dual entities). */
-export const COMPANY_SLUG_ALIASES: Record<string, string> = {
-  "wellhub-gympass": "wellhub",
-  "wellhub-gym-pass": "wellhub",
-  gympass: "wellhub",
-  "gym-pass": "wellhub",
-};
+export const COMPANY_SLUG_ALIASES: ReadonlyMap<string, string> = new Map([
+  ["wellhub-gympass", "wellhub"],
+  ["wellhub-gym-pass", "wellhub"],
+  ["gympass", "wellhub"],
+  ["gym-pass", "wellhub"],
+]);
+
+/** Keys that resolve on a plain object through Object.prototype (lowercased). */
+export const PROTOTYPE_KEYS: ReadonlySet<string> = new Set(
+  [...Object.getOwnPropertyNames(Object.prototype), "__proto__", "prototype"].map((k) => k.toLowerCase()),
+);
+
+/** A slug that came from stringifying a function (e.g. "function Object() { [native code] }"). */
+export function isPrototypeSlug(slug?: string | null): boolean {
+  const s = String(slug || "").toLowerCase();
+  if (!s) return false;
+  return /native[\s-]*code|[{}()]/.test(s);
+}
 
 export function normalizeCompanyKey(input: string): string {
   return String(input || "")
@@ -20,7 +32,8 @@ export function normalizeCompanyKey(input: string): string {
 export function canonicalCompanySlug(nameOrSlug: string): string {
   const raw = normalizeCompanyKey(nameOrSlug);
   if (!raw) return raw;
-  if (COMPANY_SLUG_ALIASES[raw]) return COMPANY_SLUG_ALIASES[raw];
+  const alias = COMPANY_SLUG_ALIASES.get(raw);
+  if (alias) return alias;
   if (raw.includes("wellhub") && raw.includes("gympass")) return "wellhub";
   if (raw === "gympass" || raw.startsWith("gympass-")) return "wellhub";
   return raw;

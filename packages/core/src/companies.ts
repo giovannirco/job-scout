@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
 import { boardSources, companies, evaluations, getDb, id, positions, slugify } from "@job-scout/db";
 import { canonicalCompanySlug, isJobPostingUrl, parseListSort, preferredCompanyName } from "@job-scout/shared";
 
@@ -80,13 +80,10 @@ function isUniqueViolation(err: unknown): boolean {
 
 export async function getCompany(idOrSlug: string) {
   const db = await getDb();
-  const row = (
-    await db
-      .select()
-      .from(companies)
-      .where(or(eq(companies.id, idOrSlug), eq(companies.slug, idOrSlug)))
-      .limit(1)
-  )[0];
+  const find = (where: SQL | undefined) => db.select().from(companies).where(where).limit(1);
+  // Slugs replaced by a repair stay resolvable through metadata.previousSlugs.
+  const row = (await find(or(eq(companies.id, idOrSlug), eq(companies.slug, idOrSlug))))[0]
+    ?? (await find(sql`jsonb_exists(coalesce(${companies.metadata}->'previousSlugs', '[]'::jsonb), ${idOrSlug})`))[0];
   if (!row) return null;
   const pos = await db
     .select({

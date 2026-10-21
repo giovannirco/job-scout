@@ -91,9 +91,14 @@ settingsRoutes.patch("/profile", async (c) => {
 /** Settings > AI */
 settingsRoutes.get("/llm/models", async (c) => {
   const r = await getModelsCatalog({ force: c.req.query("refresh") === "1" });
-  const groups: Record<string, string[]> = {};
-  for (const m of r.models) (groups[m.ownedBy || "other"] ||= []).push(m.id);
-  return ok(c, { models: r.models, groups, cachedAt: r.cachedAt, fromCache: r.fromCache, error: (r as { error?: string }).error ?? null });
+  const groups = new Map<string, string[]>();
+  for (const m of r.models) {
+    const k = m.ownedBy || "other";
+    const g = groups.get(k);
+    if (g) g.push(m.id);
+    else groups.set(k, [m.id]);
+  }
+  return ok(c, { models: r.models, groups: Object.fromEntries(groups), cachedAt: r.cachedAt, fromCache: r.fromCache, error: (r as { error?: string }).error ?? null });
 });
 
 settingsRoutes.get("/llm/status", async (c) => {
@@ -158,7 +163,7 @@ settingsRoutes.get("/autopilot", async (c) => {
 });
 settingsRoutes.post("/autopilot/preset", async (c) => {
   const b = await body<{ preset?: string }>(c);
-  if (!b.preset || !(b.preset in AUTOPILOT_PRESET_VALUES)) return fail(c, "VALIDATION_ERROR", "preset must be manual | assisted | autopilot");
+  if (!b.preset || !Object.hasOwn(AUTOPILOT_PRESET_VALUES, b.preset)) return fail(c, "VALIDATION_ERROR", "preset must be manual | assisted | autopilot");
   const s = await getSettings();
   const next = applyAutopilotPreset(s.autopilot, b.preset as "manual" | "assisted" | "autopilot");
   const saved = await updateSettings({ autopilot: next });

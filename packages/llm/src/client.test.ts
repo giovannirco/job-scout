@@ -24,6 +24,14 @@ describe("splitDocument", () => {
     const r = splitDocument("=== SECTION: resume ===\nR\n=== SECTION: cover ===\nC\n```json\n{}\n```", ["resume", "cover"]);
     expect(r.sections).toEqual({ resume: "R", cover: "C" });
   });
+
+  it("keeps prototype-named sections as own keys", () => {
+    const r = splitDocument("=== SECTION: constructor ===\nA\n=== SECTION: toString ===\nB", ["constructor", "tostring"]);
+    expect(Object.hasOwn(r.sections, "constructor")).toBe(true);
+    expect(r.sections.constructor).toBe("A");
+    expect(r.sections.tostring).toBe("B");
+    expect(r.sections.valueOf).toBeUndefined();
+  });
 });
 
 describe("parseLastJsonValue / parseJsonLenient", () => {
