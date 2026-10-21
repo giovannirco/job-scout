@@ -12,7 +12,7 @@ import {
   slugify,
   type PositionStatus,
 } from "@job-scout/db";
-import { decodeHtmlEntities, fetchJobFromUrl as fetchListing, greenhouseListingLocation, type AtsJob } from "@job-scout/ats";
+import { assertPublicUrl, decodeHtmlEntities, detectAts, externalIdentityFromDetect, fetchJobFromUrl as fetchListing, greenhouseListingLocation, type AtsJob } from "@job-scout/ats";
 import { fetchJob as fetchJobFromUrl } from "./fetch-job.js";
 import {
   classifyMateriality,
@@ -29,6 +29,8 @@ import {
   summarizeDiffs,
   HOT_STATUSES,
   PipelineStatus,
+  GeoClass,
+  Workplace,
   snapshotIdentityMismatch, snapshotPageVerdict, bodyNotFoundPlausible,
   isNoiseJobTitle, cleanJobTitle, cleanLocation, canonicalExternalIdentity,
   companiesMatch, jdRefreshFrozen, sameNormalizedUrl,
@@ -42,6 +44,8 @@ import { jdChanges, watchChecks, ingestQuality } from "./metrics.js";
 import { careerStamp, groupingRows, groupRows, groupSummary, repostFor, terminalCareerStatus, validOperatorRow } from "./position-groups.js";
 import { getProfile, profileFingerprint } from "./profile.js";
 import { decodeCursor, encodeCursor, filterFingerprint } from "./list-cursor.js";
+import { applyClassificationOverride, classificationOverride } from "./classification-override.js";
+import { positionSlug, withPreviousSlug } from "./slug-repair.js";
 import { log as rootLog } from "@job-scout/shared";
 const log = rootLog.child({ scope: "positions" });
 
@@ -436,10 +440,8 @@ export async function currentJdText(positionId: string): Promise<string> {
 }
 
 const PATCHABLE = new Set([
-  "title",
   "status",
   "priority",
-  "primaryUrl",
   "resumeSurface",
   "nextAction",
   "notes",
@@ -450,11 +452,90 @@ const PATCHABLE = new Set([
   "geoNotes",
 ]);
 
+type PositionRow = NonNullable<Awaited<ReturnType<typeof getPosition>>>;
+type EditEvent = { field: string; from: unknown; to: unknown };
+
+/**
+ * Listing fields a person corrects by hand: title (reslugged, the old slug kept
+ * in metadata.previousSlugs), primaryUrl (public URL guard, ATS identity
+ * re-derived as intake does, the old URL kept in metadata.previousUrls so
+ * intake still finds the position) and workplace/geoClass (recorded in
+ * metadata.classificationOverride, which automatic classification respects).
+ */
+async function listingEdits(pos: PositionRow, patch: Record<string, unknown>, actor: string) {
+  const set: Record<string, unknown> = {};
+  const metadata: Record<string, unknown> = { ...(pos.metadata || {}) };
+  const events: EditEvent[] = [];
+  if (patch.title !== undefined) {
+    const title = cleanJobTitle(String(patch.title ?? "")).trim();
+    if (!title) throw new Error("invalid_title: title must not be empty");
+    if (title.length > 300) throw new Error("invalid_title: title is longer than 300 characters");
+    if (title !== pos.title) {
+      set.title = title;
+      set.craftFamily = craftFamily(title);
+      let slug = positionSlug(pos.company.slug, title, pos.id);
+      const db = await getDb();
+      const taken = (await db.select({ id: positions.id }).from(positions).where(and(eq(positions.slug, slug), sql`${positions.id} <> ${pos.id}`)).limit(1))[0];
+      if (taken) slug = `${slug}-${pos.id.slice(-8, -4).toLowerCase()}`;
+      if (slug !== pos.slug) {
+        set.slug = slug;
+        Object.assign(metadata, withPreviousSlug(metadata, pos.slug));
+      }
+      events.push({ field: "title", from: pos.title, to: title });
+    }
+  }
+  if (patch.primaryUrl !== undefined) {
+    const raw = String(patch.primaryUrl ?? "").trim();
+    let url: string;
+    try {
+      url = assertPublicUrl(raw).toString();
+    } catch (e) {
+      throw new Error(`invalid_url: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    if (isPlaceholderAtsUrl(url)) throw new Error("invalid_url: placeholder or invalid posting URL");
+    if (url !== pos.primaryUrl) {
+      const detected = detectAts(url);
+      const externalIdentity = canonicalExternalIdentity(externalIdentityFromDetect(detected)) || null;
+      const db = await getDb();
+      const others = await db.select({ id: positions.id, slug: positions.slug, url: positions.primaryUrl, externalIdentity: positions.externalIdentity }).from(positions).where(sql`${positions.id} <> ${pos.id}`);
+      const clash = others.find((o) => o.url === url || normalizePostingUrl(o.url) === normalizePostingUrl(url)
+        || (externalIdentity && canonicalExternalIdentity(o.externalIdentity) === externalIdentity));
+      if (clash) throw new Error(`url_conflict: ${url} already belongs to position ${clash.slug}`);
+      set.primaryUrl = url;
+      set.atsProvider = detected.provider === "unknown" ? "other" : detected.provider;
+      set.atsJobId = detected.jobId ?? null;
+      set.atsBoardToken = detected.boardToken ?? null;
+      set.externalIdentity = externalIdentity;
+      const prev = Array.isArray(metadata.previousUrls) ? metadata.previousUrls.filter((u): u is string => typeof u === "string") : [];
+      if (pos.primaryUrl) metadata.previousUrls = [...new Set([...prev, pos.primaryUrl])].filter((u) => u !== url);
+      events.push({ field: "primaryUrl", from: pos.primaryUrl, to: url });
+    }
+  }
+  const override = { ...classificationOverride(metadata) };
+  let overridden = false;
+  for (const [field, schema] of [["workplace", Workplace], ["geoClass", GeoClass]] as const) {
+    if (patch[field] === undefined) continue;
+    const parsed = schema.safeParse(patch[field]);
+    if (!parsed.success) throw new Error(`invalid_${field}: must be ${schema.options.join("|")}`);
+    // Recorded even when the value already matches, so later classification keeps it.
+    override[field] = parsed.data as never;
+    overridden = true;
+    if (parsed.data !== pos[field]) {
+      set[field] = parsed.data;
+      events.push({ field, from: pos[field], to: parsed.data });
+    }
+  }
+  if (overridden) metadata.classificationOverride = { ...override, actor, at: new Date().toISOString() };
+  const touched = Object.keys(set).length > 0 || overridden;
+  return { set: touched ? { ...set, metadata } : {}, events };
+}
+
 export async function patchPosition(idOrSlug: string, patch: Record<string, unknown>, actor = "operator") {
   const db = await getDb();
   const pos = await getPosition(idOrSlug);
   if (!pos) return null;
-  const set: Record<string, unknown> = { updatedAt: new Date() };
+  const edits = await listingEdits(pos, patch, actor);
+  const set: Record<string, unknown> = { updatedAt: new Date(), ...edits.set };
   for (const [k, v] of Object.entries(patch)) {
     if (!PATCHABLE.has(k)) continue;
     if (k === "status") {
@@ -469,7 +550,7 @@ export async function patchPosition(idOrSlug: string, patch: Record<string, unkn
     else set[k] = v;
   }
   if (patch.metadata && typeof patch.metadata === "object") {
-    set.metadata = { ...(pos.metadata || {}), ...(patch.metadata as object) };
+    set.metadata = { ...((set.metadata as Record<string, unknown> | undefined) || pos.metadata || {}), ...(patch.metadata as object) };
   }
   if (set.status) {
     const metadata = { ...(pos.metadata || {}), ...((set.metadata || {}) as Record<string, unknown>) };
@@ -486,6 +567,9 @@ export async function patchPosition(idOrSlug: string, patch: Record<string, unkn
     set.metadata = metadata;
   }
   await db.update(positions).set(set).where(eq(positions.id, pos.id));
+  for (const e of edits.events) {
+    await addEvent({ positionId: pos.id, kind: "edit", title: `${e.field}: ${String(e.from ?? "∅")} → ${String(e.to ?? "∅")}`.slice(0, 300), actor, metadata: { field: e.field, from: e.from ?? null, to: e.to ?? null } });
+  }
   if (set.status && set.status !== pos.status) {
     await addEvent({ positionId: pos.id, kind: "status", title: `${pos.status} → ${String(set.status)}`, actor });
     if ((HOT_STATUSES as readonly string[]).includes(String(set.status))) {
@@ -696,7 +780,7 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
     forceKind: nextRev === 1 ? "first_seen" : listingClosed ? "closed" : undefined,
   });
   const loc = locationRaw || before.location_raw;
-  const facts = classifyListing({
+  const computed = classifyListing({
     locationRaw: loc,
     workplaceType: opts.job.workplaceType,
     isRemote: opts.job.isRemote,
@@ -704,6 +788,8 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
     title,
     descriptionText: bodyText,
   });
+  // The revision records what the listing says; the position keeps a person's workplace/geo call.
+  const facts = applyClassificationOverride(pos.metadata, computed);
 
   await db.insert(jdRevisions).values({
     id: id("jdr"),
@@ -721,8 +807,8 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
     salaryCurrency: salary.currency || pos.salaryCurrency,
     salaryPeriod: salary.period || pos.salaryPeriod,
     salaryRaw,
-    remoteClass: facts.remoteClass,
-    geoClass: facts.geoClass,
+    remoteClass: computed.remoteClass,
+    geoClass: computed.geoClass,
     diffSummary: nextRev === 1 ? "first snapshot" : summarizeDiffs(diffs),
     fieldDiffs: diffs,
     source: opts.source || "scan",
@@ -1201,7 +1287,7 @@ export async function upsertFromJob(
 async function afterAtsFetch(positionId: string, job: AtsJob, facts?: ReturnType<typeof classifyListing>) {
   const pos = await getPosition(positionId);
   if (!pos) return;
-  const f =
+  const f = applyClassificationOverride(pos.metadata,
     facts ??
     classifyListing({
       locationRaw: job.locationRaw,
@@ -1210,7 +1296,7 @@ async function afterAtsFetch(positionId: string, job: AtsJob, facts?: ReturnType
       company: pos.company.name,
       title: job.title || pos.title,
       descriptionText: job.descriptionText,
-    });
+    }));
   const db = await getDb();
   const prev = (pos.metadata || {}) as Record<string, unknown>;
   const ats = { ...((prev.ats as Record<string, unknown>) || {}), workplaceType: job.workplaceType ?? null, isRemote: job.isRemote ?? null };
@@ -1268,7 +1354,7 @@ export async function expandStoredOfficeLocations(): Promise<{ checked: number; 
     }
     if (!next || next === rev.locationRaw.trim()) continue;
     const restore = next.startsWith("Distributed · ") && withdrawnAsOnsite;
-    const facts = classifyListing({
+    const computed = classifyListing({
       locationRaw: next,
       workplaceType: ats?.workplaceType,
       isRemote: ats?.isRemote,
@@ -1282,9 +1368,10 @@ export async function expandStoredOfficeLocations(): Promise<{ checked: number; 
       salaryRaw: rev.salaryRaw || row.salaryRaw,
       locationRaw: next,
     });
+    const facts = applyClassificationOverride(row.metadata, computed);
     await db
       .update(jdRevisions)
-      .set({ locationRaw: next, geoClass: facts.geoClass, remoteClass: facts.remoteClass, contentHash: hash })
+      .set({ locationRaw: next, geoClass: computed.geoClass, remoteClass: computed.remoteClass, contentHash: hash })
       .where(eq(jdRevisions.id, rev.id));
     await db
       .update(positions)

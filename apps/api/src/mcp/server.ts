@@ -50,7 +50,7 @@ import {
   careerOpsDropStatus,
   noteCareerOpsDrop,
 } from "@job-scout/core";
-import { log as rootLog } from "@job-scout/shared";
+import { GeoClass, log as rootLog, Workplace } from "@job-scout/shared";
 import { env } from "../env.js";
 import { text } from "./result.js";
 import { interviewSummary, positionSummary } from "./summary.js";
@@ -230,7 +230,7 @@ export function createJobScoutMcpServer() {
 
   server.registerTool(
     "update_position",
-    { title: "Update position", description: "PATCH status, priority, notes, nextAction, resumeSurface, watchEnabled, appliedAt. A status of skip/archived from the career-ops sync (token named career-ops…, or source=career-ops) is recorded as a note and not applied; the other fields still apply. status=materials is refused with a materials_missing error until the position has a resume/cover in job-scout or a career-ops stamp with pdfPath: create materials (run_llm materials) or upsert_career_ops_stamp with pdfPath first. Returns a compact position summary (verbose=true for the full row).", inputSchema: { idOrSlug: z.string(), status: z.string().optional(), priority: z.string().optional(), notes: z.string().optional(), nextAction: z.string().optional(), resumeSurface: z.string().optional(), watchEnabled: z.boolean().optional(), appliedAt: z.string().optional(), source: z.string().optional(), verbose: VERBOSE } },
+    { title: "Update position", description: "PATCH status, priority, notes, nextAction, resumeSurface, watchEnabled, appliedAt, and listing corrections: title, primaryUrl, workplace, geoClass, geoNotes. A title change reslugs the position (the old slug still resolves); a primaryUrl must be a public http(s) URL not already used by another position, re-derives the ATS identity and keeps the old URL in metadata.previousUrls (refresh_jd re-reads the JD from it); workplace/geoClass are recorded as a human override that ATS snapshots and listing_classify keep. Each correction is a timeline event. A status of skip/archived from the career-ops sync (token named career-ops…, or source=career-ops) is recorded as a note and not applied; the other fields still apply. status=materials is refused with a materials_missing error until the position has a resume/cover in job-scout or a career-ops stamp with pdfPath: create materials (run_llm materials) or upsert_career_ops_stamp with pdfPath first. Returns a compact position summary (verbose=true for the full row).", inputSchema: { idOrSlug: z.string(), status: z.string().optional(), priority: z.string().optional(), notes: z.string().optional(), nextAction: z.string().optional(), resumeSurface: z.string().optional(), watchEnabled: z.boolean().optional(), appliedAt: z.string().optional(), title: z.string().optional(), primaryUrl: z.string().optional(), workplace: Workplace.optional(), geoClass: GeoClass.optional(), geoNotes: z.string().optional(), source: z.string().optional(), verbose: VERBOSE } },
     async ({ idOrSlug, source, verbose, ...patch }, ctx) => {
       try {
         return echo(await patchFromCaller(idOrSlug, patch, { actor: agentOf(ctx as ToolCtx), source }), verbose);

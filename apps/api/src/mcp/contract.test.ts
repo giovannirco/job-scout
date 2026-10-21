@@ -5,7 +5,7 @@ import { join } from "node:path";
 import bcrypt from "bcryptjs";
 import { eq, inArray, sql } from "drizzle-orm";
 import { apiTokens, closeDb, evaluations, getDb, id as newId, positions } from "@job-scout/db";
-import { applySnapshot, bootstrap, getPosition, harvestFromJob, stampCareerOps, upsertFromJob } from "@job-scout/core";
+import { applySnapshot, bootstrap, getPosition, harvestFromJob, listEvents, runListingClassify, stampCareerOps, upsertFromJob } from "@job-scout/core";
 import { env } from "../env.js";
 import { handleMcpHttp } from "./handler.js";
 import { fitPage } from "./page.js";
@@ -29,7 +29,9 @@ async function call(name: string, args: Record<string, unknown>): Promise<ToolRe
   const body = JSON.parse(json) as { result?: { content?: Array<{ text?: string }>; isError?: boolean }; error?: unknown };
   expect(body.error).toBeUndefined();
   const text = body.result?.content?.[0]?.text || "null";
-  return { raw: text, bytes: Buffer.byteLength(text), isError: Boolean(body.result?.isError), data: JSON.parse(text) };
+  let data: any;
+  try { data = JSON.parse(text); } catch { data = { error: text }; } // SDK input-validation errors are plain text
+  return { raw: text, bytes: Buffer.byteLength(text), isError: Boolean(body.result?.isError), data };
 }
 
 let seq = 0;
@@ -259,6 +261,68 @@ describe("MCP contract", () => {
       expect(next.data.positions.some((x: { id: string }) => ids.has(x.id))).toBe(false);
       const wrong = await call("list_changes", { since: new Date(1).toISOString(), cursor: r.data.nextCursor });
       expect(wrong).toMatchObject({ isError: true, data: { code: "invalid_cursor" } });
+    });
+  });
+
+  describe("update_position listing corrections", () => {
+    const edits = async (pid: string) => (await listEvents(pid, 50)).filter((e) => e.kind === "edit");
+
+    it("retitles and reslugs, keeping the old slug resolvable", async () => {
+      const p = await position({ title: "Platfrom Engneer" });
+      const r = await call("update_position", { idOrSlug: p.slug, title: "Staff Platform Engineer" });
+      expect(r.isError).toBe(false);
+      expect(r.data.title).toBe("Staff Platform Engineer");
+      expect(r.data.slug).not.toBe(p.slug);
+      expect(r.data.slug).toContain("staff-platform-engineer");
+      const viaOld = await call("get_position", { idOrSlug: p.slug, includeJd: false });
+      expect(viaOld.data.id).toBe(p.id);
+      expect(viaOld.data.metadata.previousSlugs).toContain(p.slug);
+      expect((await edits(p.id)).map((e) => e.title)).toContain("title: Platfrom Engneer → Staff Platform Engineer");
+      expect((await call("update_position", { idOrSlug: p.id, title: "  " })).isError).toBe(true);
+    });
+
+    it("validates and re-points primaryUrl, keeping the old URL in history", async () => {
+      const p = await position({ board: "example-url-old" });
+      const other = await position({ board: "example-url-taken" });
+      for (const bad of ["http://localhost/jobs/1", "http://10.0.0.5/jobs/1", "ftp://example.com/jobs/1", "not a url"]) {
+        const r = await call("update_position", { idOrSlug: p.id, primaryUrl: bad });
+        expect(r.isError).toBe(true);
+        expect(r.data.error).toMatch(/^invalid_url/);
+      }
+      const clash = await call("update_position", { idOrSlug: p.id, primaryUrl: other.primaryUrl });
+      expect(clash.isError).toBe(true);
+      expect(clash.data.error).toMatch(/^url_conflict/);
+
+      const next = "https://jobs.ashbyhq.com/example-url-new/0b6c3f6e-1111-4c2a-9d7e-123456789abc";
+      const r = await call("update_position", { idOrSlug: p.id, primaryUrl: next, verbose: true });
+      expect(r.isError).toBe(false);
+      expect(r.data).toMatchObject({ primaryUrl: next, atsProvider: "ashby" });
+      expect(r.data.externalIdentity).toContain("ashby");
+      expect(r.data.metadata.previousUrls).toEqual([p.primaryUrl]);
+      expect((await edits(p.id)).some((e) => e.title.startsWith("primaryUrl:"))).toBe(true);
+    });
+
+    it("records workplace/geo as a human override that snapshots and listing_classify keep", async () => {
+      const p = await position({ board: "example-override" });
+      const r = await call("update_position", { idOrSlug: p.id, workplace: "hybrid", geoClass: "hard_geo", geoNotes: "office days in an example city" });
+      expect(r.isError).toBe(false);
+      expect(r.data).toMatchObject({ workplace: "hybrid", geoClass: "hard_geo", geoNotes: "office days in an example city" });
+      expect(r.data.classificationOverride).toMatchObject({ workplace: "hybrid", geoClass: "hard_geo", actor: "contract-agent" });
+      expect((await edits(p.id)).map((e) => e.title)).toEqual(expect.arrayContaining(["workplace: remote → hybrid"]));
+
+      // A material JD change with a remote location recomputes facts; the override wins on the position.
+      const changed = await applySnapshot({ positionId: p.id, source: "watch", job: {
+        provider: "greenhouse", boardToken: "example-override", jobId: p.atsJobId!, company: p.company.name, title: p.title, url: p.primaryUrl!,
+        locationRaw: "Remote - Worldwide", descriptionText: "A rewritten description for an example product, fully remote. " + "w".repeat(600), listingStatus: "open",
+      } });
+      expect(changed.changed).toBe(true);
+      const after = (await getPosition(p.id))!;
+      expect(after.workplace).toBe("hybrid");
+      expect(after.geoClass).toBe("hard_geo");
+      expect(await runListingClassify(p.id)).toMatchObject({ skipped: true, reason: "human_override" });
+
+      const bad = await call("update_position", { idOrSlug: p.id, workplace: "moon" });
+      expect(bad.isError).toBe(true);
     });
   });
 });

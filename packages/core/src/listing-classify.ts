@@ -13,6 +13,7 @@ import {
 } from "@job-scout/shared";
 import { z } from "zod";
 import type { ChatMessage } from "@job-scout/llm";
+import { applyClassificationOverride, fullyOverridden } from "./classification-override.js";
 import { enqueueJob } from "./jobs.js";
 import { addEvent } from "./timeline.js";
 import { gateOperation, getLlmClient, logged, LlmGateError } from "./llm.js";
@@ -46,7 +47,7 @@ export async function maybeEnqueueListingClassify(
   const cfg = s.llm.operations.listing_classify;
   if (!cfg?.enabled || !cfg.model) return { enqueued: false };
   const pos = await getPosition(positionId);
-  if (!pos || classificationInactive(pos) || !(await currentJdText(pos.id)).trim()) return { enqueued: false };
+  if (!pos || classificationInactive(pos) || fullyOverridden(pos.metadata) || !(await currentJdText(pos.id)).trim()) return { enqueued: false };
   const fingerprint = await classificationFingerprint(pos, cfg.model);
   const cache = pos.metadata?.listingClassify as { inputHash?: string; result?: Record<string, unknown> } | undefined;
   if (cache?.inputHash === fingerprint && cache.result) {
@@ -54,7 +55,7 @@ export async function maybeEnqueueListingClassify(
     if (parsed.success) {
       const db = await getDb();
       const rev = (await db.select().from(jdRevisions).where(eq(jdRevisions.positionId, pos.id)).orderBy(desc(jdRevisions.revision)).limit(1))[0];
-      const result = mergeListingClassify({ ...facts, locationRaw: rev?.locationRaw || "" }, parsed.data);
+      const result = applyClassificationOverride(pos.metadata, mergeListingClassify({ ...facts, locationRaw: rev?.locationRaw || "" }, parsed.data));
       // afterAtsFetch recomputes deterministic facts: restore the same-input model result.
       await db.update(positions).set({ workplace: result.workplace, geoClass: result.geoClass,
         remoteClass: remoteClass(rev?.locationRaw || "", result.workplace === "remote" ? "remote" : ""),
@@ -71,6 +72,7 @@ export async function runListingClassify(positionId: string) {
   const pos = await getPosition(positionId);
   if (!pos) throw new Error("position not found");
   if (classificationInactive(pos)) return { skipped: true, reason: "inactive" };
+  if (fullyOverridden(pos.metadata)) return { skipped: true, reason: "human_override" };
   const jdText = await currentJdText(pos.id);
   if (!jdText.trim()) return { skipped: true, reason: "missing_jd" };
   const settings = await getSettings();
@@ -129,10 +131,11 @@ export async function runListingClassify(positionId: string) {
         }),
       messages,
     );
-    const merged = mergeListingClassify(
+    // A person's workplace/geo call (classificationOverride) outranks the model.
+    const merged = applyClassificationOverride(pos.metadata, mergeListingClassify(
       { ...det, locationRaw: det.locationClean || rev?.locationRaw || "" },
       res.data,
-    );
+    ));
     const workplaceBlob = merged.workplace === "remote" ? "remote" : ats?.workplaceType || "";
     const rc = remoteClass(det.locationClean, workplaceBlob);
     await db
@@ -216,14 +219,14 @@ export async function backfillListingFacts(opts: { force?: boolean } = {}) {
         .limit(1)
     )[0];
     const ats = ((row.metadata || {}) as { ats?: { workplaceType?: string | null; isRemote?: boolean | null } }).ats;
-    const facts = classifyListing({
+    const facts = applyClassificationOverride(row.metadata, classifyListing({
       locationRaw: rev?.locationRaw || "",
       workplaceType: ats?.workplaceType,
       isRemote: ats?.isRemote,
       company: row.companyName,
       title: row.title,
       descriptionText: rev?.descriptionText,
-    });
+    }));
     const salary = parseSalary(extractSalaryRaw(rev?.descriptionText || ""));
     const fillSalary = Boolean(salary.min && (row.salaryMin == null || (row.salaryMin === salary.min && row.salaryCurrency !== salary.currency)));
     const changed = fillSalary || facts.workplace !== row.workplace || facts.geoClass !== row.geoClass || facts.remoteClass !== row.remoteClass;

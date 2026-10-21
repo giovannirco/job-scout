@@ -2,6 +2,7 @@ import { and, desc, eq, ne } from "drizzle-orm";
 import { evaluations, getDb, id, jdRevisions, positions } from "@job-scout/db";
 import { bodySignature, classifyListing, contentHash, craftFamily, titleSignature, titleSimilarity } from "@job-scout/shared";
 import { fetchJob } from "./fetch-job.js";
+import { applyClassificationOverride } from "./classification-override.js";
 import { enqueueJob } from "./jobs.js";
 import { getPosition } from "./positions.js";
 import { reslugSuggestion, withPrevious } from "./slug-repair.js";
@@ -121,13 +122,14 @@ export async function repairToLastGoodRevision(p: LastGoodRepairPreset, opts: { 
   const now = new Date();
   const title = good.title || pos.title;
   const location = good.locationRaw || "";
-  const facts = classifyListing({ locationRaw: location, company: pos.company.name, title, descriptionText: good.descriptionText || "" });
+  const computed = classifyListing({ locationRaw: location, company: pos.company.name, title, descriptionText: good.descriptionText || "" });
+  const facts = applyClassificationOverride(pos.metadata, computed);
   const hash = contentHash({ title, descriptionText: good.descriptionText || "", salaryRaw: good.salaryRaw, locationRaw: location });
   if (restore) await db.insert(jdRevisions).values({
     id: id("jdr"), positionId: pos.id, revision: (revisions[0]?.revision ?? 0) + 1, observedAt: now, contentHash: hash, changeKind: "repair", material: false,
     title, locationRaw: location || null, descriptionText: good.descriptionText,
     salaryMin: good.salaryMin, salaryMax: good.salaryMax, salaryCurrency: good.salaryCurrency, salaryPeriod: good.salaryPeriod, salaryRaw: good.salaryRaw,
-    remoteClass: facts.remoteClass, geoClass: facts.geoClass, diffSummary: `repair: restored from ${good.id} (r${good.revision})`, fieldDiffs: [], source: "repair",
+    remoteClass: computed.remoteClass, geoClass: computed.geoClass, diffSummary: `repair: restored from ${good.id} (r${good.revision})`, fieldDiffs: [], source: "repair",
   });
   await db.update(positions).set({
     ...(restore ? { title, contentHash: hash, craftFamily: craftFamily(title), geoClass: facts.geoClass, remoteClass: facts.remoteClass, workplace: facts.workplace } : {}),

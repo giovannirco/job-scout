@@ -5,6 +5,16 @@ import { addEvent } from "./timeline.js";
 
 export type SlugRepairPlan = { id: string; name: string; from: string; to: string };
 
+/** Position slug: company slug + title, with the id's tail so it stays unique. */
+export function positionSlug(companySlug: string, title: string, positionId: string): string {
+  return `${slugify(`${companySlug}-${title}`).slice(0, 70)}-${positionId.slice(-4)}`;
+}
+
+/** Keep a replaced slug resolvable: getPosition/getCompany look in metadata.previousSlugs. */
+export function withPreviousSlug(metadata: Record<string, unknown> | null, slug: string): Record<string, unknown> {
+  return withPrevious(metadata, slug);
+}
+
 /** Metadata with `slug` appended to previousSlugs (which getPosition/getCompany still resolve). */
 export function withPrevious(metadata: Record<string, unknown> | null | undefined, slug: string): Record<string, unknown> {
   const m = { ...(metadata || {}) };
@@ -43,18 +53,18 @@ export async function repairPrototypeSlugs(opts: { apply?: boolean } = {}) {
     // A repaired company also reslugs positions whose slug was derived from its old slug.
     if (!bad && !(newCompanySlug.has(p.companyId) && p.slug.startsWith(slugify(p.companySlug)))) continue;
     const co = newCompanySlug.get(p.companyId) || p.companySlug;
-    const to = `${slugify(`${co}-${p.title}`).slice(0, 70)}-${p.id.slice(-4)}`;
+    const to = positionSlug(co, p.title, p.id);
     if (to !== p.slug) positionPlan.push({ id: p.id, name: p.title, from: p.slug, to });
   }
   if (!opts.apply) return { dryRun: true as const, companies: companyPlan, positions: positionPlan };
   const now = new Date();
   for (const c of companyPlan) {
     const row = cos.find(x => x.id === c.id)!;
-    await db.update(companies).set({ slug: c.to, metadata: withPrevious(row.metadata, c.from), updatedAt: now }).where(eq(companies.id, c.id));
+    await db.update(companies).set({ slug: c.to, metadata: withPreviousSlug(row.metadata, c.from), updatedAt: now }).where(eq(companies.id, c.id));
   }
   for (const p of positionPlan) {
     const row = pos.find(x => x.id === p.id)!;
-    await db.update(positions).set({ slug: p.to, metadata: withPrevious(row.metadata, p.from), updatedAt: now }).where(eq(positions.id, p.id));
+    await db.update(positions).set({ slug: p.to, metadata: withPreviousSlug(row.metadata, p.from), updatedAt: now }).where(eq(positions.id, p.id));
     await addEvent({ positionId: p.id, kind: "repair", title: `Slug repaired: ${p.from} → ${p.to}`, actor: "repair:prototype-slugs", metadata: { from: p.from, to: p.to } });
   }
   return { dryRun: false as const, companies: companyPlan, positions: positionPlan };

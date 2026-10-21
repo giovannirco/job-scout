@@ -3,6 +3,7 @@ import { boardDeltas, boardSnapshots, boardSources, companies, discoveryFeed, ge
 import { detectAts, externalIdentityFromDetect, fetchGreenhouseJob, greenhouseBoardToken, greenhouseListingNeedsBoardFetch, listBoard, regionsDisagree, type AtsJob, type BoardJobSummary } from "@job-scout/ats";
 import { fetchJob as fetchJobFromUrl } from "./fetch-job.js";
 import { applyProfileToGate, canonicalExternalIdentity, normalizePostingUrl, classifyListing, cleanJobTitle, craftFamily, gateListing, geoClass, homeMarket, isNoiseJobTitle, listingCompany, missesHomeMarket, parseClipListing, unresolvedCompany, type GateConfig, type GateVerdict } from "@job-scout/shared";
+import { classificationOverride } from "./classification-override.js";
 import { enqueueJob } from "./jobs.js";
 import { llmConfigured } from "./llm.js";
 import { archivePosition, trimStoredTitles, upsertFromJob } from "./positions.js";
@@ -852,6 +853,7 @@ export async function reclassifyUsPlaceLists(): Promise<{ positions: number; dis
       id: positions.id,
       geo: positions.geoClass,
       workplace: positions.workplace,
+      metadata: positions.metadata,
       // Qualify positions.id. A bare "id" binds to jd_revisions.id inside the subquery and comes back empty.
       location: sql<string | null>`(select jr.location_raw from jd_revisions jr where jr.position_id = "positions"."id" order by jr.revision desc limit 1)`,
     })
@@ -860,7 +862,7 @@ export async function reclassifyUsPlaceLists(): Promise<{ positions: number; dis
   let positionCount = 0;
   for (const row of posRows) {
     const location = (row.location || "").trim();
-    if (!location) continue;
+    if (!location || classificationOverride(row.metadata).geoClass) continue;
     const next = geoClass(location, row.workplace === "remote" ? "remote" : row.workplace || "");
     if (!next || next === row.geo) continue;
     await db.update(positions).set({ geoClass: next }).where(eq(positions.id, row.id));

@@ -1,6 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { getDb, jdRevisions, positions } from "@job-scout/db";
 import { classifyListing, cleanLocation, employerFromPosting, isNoiseJobTitle, isPlaceholderAtsUrl, LEGACY_SYNTHETIC_POSTING_URLS, requisitionId, unresolvedCompany, UNRESOLVED_COMPANY } from "@job-scout/shared";
+import { applyClassificationOverride } from "./classification-override.js";
 import { resolveCompanyForName } from "./companies.js";
 import { archivePosition } from "./positions.js";
 import { addEvent } from "./timeline.js";
@@ -41,7 +42,7 @@ export async function repairPositionData({ dryRun = true } = {}) {
     }
     const location = cleanLocation(row.locationRaw);
     const ats = (metadata.ats || {}) as { workplaceType?: string; isRemote?: boolean };
-    const facts = classifyListing({ locationRaw: location, workplaceType: ats.workplaceType, isRemote: ats.isRemote, company: row.company, title: row.title });
+    const facts = applyClassificationOverride(metadata, classifyListing({ locationRaw: location, workplaceType: ats.workplaceType, isRemote: ats.isRemote, company: row.company, title: row.title }));
     if (metadata.dataRepairVersion !== 1 || location !== (row.locationRaw || "")) {
       patch.geoClass = facts.geoClass;
       patch.remoteClass = facts.remoteClass;
