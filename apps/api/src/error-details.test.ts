@@ -11,11 +11,15 @@ describe("errorDetails", () => {
 
   it("carries a board-index refusal's suggestion", () => {
     const e = new BoardIndexError({ reason: "board_url", index: { provider: "greenhouse", boardToken: "acme-example", scannable: true } });
-    expect(errorDetails(e)).toMatchObject({ reason: "board_url", boardSuggestion: { provider: "greenhouse", token: "acme-example" } });
+    expect(errorDetails(e)).toMatchObject({ code: "board_index", reason: "board_url", boardSuggestion: { provider: "greenhouse", token: "acme-example" } });
     expect(String(errorDetails(e).suggestion)).toMatch(/board source/);
   });
 
   it("returns nothing for a plain error", () => {
     expect(errorDetails(new Error("boom"))).toEqual({});
+  });
+
+  it("does not pass through other error codes", () => {
+    expect(errorDetails(Object.assign(new Error("refused"), { code: "ECONNREFUSED" }))).toEqual({});
   });
 });
