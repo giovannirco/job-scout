@@ -10,7 +10,8 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json vitest.config
 COPY packages ./packages
 COPY apps ./apps
 RUN pnpm install --frozen-lockfile
-ARG APP_VERSION=2.0.0
+# Empty by default: the app then reports the root package.json version.
+ARG APP_VERSION=
 ENV APP_VERSION=${APP_VERSION}
 RUN pnpm build
 # drop dev-only weight (vite, tailwind, drizzle-kit, vitest) — runtime is tsx + hono + drizzle + pg
@@ -22,7 +23,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=8080
-ARG APP_VERSION=2.0.0
+ARG APP_VERSION=
 ENV APP_VERSION=${APP_VERSION}
 RUN useradd -m -u 10001 appuser
 COPY --from=build --chown=appuser:appuser /app /app

@@ -8,8 +8,13 @@ function readRootVersion(): string {
   }
 }
 
+/** APP_VERSION when set and non-empty, else the workspace root package.json version. */
+export function resolveAppVersion(raw: string | undefined, readRoot: () => string = readRootVersion): string {
+  return raw?.trim() || readRoot();
+}
+
 /** Version of the running build: APP_VERSION env, else the workspace root package.json. */
-export const appVersion: string = process.env.APP_VERSION || readRootVersion();
+export const appVersion: string = resolveAppVersion(process.env.APP_VERSION);
 
 export const coreEnv = {
   openaiBaseUrl: (process.env.OPENAI_BASE_URL || "http://127.0.0.1:8317/v1").replace(/\/+$/, ""),

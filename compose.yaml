@@ -52,7 +52,7 @@ services:
       context: .
       dockerfile: deploy/Dockerfile
       args:
-        APP_VERSION: ${APP_VERSION:-local}
+        APP_VERSION: ${APP_VERSION:-} # empty reports the package.json version
     command: ["node", "--import", "tsx", "apps/api/src/index.ts"]
     environment:
       <<: *app-env

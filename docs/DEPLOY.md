@@ -15,7 +15,7 @@ docker buildx build --platform linux/amd64 \
   --push .
 ```
 
-Pass `APP_VERSION`: the Dockerfile's default build argument is a fixed placeholder, and the running app reports whatever the image sets (in `/api/v1/health`, `server_info` and `job_scout_build_info`). Use `--platform` to match your nodes. Pin the deployment to the pushed tag or digest.
+`APP_VERSION` is what the running app reports (in `/api/v1/health`, `server_info` and `job_scout_build_info`). Without it, or with it empty, the app reports the root `package.json` version baked into the image; pass it to report something else, such as a commit-suffixed tag. Use `--platform` to match your nodes. Pin the deployment to the pushed tag or digest.
 
 ## Secret
 
