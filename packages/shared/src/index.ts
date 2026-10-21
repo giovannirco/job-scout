@@ -6,6 +6,7 @@ export * from "./gate.js";
 export * from "./classify.js";
 export * from "./sort.js";
 export * from "./hash.js";
+export * from "./html-entities.js";
 export * from "./salary.js";
 export * from "./archive-policy.js";
 export * from "./source-catalog.js";

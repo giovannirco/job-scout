@@ -5,6 +5,7 @@
 // A namespace import defers the property access to call time, which never happens
 // in the browser.
 import * as nodeCrypto from "node:crypto";
+import { decodeHtmlEntities } from "./html-entities.js";
 import type { ChangeKind, FieldDiff } from "./types.js";
 
 export function normalizeDescription(text: string): string {
@@ -17,32 +18,17 @@ export function normalizeDescription(text: string): string {
     .toLowerCase();
 }
 
-/** Decode common HTML entities (up to 2 passes for double-escaped ATS dumps). */
+/**
+ * Decode HTML entities, named Latin-1 letters included (up to 2 passes for double-escaped
+ * ATS dumps). Same decoder as ingestion, so `log&iacute;stica` and `logística` compare equal.
+ */
 export function decodeBasicEntities(text: string): string {
   let s = text || "";
   for (let i = 0; i < 2; i++) {
-    if (!/&(?:lt|gt|amp|quot|nbsp|mdash|ndash|hellip|rsquo|lsquo|rdquo|ldquo|#\d+|#x[0-9a-f]+);/i.test(s)) break;
-    s = s
-      .replace(/&nbsp;/gi, " ")
-      .replace(/&mdash;/gi, "—")
-      .replace(/&ndash;/gi, "–")
-      .replace(/&hellip;/gi, "…")
-      .replace(/&rsquo;/gi, "’")
-      .replace(/&lsquo;/gi, "‘")
-      .replace(/&rdquo;/gi, "”")
-      .replace(/&ldquo;/gi, "“")
-      .replace(/&quot;/g, '"')
-      .replace(/&#0*39;/g, "'")
-      .replace(/&#x27;/gi, "'")
-      .replace(/&apos;/g, "'")
-      .replace(/&#(\d+);/g, (_, n) => {
-        const code = Number(n);
-        return Number.isFinite(code) ? String.fromCharCode(code) : _;
-      })
-      .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&amp;/g, "&");
+    if (!/&(?:[a-z][a-z0-9]{1,7}|#\d+|#x[0-9a-f]+);/i.test(s)) break;
+    const next = decodeHtmlEntities(s);
+    if (next === s) break;
+    s = next;
   }
   return s;
 }

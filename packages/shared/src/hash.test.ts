@@ -13,6 +13,7 @@ import {
   changeKindLabel,
   humanDiffSummary,
   isLocationRefinement,
+  isCosmeticTextChange,
 } from "./hash.js";
 
 describe("contentHash", () => {
@@ -252,5 +253,29 @@ describe("location refinement", () => {
     expect(isLocationRefinement("New York; NY", "New York - NY - United States")).toBe(true);
     expect(isLocationRefinement("", "Remote")).toBe(false);
     expect(isLocationRefinement("York", "New York")).toBe(false);
+  });
+});
+
+describe("entity-decoding-only description", () => {
+  const encoded = "Atuar com log&iacute;stica e opera&ccedil;&otilde;es em S&atilde;o Paulo.\n\nSal&aacute;rio &euro;5.000 &ndash; benef&iacute;cios &#233; &#x1F680; R&amp;D.";
+  const decoded = "Atuar com logística e operações em São Paulo.\n\nSalário €5.000 – benefícios é 🚀 R&D.";
+
+  it("is cosmetic: no material revision", () => {
+    expect(isCosmeticTextChange(encoded, decoded)).toBe(true);
+    expect(isCosmeticTextChange(decoded, encoded)).toBe(true);
+    expect(isFormattingOnlyTextChange(encoded, decoded)).toBe(true);
+    expect(classifyMateriality([{ path: "description_text", before: encoded, after: decoded }])).toEqual({ material: false, change_kind: "noise_rebase" });
+  });
+
+  it("double-escaped entities decode too", () => {
+    expect(isCosmeticTextChange("log&amp;iacute;stica e opera&amp;ccedil;&amp;atilde;o", "logística e operação")).toBe(true);
+  });
+
+  it("a real text change alongside decoding stays material", () => {
+    const edited = `${decoded}\n\nSomente residentes no Brasil.`;
+    expect(isCosmeticTextChange(encoded, edited)).toBe(false);
+    expect(classifyMateriality([{ path: "description_text", before: encoded, after: edited }])).toEqual({ material: true, change_kind: "content" });
+    expect(isCosmeticTextChange("log&iacute;stica", "logistica")).toBe(false);
+    expect(isCosmeticTextChange("&bogus; text", " text")).toBe(false);
   });
 });

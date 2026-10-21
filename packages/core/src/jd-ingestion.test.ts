@@ -242,6 +242,26 @@ describe("JD ingestion gaps (isolated PGlite)", () => {
       expect(await jobsFor("jd_review", position.id)).toHaveLength(0);
     });
 
+    it("a body that only gains decoded HTML entities writes no revision and queues no review", async () => {
+      const encoded = `${JD}\n\nAtuar com log&iacute;stica e opera&ccedil;&otilde;es em S&atilde;o Paulo &ndash; R&amp;D.`;
+      const decoded = `${JD}\n\nAtuar com logística e operações em São Paulo – R&D.`;
+      const { position } = await upsertFromJob(role("e1", { descriptionText: encoded }), { status: "applied" });
+      const db = await getDb();
+      await db.delete(jobs);
+      const r = await applySnapshot({ positionId: position.id, job: role("e1", { descriptionText: decoded }) });
+      expect(r).toMatchObject({ changed: false });
+      expect(await revisionsOf(position.id)).toHaveLength(1);
+      expect(await jobsFor("jd_review", position.id)).toHaveLength(0);
+      expect(await jobsFor("jev_check", position.id)).toHaveLength(0);
+
+      // A real edit next to the decoding is still a material content change.
+      const r2 = await applySnapshot({ positionId: position.id, job: role("e1", { descriptionText: `${decoded}\n\nVisa sponsorship is not available.` }) });
+      expect(r2).toMatchObject({ changed: true, revision: 2 });
+      const [rev] = await revisionsOf(position.id);
+      expect(rev).toMatchObject({ revision: 2, changeKind: "content", material: true });
+      expect(await jobsFor("jd_review", position.id)).toHaveLength(1);
+    });
+
     it("jd_review runs at most once per day for description edits; a title change still queues one", async () => {
       const { position } = await upsertFromJob(role("c2"), { status: "applied" });
       await applySnapshot({ positionId: position.id, job: role("c2", { descriptionText: `${JD}\n\nVisa sponsorship is not available.` }) });
