@@ -6,6 +6,7 @@ import { applyProfileToGate, canonicalExternalIdentity, normalizePostingUrl, cla
 import { enqueueJob } from "./jobs.js";
 import { llmConfigured } from "./llm.js";
 import { archivePosition, trimStoredTitles, upsertFromJob } from "./positions.js";
+import { addEvent } from "./timeline.js";
 import { getSettings } from "./settings.js";
 import { boardErrorKind, type BoardErrorKind } from "./board-reconcile.js";
 import type { PositionStatus } from "@job-scout/db";
@@ -182,6 +183,11 @@ export async function scanBoard(boardId: string, opts: { force?: boolean } = {})
         set.watchEnabled = false;
       }
       await db.update(positions).set(set).where(eq(positions.id, pos.id));
+      // Sweeps leave the same audit trail as manual changes.
+      const actor = `scan:${board.provider}`;
+      await addEvent({ positionId: pos.id, kind: "listing_closed", title: `Listing closed: dropped from ${board.provider} board`, actor,
+        metadata: { boardSourceId: board.id, externalIdentity: p.externalIdentity, previousListingStatus: pos.listingStatus } });
+      if (set.status) await addEvent({ positionId: pos.id, kind: "status", title: `${pos.status} → archived: listing_closed`, actor, metadata: { previousStatus: pos.status, archiveReason: "listing_closed" } });
       res.closed++;
     }
   }

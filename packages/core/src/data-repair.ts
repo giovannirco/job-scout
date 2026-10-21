@@ -3,6 +3,7 @@ import { getDb, jdRevisions, positions } from "@job-scout/db";
 import { classifyListing, cleanLocation, employerFromPosting, isNoiseJobTitle, isPlaceholderAtsUrl, LEGACY_SYNTHETIC_POSTING_URLS, requisitionId, unresolvedCompany, UNRESOLVED_COMPANY } from "@job-scout/shared";
 import { resolveCompanyForName } from "./companies.js";
 import { archivePosition } from "./positions.js";
+import { addEvent } from "./timeline.js";
 import { groupingRows, repostFor } from "./position-groups.js";
 
 /** Idempotent, recoverable cleanup. Original values and decisions remain in metadata/history. */
@@ -72,6 +73,7 @@ export async function repairPositionData({ dryRun = true } = {}) {
     changes.push({ id: row.id, reasons });
     if (!dryRun) {
       await db.update(positions).set({ ...patch, metadata, updatedAt: new Date() }).where(eq(positions.id, row.id));
+      await addEvent({ positionId: row.id, kind: "repair", title: `Data repair: ${reasons.join(", ")}`, actor: "repair:position-data", metadata: { reasons, fields: Object.keys(patch) } });
       if (close || (invalid && ["triaged", "review"].includes(row.status))) await archivePosition(row.id, close ? "listing_closed" : `quarantined:${invalid}`, "system");
     }
   }

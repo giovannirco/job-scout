@@ -14,6 +14,7 @@ import {
 import { z } from "zod";
 import type { ChatMessage } from "@job-scout/llm";
 import { enqueueJob } from "./jobs.js";
+import { addEvent } from "./timeline.js";
 import { gateOperation, getLlmClient, logged, LlmGateError } from "./llm.js";
 import { currentJdText, getPosition } from "./positions.js";
 import { getSettings, updateSettings } from "./settings.js";
@@ -155,6 +156,10 @@ export async function runListingClassify(positionId: string) {
         updatedAt: new Date(),
       })
       .where(eq(positions.id, pos.id));
+    if (merged.geoClass !== pos.geoClass || merged.workplace !== pos.workplace) {
+      await addEvent({ positionId: pos.id, kind: "classify", title: `Listing classified: ${pos.workplace ?? "?"}/${pos.geoClass ?? "?"} → ${merged.workplace}/${merged.geoClass}`, actor: "listing_classify",
+        metadata: { model: res.model, from: { workplace: pos.workplace, geoClass: pos.geoClass }, to: { workplace: merged.workplace, geoClass: merged.geoClass } } });
+    }
     return {
       workplace: merged.workplace,
       geoClass: merged.geoClass,

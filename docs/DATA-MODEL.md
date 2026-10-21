@@ -26,7 +26,7 @@ Schema: `packages/db/src/schema.ts` (drizzle). Migrations: `packages/db/migratio
 | `companies` | slug, name, website, careers URL, industry tags, metadata (aliases, ATS tokens) |
 | `positions` | the CRM row — see below |
 | `jd_revisions` | Job description versions per position: `revision`, `observed_at`, `content_hash`, `change_kind` (`first_seen` `content` `title` `comp` `geo` `status` `closed` `reopened` `noise_rebase` `manual`), `material`, full JD fields, `field_diffs`, `diff_summary`. The UI labels `noise_rebase` **rewritten here** and groups those rows apart from employer edits. One `closed` revision per closing; later checks only bump `positions.last_checked_at` |
-| `timeline_events` | notes, status changes, applied, LLM results, approvals — everything History shows |
+| `timeline_events` | notes, status changes, applied, LLM results, approvals — everything History shows. Background writers record their own events: board-close sweeps (`listing_closed`, actor `scan:<provider>`), data repairs (`repair`) and listing classification changes (`classify`) |
 | `evaluations` | one row per LLM report: `kind`, `model`, `markdown`, `summary` JSON, score/verdict; `position_id` or `company_id` |
 | `application_materials` | `kind` resume / cover, `version`, markdown, surface + keyword coverage in metadata |
 | `application_questions` | Q&A drafts for application forms: `question`, `answer`, `required`, `input_type` (`text` `textarea` `select` `multi` `file`), `status` (`open` `answered` `skipped`; `open` is unanswered), choices in `metadata.options`. Greenhouse and Ashby populate these. Drafts are not submitted |
