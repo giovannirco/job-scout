@@ -65,6 +65,17 @@ describe("interviews corpus", () => {
     expect("transcriptMarkdown" in (listed[0] ?? {})).toBe(false);
   });
 
+  it("stores status scheduled as pending and names the accepted values on a bad status", async () => {
+    const { addInterview, patchInterview, parseInterviewStatus } = await import("./interviews.js");
+    const row = await addInterview(positionId, { stage: "technical", status: "scheduled", scheduledAt: "2020-01-01T10:00:00.000Z", skipBrief: true });
+    expect(row.status).toBe("pending");
+    expect((await patchInterview(positionId, row.id, { status: "Completed" }))?.status).toBe("completed");
+    expect((await patchInterview(positionId, row.id, { status: "scheduled" }))?.status).toBe("pending");
+    expect(parseInterviewStatus("canceled", "pending")).toBe("cancelled");
+    expect(parseInterviewStatus(undefined, "completed")).toBe("completed");
+    await expect(addInterview(positionId, { status: "postponed" })).rejects.toThrow(/pending\|completed\|cancelled.*scheduled/);
+  });
+
   it("rejects a bad outcome", async () => {
     const { addInterview } = await import("./interviews.js");
     await expect(addInterview(positionId, { outcome: "won" })).rejects.toThrow(/outcome/);

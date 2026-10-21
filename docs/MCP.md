@@ -45,7 +45,7 @@ The API includes an MCP server for reading positions, managing the pipeline and 
 | `update_position` | PATCH status, priority, notes, nextAction, resumeSurface, watchEnabled, appliedAt. The career-ops guard below applies to a `skip`/`archived` status; the other fields still apply. `status: materials` follows the materials rule below |
 | `set_position_status` | any pipeline status; `archived` requires a reason. Subject to the career-ops guard below; optional `actor` names the calling agent (see [Attribution](#attribution)); `materials` follows the materials rule below |
 | `log_activity` | append a timeline note |
-| `upsert_interview` | create/patch a screen or interview (transcript queues an AI brief unless `skipBrief`) |
+| `upsert_interview` | create/patch a screen or interview (transcript queues an AI brief unless `skipBrief`). `status` is `pending` (default), `completed` or `cancelled`; `scheduled` and `upcoming` are stored as `pending`, `canceled` as `cancelled`, `done` as `completed`. `outcome` is `advanced` `hold` `rejected` `cancelled` `unclear` |
 | `brief_interview` | queue or `sync` the `interview_brief` model vs JD + company pack. A transcript does not queue a brief when no model key is set |
 | `update_question` | set `answer` and/or `status` (`open` `answered` `skipped`) |
 | `run_llm` | run `triage` / `evaluate` / `materials` / `jd_review` / `form_answers` / `listing_classify` synchronously with the model from Settings › AI |

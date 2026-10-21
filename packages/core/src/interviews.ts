@@ -99,10 +99,21 @@ function parseWhen(v: string | Date | null | undefined): Date | null | undefined
   return d;
 }
 
-function parseStatus(v: string | undefined, fallback: InterviewStatus): InterviewStatus {
-  if (v == null || v === "") return fallback;
-  if (!(INTERVIEW_STATUSES as readonly string[]).includes(v)) throw new Error(`status must be ${INTERVIEW_STATUSES.join("|")}`);
-  return v as InterviewStatus;
+/** Caller words for a stored status: an upcoming round is stored as `pending`. */
+const INTERVIEW_STATUS_ALIASES: ReadonlyMap<string, InterviewStatus> = new Map([
+  ["scheduled", "pending"],
+  ["upcoming", "pending"],
+  ["canceled", "cancelled"],
+  ["done", "completed"],
+]);
+
+export function parseInterviewStatus(v: string | undefined, fallback: InterviewStatus): InterviewStatus {
+  if (v == null || v.trim() === "") return fallback;
+  const s = v.trim().toLowerCase();
+  if ((INTERVIEW_STATUSES as readonly string[]).includes(s)) return s as InterviewStatus;
+  const alias = INTERVIEW_STATUS_ALIASES.get(s);
+  if (alias) return alias;
+  throw new Error(`status must be ${INTERVIEW_STATUSES.join("|")} (aliases: ${[...INTERVIEW_STATUS_ALIASES.keys()].join(", ")})`);
 }
 
 function parseOutcome(v: string | null | undefined): InterviewOutcome | null | undefined {
@@ -326,7 +337,7 @@ async function maybeEnqueueBrief(positionId: string, interviewId: string, transc
 export async function addInterview(positionId: string, input: InterviewInput) {
   const stage = (input.stage || "screen").trim();
   if (!stage) throw new Error("stage required");
-  const status = parseStatus(input.status, "pending");
+  const status = parseInterviewStatus(input.status, "pending");
   const scheduledAt = parseWhen(input.scheduledAt);
   const occurredAt = parseWhen(input.occurredAt);
   const outcome = parseOutcome(input.outcome);
@@ -400,7 +411,7 @@ export async function patchInterview(positionId: string, interviewId: string, in
   if (input.title !== undefined) patch.title = trimOrNull(input.title);
   if (input.interviewerName !== undefined) patch.interviewerName = trimOrNull(input.interviewerName);
   if (input.interviewerRole !== undefined) patch.interviewerRole = trimOrNull(input.interviewerRole);
-  if (input.status !== undefined) patch.status = parseStatus(input.status, existing.status as InterviewStatus);
+  if (input.status !== undefined) patch.status = parseInterviewStatus(input.status, existing.status as InterviewStatus);
   if (input.scheduledAt !== undefined) patch.scheduledAt = parseWhen(input.scheduledAt) ?? null;
   if (input.occurredAt !== undefined) patch.occurredAt = parseWhen(input.occurredAt) ?? null;
   if (input.durationSeconds !== undefined) patch.durationSeconds = parseDuration(input.durationSeconds) ?? null;
