@@ -44,23 +44,23 @@ describe("interviews corpus", () => {
     const { addInterview, listInterviews } = await import("./interviews.js");
     const row = await addInterview(positionId, {
       stage: "screen",
-      title: "TA screen — Ryan",
-      interviewerName: "Ryan Zubal",
-      interviewerRole: "Talent Sourcing Manager",
-      occurredAt: "2026-09-11T14:00:00.000Z",
-      durationSeconds: 1951,
+      title: "TA screen — Ada",
+      interviewerName: "Ada Example",
+      interviewerRole: "Recruiter",
+      occurredAt: "2030-01-15T14:00:00.000Z",
+      durationSeconds: 1800,
       status: "completed",
       outcome: "advanced",
-      notes: "advanced to HM",
+      notes: "moved to the next round",
       skipBrief: true,
     });
     expect(row.briefJobId).toBeNull();
-    expect(row.interviewerName).toBe("Ryan Zubal");
+    expect(row.interviewerName).toBe("Ada Example");
     expect(row.outcome).toBe("advanced");
-    expect(row.durationSeconds).toBe(1951);
+    expect(row.durationSeconds).toBe(1800);
     const listed = await listInterviews(positionId);
     expect(listed).toHaveLength(1);
-    expect(listed[0]?.title).toBe("TA screen — Ryan");
+    expect(listed[0]?.title).toBe("TA screen — Ada");
     expect(listed[0]?.transcriptChars).toBe(0);
     expect("transcriptMarkdown" in (listed[0] ?? {})).toBe(false);
   });
@@ -89,7 +89,7 @@ describe("interviews corpus", () => {
     coreEnv.openaiApiKey = "test-key";
     try {
       const patched = await patchInterview(positionId, created.id, {
-        transcriptMarkdown: "**Ryan** hello\n**Alex** hi",
+        transcriptMarkdown: "**Ada** hello\n**Sam** hi",
         transcriptSource: "whisper",
         reviewMarkdown: "## Verdict\nadvanced",
         sourcePath: "interviews/acme/meetings/interview-1.md",
@@ -101,7 +101,7 @@ describe("interviews corpus", () => {
     }
     const got = await getInterview(positionId, created.id);
     expect(got?.sourcePath).toContain("interview-1.md");
-    expect(got?.transcriptMarkdown).toContain("Ryan");
+    expect(got?.transcriptMarkdown).toContain("Ada");
     const { listInterviews } = await import("./interviews.js");
     const listed = await listInterviews(positionId);
     const slim = listed.find((r) => r.id === created.id);

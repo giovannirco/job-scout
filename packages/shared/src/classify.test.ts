@@ -133,7 +133,7 @@ describe("quick_score_hint", () => {
 });
 
 describe("matchLabel (pager gate — never delete)", () => {
-  it("labels Wellhub-class observability platform title as match", () => {
+  it("labels an observability platform title as match", () => {
     expect(
       matchLabel({
         title: "Staff Platform Engineer Observability",
@@ -142,10 +142,10 @@ describe("matchLabel (pager gate — never delete)", () => {
     ).toBe("match");
   });
 
-  it("labels Vinted-class Staff Engineer AI title unmatched but does not invent skip", () => {
+  it("labels a Staff Engineer AI title unmatched but does not invent skip", () => {
     expect(
       matchLabel({
-        title: "Staff Engineer, AI, Engineering Experience",
+        title: "Staff Engineer, AI, Developer Productivity",
         location: "",
       }),
     ).toBe("unmatched");

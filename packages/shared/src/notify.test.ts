@@ -59,13 +59,13 @@ describe("decideNotify", () => {
 });
 
 describe("quiet hours", () => {
-  it("treats 23:00–08:00 America/Sao_Paulo as overnight", () => {
-    expect(inQuietHours(new Date("2026-09-22T02:10:00.000Z"), "America/Sao_Paulo", "23:00", "08:00")).toBe(true);
-    expect(inQuietHours(new Date("2026-09-21T15:00:00.000Z"), "America/Sao_Paulo", "23:00", "08:00")).toBe(false);
+  it("treats 23:00–08:00 America/New_York as overnight", () => {
+    expect(inQuietHours(new Date("2026-09-22T04:10:00.000Z"), "America/New_York", "23:00", "08:00")).toBe(true);
+    expect(inQuietHours(new Date("2026-09-21T15:00:00.000Z"), "America/New_York", "23:00", "08:00")).toBe(false);
   });
 
   it("schedules the next local 08:00", () => {
-    const end = nextQuietEnd(new Date("2026-09-22T02:10:00.000Z"), "America/Sao_Paulo", "08:00");
+    const end = nextQuietEnd(new Date("2026-09-22T02:10:00.000Z"), "America/New_York", "08:00");
     expect(end.getTime()).toBeGreaterThan(Date.parse("2026-09-22T02:10:00.000Z"));
   });
 });

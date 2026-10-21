@@ -44,7 +44,7 @@ describe("posting identity and eligibility", () => {
     expect(decisionTitle("Senior Backend Engineer - Databases - Analytics | Germany | Remote"))
       .not.toBe(decisionTitle("Staff Backend Engineer - Databases - Analytics | Germany | Remote"));
     expect(decisionTitle("Senior Backend Software Engineer | IDX Team")).toBe("senior backend software engineer idx team");
-    expect(requisitionId("Req R6926, Brazil")).toBe("R6926");
+    expect(requisitionId("Req R0042, Remote")).toBe("R0042");
     expect(requisitionId("Requisition ID: 1524")).toBe("1524");
     expect(requisitionId("We require 5 years")).toBeNull();
   });
@@ -61,8 +61,8 @@ describe("posting identity and eligibility", () => {
     expect(isPlaceholderAtsUrl("https://jobs.ashbyhq.com/demo-company/abc123")).toBe(false);
   });
   it("recovers WWR employers only at a proven title boundary", () => {
-    expect(employerFromPosting("https://weworkremotely.com/remote-jobs/jumio-devops-engineer-iv-obs", "DevOps Engineer IV (Obs)")).toBe("Jumio");
-    expect(employerFromPosting("https://weworkremotely.com/remote-jobs/jumio-something-else", "DevOps Engineer")).toBeNull();
+    expect(employerFromPosting("https://weworkremotely.com/remote-jobs/examplesoft-cloud-engineer-ii-ops", "Cloud Engineer II (Ops)")).toBe("Examplesoft");
+    expect(employerFromPosting("https://weworkremotely.com/remote-jobs/examplesoft-something-else", "Cloud Engineer")).toBeNull();
     expect(cleanLocation("LATAM · [object Object] · Brazil")).toBe("LATAM · Brazil");
   });
 });

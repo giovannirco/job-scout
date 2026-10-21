@@ -101,15 +101,15 @@ describe("queue integrity on isolated PGlite", () => {
   });
 
   it("recovers aggregator employer and excludes an unresolved clip", async () => {
-    const { position } = await upsertFromJob(job("We Work Remotely", "1", { boardToken: "weworkremotely", company: "We Work Remotely", title: "DevOps Engineer IV (Obs)", url: "https://weworkremotely.com/remote-jobs/jumio-devops-engineer-iv-obs" }));
-    expect(position.company.name).toBe("Jumio");
+    const { position } = await upsertFromJob(job("We Work Remotely", "1", { boardToken: "weworkremotely", company: "We Work Remotely", title: "Cloud Engineer II (Ops)", url: "https://weworkremotely.com/remote-jobs/examplesoft-cloud-engineer-ii-ops" }));
+    expect(position.company.name).toBe("Examplesoft");
     const mystery = await upsertFromJob({ provider: "linkedin", title: "Platform Engineer", url: "https://linkedin.com/jobs/view/918273", listingStatus: "open" });
     expect(mystery.position.company.name).toBe("__unresolved__");
     expect((await listPositions({ company: "unresolved", actionable: "true" })).total).toBe(0);
   });
 
   it("aliases board tokens and links a new posting to prior application history", async () => {
-    const old = job("gympass", "1000000001", { title: "Staff Platform Engineer | Observability" });
+    const old = job("gympass", "1000000001", { title: "Platform Engineer" });
     const { position } = await upsertFromJob(old, { status: "applied" });
     await patchPosition(position.id, { appliedAt: "2020-01-01" });
     const alias = await upsertFromJob({ ...old, company: "Wellhub", boardToken: "wellhub", externalIdentity: "greenhouse:wellhub:1000000001", url: "https://job-boards.greenhouse.io/wellhub/jobs/1000000001" });
@@ -124,14 +124,14 @@ describe("queue integrity on isolated PGlite", () => {
   });
 
   it("reconciles URL-first, reports missing paths and excludes terminal stamps", async () => {
-    const { position } = await upsertFromJob(job("vtex", "1000000003"), { status: "review" });
-    const rows = [{ trackerId: 42, company: "VTEX", title: "different display title", url: "https://boards.greenhouse.io/vtex/jobs/1000000003/?utm_source=tracker", status: "SKIP", score: 3.7, reportPath: "reports/42.md", reportExists: false }];
+    const { position } = await upsertFromJob(job("examplecorp", "1000000003"), { status: "review" });
+    const rows = [{ trackerId: 42, company: "ExampleCorp", title: "different display title", url: "https://boards.greenhouse.io/examplecorp/jobs/1000000003/?utm_source=tracker", status: "SKIP", score: 3.2, reportPath: "reports/42.md", reportExists: false }];
     const dry = await reconcileCareerOps({ rows });
     expect(dry.matches[0].positionIds).toEqual([position.id]);
     expect((await getPosition(position.id))?.metadata?.careerOps).toBeUndefined();
     const applied = await reconcileCareerOps({ rows, dryRun: false });
     expect(applied.reports[0].status).toBe("missing");
-    expect((await listPositions({ company: "vtex", actionable: "true" })).total).toBe(0);
+    expect((await listPositions({ company: "examplecorp", actionable: "true" })).total).toBe(0);
   });
 
   it("reports ambiguous titles, conflicting URLs and competing tracker rows", async () => {

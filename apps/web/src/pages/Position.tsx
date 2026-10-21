@@ -1150,9 +1150,9 @@ function InterviewsPanel({ positionId, noKey }: { positionId: string; noKey: boo
             </option>
           ))}
         </Select>
-        <Input label="Title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="TA screen — Ryan Zubal" />
+        <Input label="Title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="TA screen — recruiter name" />
         <Input label="Interviewer" value={interviewerName} onChange={(e) => setInterviewerName(e.target.value)} />
-        <Input label="Interviewer role" value={interviewerRole} onChange={(e) => setInterviewerRole(e.target.value)} placeholder="Talent Sourcing Manager" />
+        <Input label="Interviewer role" value={interviewerRole} onChange={(e) => setInterviewerRole(e.target.value)} placeholder="Recruiter" />
         <Input label="Scheduled" type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
         <Input label="Occurred" type="datetime-local" value={occurredAt} onChange={(e) => setOccurredAt(e.target.value)} />
         <Select label="Outcome" value={outcome} onChange={(e) => setOutcome(e.target.value)}>

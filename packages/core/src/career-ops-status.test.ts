@@ -34,7 +34,7 @@ describe("career-ops never skips or archives on its own", () => {
     coreEnv.openaiApiKey = "test-only";
     await bootstrap({ seedBoards: false });
     await updateSettings({ llm: { operations: { triage: { enabled: true, model: "test-model", dailyCap: 0 } } } });
-    await updateProfile({ cashFloorUsd: 70000 });
+    await updateProfile({ cashFloorUsd: 64000 });
   });
   afterEach(() => vi.restoreAllMocks());
   afterAll(async () => { await closeDb(); rmSync(dir, { recursive: true, force: true }); });

@@ -11,12 +11,12 @@ function job(over: Partial<AtsJob> = {}): AtsJob {
     boardToken: "acme",
     jobId: "brief-1",
     externalIdentity: "greenhouse:acme:brief-1",
-    title: "Senior SRE, DevEx",
-    company: "Chainlink Labs",
-    url: "https://jobs.ashbyhq.com/chainlink-labs/devex",
-    locationRaw: "Remote - Brazil",
+    title: "Senior Platform Engineer",
+    company: "Acme Example",
+    url: "https://jobs.ashbyhq.com/acme-example/brief-1",
+    locationRaw: "Remote",
     descriptionText: "Build Kubernetes operators and GitHub Actions. Not an operational support role. " + "x".repeat(200),
-    salaryRaw: "$90,000 - $125,000",
+    salaryRaw: "$100,000 - $120,000",
     listingStatus: "open",
     ...over,
   };
@@ -57,21 +57,21 @@ describe("interview_brief", () => {
     vi.spyOn(llm, "getLlmClient").mockReturnValue({
       chatDocument: async () => ({
         content: "",
-        markdown: "## 1. What happened\nSourcer advanced the candidate.\n",
+        markdown: "## 1. What happened\nThe recruiter moved the candidate forward.\n",
         sections: {},
         data: {
-          headline: "Advanced to HM after a DevEx rematch screen.",
+          headline: "Advanced to the hiring manager round after a platform screen.",
           outcomeGuess: "advanced",
           jdFitScore: 3.6,
           jdHits: ["GitHub Actions", "Kubernetes"],
           jdMisses: ["operator-from-scratch"],
-          companyFit: "Platformization matched.",
+          companyFit: "Platform focus matched.",
           strengths: ["honest gaps"],
-          misses: ["talked over cash split"],
-          signals: ["makes a lot of sense for what we're looking for"],
-          compensationNotes: "$135k TC = $80k cash + LTI",
-          nextRoundPrep: ["MCP artifact"],
-          questionsToAsk: ["What does DevEx own?"],
+          misses: ["rushed the pay question"],
+          signals: ["sounds like a good fit for the team"],
+          compensationNotes: "$110k base + equity",
+          nextRoundPrep: ["walk through a past migration"],
+          questionsToAsk: ["What does the platform team own?"],
         },
         model: "test-model",
         tokensIn: 10,
@@ -85,8 +85,8 @@ describe("interview_brief", () => {
     const { addInterview, getInterview } = await import("./interviews.js");
     const round = await addInterview(positionId, {
       stage: "screen",
-      interviewerName: "Ryan Zubal",
-      transcriptMarkdown: "Ryan: makes a lot of sense\nAlex: GitLab to GitHub Actions and Argo CD",
+      interviewerName: "Ada Example",
+      transcriptMarkdown: "Ada: sounds like a good fit\nSam: CI moved to GitHub Actions and Argo CD",
       skipBrief: true,
     });
     const { runInterviewBrief } = await import("./interview-brief.js");
@@ -96,6 +96,6 @@ describe("interview_brief", () => {
     const stored = await getInterview(positionId, round.id);
     expect(stored?.aiBriefMarkdown).toContain("What happened");
     expect(stored?.aiBriefModel).toBe("test-model");
-    expect((stored?.aiBriefJson as { headline?: string } | null)?.headline).toContain("Advanced to HM");
+    expect((stored?.aiBriefJson as { headline?: string } | null)?.headline).toContain("hiring manager round");
   });
 });
