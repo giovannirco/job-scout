@@ -89,7 +89,10 @@ export type LlmOperationHealth = {
 
 export type LlmHealthReport = {
   state: LlmHealthState;
-  /** Provider-wide failure (auth/quota/upgrade/outage) on a failing operation: park LLM work. */
+  /**
+   * Provider-wide failure (auth/quota/upgrade/outage) on a failing operation that no other
+   * operation has succeeded since: park LLM work.
+   */
   providerDown: boolean;
   kind: LlmFailureKind | null;
   failingOperations: string[];
@@ -157,6 +160,14 @@ export function assessLlmHealth(runs: LlmRunSample[], opts: { now?: Date; operat
     byOp.set(r.operation, list);
   }
   const operations = [...byOp.entries()].map(([op, rows]) => assessOperation(op, rows, opts)).sort((a, b) => a.operation.localeCompare(b.operation));
+  // A provider-wide streak (auth/quota/upgrade/outage) is disproved once any other operation
+  // succeeds after it began: the provider answers again. That operation stays degraded until
+  // its own success, but it no longer parks the rest of the LLM work.
+  for (const o of operations) {
+    if (o.state !== "failing" || !providerWideKind(o.kind) || !o.failingSince) continue;
+    const since = Date.parse(o.failingSince);
+    if (operations.some((x) => x !== o && x.lastOkAt != null && Date.parse(x.lastOkAt) > since)) o.state = "degraded";
+  }
   const failing = operations.filter((o) => o.state === "failing");
   const degraded = operations.filter((o) => o.state === "degraded");
   const providerFailing = failing.filter((o) => providerWideKind(o.kind));

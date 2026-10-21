@@ -57,4 +57,34 @@ describe("assessLlmHealth", () => {
     expect(r.providerDown).toBe(false);
     expect(r.kind).toBe("error");
   });
+  it("clears providerDown once another operation succeeds after a provider-wide streak began", () => {
+    const err = "llm 503 on /chat/completions: service unavailable";
+    const streak = [fail("company_research", 10, err), fail("company_research", 9, err), fail("company_research", 8, err)];
+    const r = assessLlmHealth([...streak, ok("evaluate", 20), ok("evaluate", 5)], { now, operations: ["company_research", "evaluate", "triage"] });
+    expect(r).toMatchObject({ state: "degraded", providerDown: false, failingOperations: [], degradedOperations: ["company_research"], failingSince: null });
+    const cr = r.operations.find((o) => o.operation === "company_research")!;
+    expect(cr).toMatchObject({ state: "degraded", consecutiveFailures: 3, kind: "outage", failingSince: at(10).toISOString() });
+    expect(r.operations.find((o) => o.operation === "evaluate")?.state).toBe("ok");
+
+    // A success from before the streak proves nothing.
+    expect(assessLlmHealth([...streak, ok("evaluate", 15)], { now })).toMatchObject({ state: "failing", providerDown: true, failingOperations: ["company_research"] });
+    // The streak's own operation recovers on its own success as before.
+    expect(assessLlmHealth([...streak, ok("company_research", 1)], { now })).toMatchObject({ providerDown: false, failingOperations: [] });
+  });
+
+  it("keeps the provider down when a later streak started after the only success", () => {
+    const err = "llm 401 on /chat/completions: invalid api key";
+    const runs = [
+      fail("company_research", 30, err), fail("company_research", 29, err), fail("company_research", 28, err),
+      ok("evaluate", 20),
+      fail("triage", 10, err), fail("triage", 9, err), fail("triage", 8, err),
+    ];
+    const r = assessLlmHealth(runs, { now });
+    expect(r).toMatchObject({ state: "failing", providerDown: true, kind: "auth", failingOperations: ["triage"], degradedOperations: ["company_research"], failingSince: at(10).toISOString() });
+  });
+
+  it("does not clear a plain-error streak because another operation succeeded", () => {
+    const runs = [...[3, 2, 1].map((m) => fail("evaluate", m, "llm output failed schema evaluate: bad")), ok("triage", 0.5)];
+    expect(assessLlmHealth(runs, { now })).toMatchObject({ state: "failing", providerDown: false, failingOperations: ["evaluate"] });
+  });
 });

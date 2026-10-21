@@ -5,6 +5,7 @@ import {
   getLlmHealth,
   invalidateLlmHealth,
   llmCircuit,
+  releaseParkedLlmJobs,
   claimNextJob,
   completeJob,
   enqueueDueBoardScans,
@@ -125,6 +126,23 @@ export function startWorker(opts: WorkerOptions = {}) {
     return (await getLlmHealth({ fresh: true }).catch(() => null))?.providerDown === true;
   };
 
+  /**
+   * A successful LLM job may have flipped health. Drop the cached report so the circuit sees it,
+   * and when a probe proves the provider up again, put parked jobs of every operation back now
+   * instead of waiting for the next health tick. The recovery alert stays with that tick.
+   */
+  const afterLlmSuccess = async (probe: boolean, jlog: typeof log) => {
+    invalidateLlmHealth();
+    if (!probe) return;
+    try {
+      if (await providerDownNow()) return;
+      const released = await releaseParkedLlmJobs();
+      if (released) jlog.info("llm.parked_released", { released, by: "probe" });
+    } catch (e) {
+      jlog.warn("llm.parked_release_failed", { err: e });
+    }
+  };
+
   /** Hold an LLM job while the provider is down: requeue later without spending an attempt. */
   const park = async (job: JobRow, msg: string, kind: string | null, retryInMs: number) => {
     const prev = (job.payload as { llmParked?: { count?: number } } | null)?.llmParked;
@@ -139,8 +157,11 @@ export function startWorker(opts: WorkerOptions = {}) {
     const t0 = Date.now();
     const jlog = log.child({ jobId: job.id, type: job.type, attempt: job.attempts, positionId: (job.payload as Record<string, unknown> | null)?.positionId ?? undefined });
     const llmJob = LLM_TYPES.includes(job.type);
+    /** Let through as a probe while the provider was reported down. */
+    let probe = false;
     if (llmJob) {
       const circuit = await llmCircuit(job.type).catch(() => ({ open: false, kind: null, reason: null }));
+      probe = !circuit.open && circuit.kind != null;
       if (circuit.open) {
         await park(job, circuit.reason ?? "LLM provider down", circuit.kind, LLM_PROBE_INTERVAL_MS);
         jobsProcessed.labels({ type: job.type, outcome: "parked" }).inc();
@@ -165,6 +186,7 @@ export function startWorker(opts: WorkerOptions = {}) {
       jobDuration.labels({ type: job.type }).observe(ms / 1000);
       jobsProcessed.labels({ type: job.type, outcome: "ok" }).inc();
       jlog.info("job.ok", { ms, ...summarize(result) });
+      if (llmJob) await afterLlmSuccess(probe, jlog);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       const gate = e instanceof LlmGateError;
