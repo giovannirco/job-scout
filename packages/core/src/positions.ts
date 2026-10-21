@@ -265,7 +265,7 @@ export async function listPositions(q: ListPositionsQuery) {
                     : [d(positions.updatedAt), d(positions.id)];
 
   const query = db
-    .select({ ...LIST_ROW, cursorTs: sql<string>`${positions.updatedAt}::text` })
+    .select({ ...LIST_ROW, cursorTs: sql<string>`to_json(${positions.updatedAt})#>>'{}'` })
     .from(positions)
     .innerJoin(companies, eq(positions.companyId, companies.id))
     .where(pageWhere)
@@ -1490,7 +1490,7 @@ export async function listChangesSince(since: Date, opts: number | { limit?: num
   if (!positionsMore) {
     const after = cursor?.e ? sql`(${evaluations.createdAt}, ${evaluations.id}) > (${cursor.e[0]}::timestamptz, ${cursor.e[1]})` : undefined;
     const rows = await db
-      .select({ id: evaluations.id, positionId: evaluations.positionId, kind: evaluations.kind, model: evaluations.model, createdAt: evaluations.createdAt, cursorTs: sql<string>`${evaluations.createdAt}::text` })
+      .select({ id: evaluations.id, positionId: evaluations.positionId, kind: evaluations.kind, model: evaluations.model, createdAt: evaluations.createdAt, cursorTs: sql<string>`to_json(${evaluations.createdAt})#>>'{}'` })
       .from(evaluations)
       .where(and(gt(evaluations.createdAt, since), after))
       .orderBy(asc(evaluations.createdAt), asc(evaluations.id))
@@ -1517,7 +1517,7 @@ export async function listChangesSince(since: Date, opts: number | { limit?: num
 async function changedPositions(since: Date, after: [string, string] | undefined, limit: number) {
   const db = await getDb();
   return db
-    .select({ ...LIST_ROW, cursorTs: sql<string>`${positions.updatedAt}::text` })
+    .select({ ...LIST_ROW, cursorTs: sql<string>`to_json(${positions.updatedAt})#>>'{}'` })
     .from(positions)
     .innerJoin(companies, eq(positions.companyId, companies.id))
     .where(and(gt(positions.updatedAt, since), after ? sql`(${positions.updatedAt}, ${positions.id}) > (${after[0]}::timestamptz, ${after[1]})` : undefined))

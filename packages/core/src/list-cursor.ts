@@ -20,7 +20,7 @@ export type ListCursor = {
   w?: string;
 };
 
-/** timestamptz::text, e.g. 2026-01-02 03:04:05.123456+00 */
+/** timestamptz as JSON text (ISO 8601 whatever DateStyle is), e.g. 2026-01-02T03:04:05.123456+00:00 */
 const PG_TIMESTAMP = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}(:?\d{2}){0,2})?$/;
 
 export class CursorError extends Error {
