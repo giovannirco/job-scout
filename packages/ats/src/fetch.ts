@@ -116,6 +116,51 @@ export function salaryFromBaseSalary(base: unknown): string | undefined {
   return `${currency} ${min ?? max}${suffix}`;
 }
 
+const ISO_COUNTRY: Record<string, string> = {
+  AR: "Argentina", AU: "Australia", AT: "Austria", BE: "Belgium", BO: "Bolivia", BR: "Brazil", CA: "Canada", CH: "Switzerland",
+  CL: "Chile", CO: "Colombia", CR: "Costa Rica", CZ: "Czechia", DE: "Germany", DK: "Denmark", EC: "Ecuador", ES: "Spain",
+  FI: "Finland", FR: "France", GB: "United Kingdom", GR: "Greece", GT: "Guatemala", HU: "Hungary", IE: "Ireland", IL: "Israel",
+  IN: "India", IT: "Italy", JP: "Japan", KR: "South Korea", MX: "Mexico", NL: "Netherlands", NO: "Norway", NZ: "New Zealand",
+  PE: "Peru", PL: "Poland", PT: "Portugal", PY: "Paraguay", RO: "Romania", SE: "Sweden", SG: "Singapore", TR: "Turkey",
+  UK: "United Kingdom", US: "United States", USA: "United States", UY: "Uruguay", VE: "Venezuela", ZA: "South Africa",
+};
+
+const ldList = (v: unknown): unknown[] => (Array.isArray(v) ? v : v == null ? [] : [v]);
+const ldText = (v: unknown): string => {
+  if (typeof v === "string") return v.trim();
+  if (v && typeof v === "object") return ldText((v as { name?: unknown }).name);
+  return "";
+};
+const countryName = (v: unknown): string => {
+  const t = ldText(v);
+  return ISO_COUNTRY[t.toUpperCase()] || t;
+};
+
+/**
+ * Location facts from a schema.org JobPosting, before any free-text heuristic:
+ * jobLocationType=TELECOMMUTE is remote; applicantLocationRequirements lists the
+ * countries a remote hire may live in; jobLocation may be one place or several,
+ * each with a locality, region and/or only a country.
+ */
+export function jsonLdPlace(n: Record<string, unknown>): { locationRaw?: string; workplaceType?: string; isRemote?: boolean } {
+  const telecommute = ldList(n.jobLocationType).some((t) => /telecommute/i.test(String(t)));
+  const applicant = [...new Set(ldList(n.applicantLocationRequirements).map(countryName).filter(Boolean))];
+  const places = [...new Set(ldList(n.jobLocation).map((loc) => {
+    if (typeof loc === "string") return loc.trim();
+    const l = (loc || {}) as { name?: unknown; address?: unknown };
+    const a = (typeof l.address === "string" ? { addressLocality: l.address } : (l.address || {})) as Record<string, unknown>;
+    const parts = [ldText(a.addressLocality), ldText(a.addressRegion), countryName(a.addressCountry)].filter(Boolean);
+    return [...new Set(parts)].join(", ") || ldText(l.name);
+  }).filter(Boolean))];
+  if (telecommute) {
+    const where = applicant.length ? applicant : places;
+    return { locationRaw: ["Remote", ...where].join(" · "), workplaceType: "remote", isRemote: true };
+  }
+  if (places.length) return { locationRaw: places.join(" · ") };
+  if (applicant.length) return { locationRaw: applicant.join(" · ") };
+  return {};
+}
+
 function extractJsonLdJob(html: string): Partial<AtsJob> | null {
   const re = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
   let m: RegExpExecArray | null;
@@ -126,15 +171,14 @@ function extractJsonLdJob(html: string): Partial<AtsJob> | null {
       for (const n of nodes) {
         if (n && (n["@type"] === "JobPosting" || n["@type"]?.includes?.("JobPosting"))) {
           const salaryRaw = salaryFromBaseSalary(n.baseSalary);
+          const place = jsonLdPlace(n);
           return {
             title: n.title || n.name,
             descriptionText: n.description ? stripHtml(String(n.description)) : undefined,
             descriptionHtml: typeof n.description === "string" ? n.description : undefined,
-            locationRaw:
-              n.jobLocation?.address?.addressLocality ||
-              n.jobLocation?.name ||
-              (typeof n.jobLocation === "string" ? n.jobLocation : undefined) ||
-              n.applicantLocationRequirements?.name,
+            locationRaw: place.locationRaw,
+            workplaceType: place.workplaceType,
+            isRemote: place.isRemote,
             salaryRaw,
             employmentType: Array.isArray(n.employmentType)
               ? n.employmentType.join(", ")
@@ -731,6 +775,8 @@ export async function fetchAshbyJob(org: string, jobId: string, opts: { render?:
     title: shell ? "" : rawTitle,
     url: pageUrl,
     locationRaw: ld?.locationRaw,
+    workplaceType: ld?.workplaceType,
+    isRemote: ld?.isRemote,
     descriptionText: ld?.descriptionText,
     descriptionHtml: ld?.descriptionHtml,
     salaryRaw: ld?.salaryRaw,
@@ -944,6 +990,8 @@ function extractFromHtml(url: string, body: string, status: number): AtsJob {
     title: picked,
     url,
     locationRaw: ld?.locationRaw,
+    workplaceType: ld?.workplaceType,
+    isRemote: ld?.isRemote,
     descriptionText:
       ld?.descriptionText ||
       (picked ? stripHtml(body).slice(0, 12000) : undefined),

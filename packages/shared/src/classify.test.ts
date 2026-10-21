@@ -5,6 +5,7 @@ import {
   mergeListingClassify,
   craftFamily,
   geoClass,
+  remoteClass,
   isCraftMatch,
   isNoiseTitle,
   laneForEvent,
@@ -281,7 +282,9 @@ describe("classifyListing", () => {
     expect(classifyListing({ locationRaw: "AMER" }).workplace).toBe("remote");
     expect(classifyListing({ locationRaw: "N/A" }).locationClean).toBe("");
     expect(classifyListing({ locationRaw: "Ontario, CAN" }).workplace).toBe("onsite");
-    expect(classifyListing({ locationRaw: "San Francisco", workplaceType: "Remote", title: "Software Engineer, Distributed Data Systems" }).workplace).toBe("onsite");
+    // A title word never makes a city remote; an ATS workplaceType of Remote does (the city still locks geo).
+    expect(classifyListing({ locationRaw: "San Francisco", title: "Software Engineer, Distributed Data Systems" }).workplace).toBe("onsite");
+    expect(classifyListing({ locationRaw: "San Francisco", workplaceType: "Remote", title: "Software Engineer, Distributed Data Systems" })).toMatchObject({ workplace: "remote", geoClass: "hard_geo" });
     expect(classifyListing({ locationRaw: "United States", workplaceType: "Remote" }).workplace).toBe("remote");
     expect(classifyListing({ locationRaw: "United States", isRemote: true }).workplace).toBe("remote");
     expect(classifyListing({ locationRaw: "Boston, Massachusetts, USA; New York, New York, USA", isRemote: true }).workplace).toBe("onsite");
@@ -368,5 +371,101 @@ describe("mergeListingClassify", () => {
     expect(
       mergeListingClassify({ workplace: "remote", geoClass: "worldwideish" }, { workplace: "onsite" }).workplace,
     ).toBe("remote");
+  });
+});
+
+describe("geo/workplace misreads: structured data first, no escalation from weak signals", () => {
+  it("a city location with an ATS workplaceType of Remote is remote, not onsite", () => {
+    const r = classifyListing({ locationRaw: "São Paulo", workplaceType: "Remote", company: "Example Co" });
+    expect(r).toMatchObject({ workplace: "remote", geoClass: "brazil_friendly", workplaceWeak: false });
+    expect(classifyListing({ locationRaw: "Curitiba", workplaceType: "TELECOMMUTE" }).workplace).toBe("remote");
+    // Structured onsite and hybrid stay locked.
+    expect(classifyListing({ locationRaw: "São Paulo", workplaceType: "OnSite" }).workplace).toBe("onsite");
+    expect(classifyListing({ locationRaw: "São Paulo", workplaceType: "Hybrid" }).workplace).toBe("hybrid");
+  });
+
+  it("a JD saying 'Remote in Brazil' overrides an office guessed from the city name", () => {
+    const r = classifyListing({
+      locationRaw: "São Paulo, Brazil",
+      company: "Example Co",
+      descriptionText: "About the role\nThis position is Remote in Brazil. You will run Kubernetes clusters.",
+    });
+    expect(r.workplace).toBe("remote");
+    expect(r.geoClass).toBe("brazil_friendly");
+    // Without any remote statement the city is still an office.
+    expect(classifyListing({ locationRaw: "São Paulo, Brazil", descriptionText: "Join our team downtown." }).workplace).toBe("onsite");
+    expect(classifyListing({ locationRaw: "Lisbon", descriptionText: "This is a Fully Remote role." }).workplace).toBe("remote");
+    expect(classifyListing({ locationRaw: "Lisbon", descriptionText: "We are 100% Remote." }).workplace).toBe("remote");
+    expect(classifyListing({ locationRaw: "Lisbon", descriptionText: "Work remote from the office twice a month." }).workplace).toBe("onsite");
+    // An onsite statement for this role beats company-wide remote wording.
+    const lisbon = classifyListing({ locationRaw: "Lisbon", descriptionText: "We are remote-first with teams across Latin America, but this role is onsite in Lisbon." });
+    expect(lisbon.workplace).toBe("onsite");
+    expect(lisbon.geoClass).toBe("hard_geo");
+    // A hybrid requirement in the JD keeps it an office.
+    expect(classifyListing({ locationRaw: "São Paulo, Brazil", descriptionText: "Fully remote culture, but this is a hybrid role with 3 days a week in the office." }).workplace).toBe("onsite");
+  });
+
+  it("a city office whose JD mentions remote work is weak and goes to the listing model", () => {
+    const r = classifyListing({ locationRaw: "Lisbon", descriptionText: "We offer remote Fridays and a modern office." });
+    expect(r).toMatchObject({ workplace: "onsite", workplaceWeak: true });
+    expect(listingClassifyNeeded(r)).toBe(true);
+    expect(mergeListingClassify(r, { workplace: "remote" }).workplace).toBe("remote");
+    // A structured or explicit onsite is not weak.
+    expect(classifyListing({ locationRaw: "Lisbon", workplaceType: "OnSite", descriptionText: "remote Fridays" }).workplaceWeak).toBe(false);
+    expect(mergeListingClassify({ workplace: "onsite", geoClass: "hard_geo" }, { workplace: "remote" }).workplace).toBe("onsite");
+  });
+
+  it("a role open to Argentina, Mexico and Brazil stays multi-country, not one office or Mexico-only", () => {
+    const r = classifyListing({ locationRaw: "Argentina, Mexico, Brazil", company: "Example Co" });
+    expect(r.workplace).not.toBe("onsite");
+    expect(r.geoClass).toBe("brazil_friendly");
+    const remote = classifyListing({ locationRaw: "Argentina, Mexico, Brazil", workplaceType: "Remote" });
+    expect(remote).toMatchObject({ workplace: "remote", geoClass: "brazil_friendly" });
+    // The listing model cannot narrow the list to its first country.
+    expect(mergeListingClassify({ ...remote, geoClass: "ambiguous_remote", locationRaw: "Argentina, Mexico, Brazil" }, { geoClass: "hard_geo", geoNote: "Mexico only" }).geoClass).toBe("ambiguous_remote");
+    // An address is still one place.
+    expect(classifyListing({ locationRaw: "Ontario, Canada" }).workplace).toBe("onsite");
+    expect(classifyListing({ locationRaw: "Menlo Park, California, United States" }).workplace).toBe("onsite");
+  });
+
+  it("'fully remote' in an EU-only posting is region-remote, never worldwide", () => {
+    expect(geoClass("Fully remote")).toBe("ambiguous_remote");
+    expect(remoteClass("Fully remote")).toBe("ambiguous_remote");
+    expect(remoteClass("Fully remote (EU)")).toBe("emea");
+    expect(remoteClass("Fully remote, EU only")).toBe("eu_only");
+    expect(remoteClass("Fully remote, US only")).toBe("us_only");
+    const r = classifyListing({ locationRaw: "Fully remote (EU)", company: "Example Co" });
+    expect(r.workplace).toBe("remote");
+    expect(r.geoClass).not.toBe("worldwideish");
+    expect(r.remoteClass).not.toBe("worldwide");
+    // Worldwide wording is still worldwide.
+    expect(geoClass("Remote - Worldwide")).toBe("worldwideish");
+    // The model may tighten "fully remote" to hard_geo when the JD says EU only.
+    expect(mergeListingClassify({ workplace: "remote", geoClass: "ambiguous_remote", locationRaw: "Fully remote" }, { geoClass: "hard_geo", evidence: "Candidates must reside in the EU" }).geoClass).toBe("hard_geo");
+  });
+
+  it("a LATAM-remote contract is neither onsite nor hard_geo", () => {
+    const r = classifyListing({
+      locationRaw: "Buenos Aires, Argentina",
+      descriptionText: "Contract role. We hire remote contractors anywhere in Latin America; overlap with US Eastern time.",
+    });
+    expect(r.workplace).toBe("remote");
+    expect(r.geoClass).toBe("brazil_friendly");
+    expect(classifyListing({ locationRaw: "Latin America (Contract)" })).toMatchObject({ workplace: "remote", geoClass: "brazil_friendly" });
+    expect(classifyListing({ locationRaw: "LATAM - Contractor" }).workplace).toBe("remote");
+    // A LATAM note from the model is not a lock.
+    expect(mergeListingClassify({ workplace: "remote", geoClass: "ambiguous_remote", locationRaw: "Remote" }, { geoClass: "hard_geo", geoNote: "must be located in LATAM" }).geoClass).toBe("ambiguous_remote");
+    // A residency limit in the JD cancels the wider region.
+    const us = classifyListing({ locationRaw: "Austin, TX", descriptionText: "Remote across the Americas. Must reside in the United States." });
+    expect(us.geoClass).toBe("hard_geo");
+  });
+
+  it("the listing model never reaches hard_geo from a weak note", () => {
+    const det = { workplace: "remote" as const, geoClass: "ambiguous_remote" as const, locationRaw: "Remote" };
+    expect(mergeListingClassify(det, { geoClass: "hard_geo", geoNote: "mentions Germany" }).geoClass).toBe("ambiguous_remote");
+    expect(mergeListingClassify(det, { geoClass: "hard_geo", geoNote: "fully remote" }).geoClass).toBe("ambiguous_remote");
+    expect(mergeListingClassify(det, { geoClass: "hard_geo", geoNote: "Americas-based candidates" }).geoClass).toBe("ambiguous_remote");
+    expect(mergeListingClassify(det, { geoClass: "hard_geo", evidence: "Remote role restricted to candidates in Germany" }).geoClass).toBe("hard_geo");
+    expect(mergeListingClassify(det, { geoClass: "hard_geo", evidence: "Requires US work authorization" }).geoClass).toBe("hard_geo");
   });
 });

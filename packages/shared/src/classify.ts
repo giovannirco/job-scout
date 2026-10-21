@@ -11,7 +11,7 @@ const GEO_HARD_RE =
   /(?:\b(united\s*states|usa|u\.s\.|america)\s*only\b|\bremote\s*[-–—]?\s*usa?\b|\bremote\s*us\s*only\b|\bus\s*remote\s*only\b|\bus\s+only\b|\bcanada\s*only\b|\b(uk|united\s*kingdom)\s*only\b|\b(eu|emea|europe)\s*only\b|\bindia\s*only\b|\b(lisbon|london|dublin|berlin|amsterdam|vilnius|kaunas|tokyo|singapore|sydney|toronto|chicago|geneva)\b|\bhybrid\b.*\b(san\s*francisco|new\s*york|seattle|london|tokyo)\b|\bon[\s-]*site\b|\boffice\s*based\b)/i;
 
 const GEO_FRIENDLY_RE =
-  /(?:\bbrazil\b|\bbrasil\b|\blatam\b|\blatin\s*america\b|\bamericas\b|\bworldwide\b|\banywhere\b|\bglobal\b|\bwork\s*from\s*anywhere\b|\bfully\s*remote\b|\bremote\s*[-–—]?\s*brazil\b)/i;
+  /(?:\bbrazil\b|\bbrasil\b|\blatam\b|\blatin\s*america\b|\bamericas\b|\bworldwide\b|\banywhere\b|\bglobal\b|\bwork\s*from\s*anywhere\b|\bremote\s*[-–—]?\s*brazil\b)/i;
 
 const GEO_AMBIGUOUS_MARKERS = /\bremote\b|\bremoto\b|\bdistributed\b|\bremote[\s-]*first\b|^all$/i;
 
@@ -109,8 +109,20 @@ function specificPlace(location: string): boolean {
   return FOREIGN_REGION.test(location) || HARD_CITY.test(location) || locationSegments(location).some(segmentIsUsState);
 }
 
-/** Three or more bullet-separated places, and not only cities, is a country list rather than one office. A comma address is one place. */
+const SUBNATIONAL = /^(ontario|england|scotland|wales)$/i;
+const COUNTRY_SEGMENT = new RegExp(`^(?:${FOREIGN_REGION.source.slice(3, -3)}|brazil|brasil)$`, "i");
+
+/** "Argentina, Mexico, Brazil": two or more comma-separated segments that are all countries or regions. */
+export function isCommaCountryList(location = ""): boolean {
+  if (/[·•;|]/.test(location) || !location.includes(",")) return false;
+  const segs = locationSegments(location).map(placeWithoutRemoteWording).filter(Boolean);
+  // "Ontario, Canada" and "England, United Kingdom" are addresses, not a list.
+  return segs.length >= 2 && new Set(segs.map((x) => x.toLowerCase())).size >= 2 && segs.every((x) => COUNTRY_SEGMENT.test(x) && !HARD_CITY.test(x) && !SUBNATIONAL.test(x));
+}
+
+/** Three or more bullet-separated places, and not only cities, is a country list rather than one office. A comma address is one place, unless every part is a country. */
 function isCountryList(location: string): boolean {
+  if (isCommaCountryList(location)) return true;
   if (!/[·•;|]/.test(location)) return false;
   if (!isTzOverlapLocation(location)) return false;
   const segs = locationSegments(location);
@@ -252,48 +264,108 @@ export function classifyListing(input: {
   remoteClass: string;
   locationDiscarded: boolean;
   locationClean: string;
+  /** Onsite only because the location names a city or office while the JD talks about remote work: the listing model may correct it. */
+  workplaceWeak: boolean;
 } {
   const company = input.company || "";
   const raw = (input.locationRaw || "").trim().replace(/,\s*CAN\b/g, ", Canada");
   const junkPlace = /^(n\/a|hq|tbd|none|null|-+|—+)$/i.test(raw);
   const locationDiscarded = junkPlace || isCompanyNameLocation(raw, company);
   const locationClean = locationDiscarded ? "" : raw;
+  const jd = input.descriptionText || "";
   let workplace = workplaceOf(input.workplaceType, input.isRemote, [locationClean, input.title || ""].filter(Boolean).join(" "));
+  // Structured data comes first: an ATS workplaceType (Ashby workplaceType, schema.org
+  // jobLocationType=TELECOMMUTE) of remote is remote even when the location is a city.
+  // A remote label inferred from words (title, isRemote from office names) is not.
+  const structuredRemote = STRUCTURED_REMOTE.test((input.workplaceType || "").trim());
   // A city office stays an office even when an earlier pass stored "remote" from the title.
   // A country on its own ("United States") can still be a remote hiring region.
   // "Distributed · Austin, TX · …" is a list of places you may live, not a desk.
   const leadingModality = /^(remote|distributed)\b/i.test(locationClean);
-  if (leadingModality && workplace !== "hybrid") workplace = "remote";
-  else if (workplace !== "hybrid" && isCityOffice(locationClean)) workplace = "onsite";
-  else if (workplace === "unknown" && isNamedOffice(locationClean)) workplace = "onsite";
-  if (workplace === "unknown" && /^(amer|emea|apac|apj|latam|na|distributed)$/i.test(locationClean)) workplace = "remote";
-  if (workplace === "unknown" && !locationClean && /#LI-Remote\b/i.test(input.descriptionText || "")) workplace = "remote";
+  let officeFromPlace = false;
+  if ((leadingModality || structuredRemote) && workplace !== "hybrid") workplace = "remote";
+  else if (workplace !== "hybrid" && isCityOffice(locationClean)) { workplace = "onsite"; officeFromPlace = true; }
+  else if (workplace === "unknown" && isNamedOffice(locationClean)) { workplace = "onsite"; officeFromPlace = true; }
+  if (workplace === "unknown" && REGION_ONLY.test(locationClean)) workplace = "remote";
+  if (workplace === "unknown" && !locationClean && /#LI-Remote\b/i.test(jd)) workplace = "remote";
+  // A place name alone is weak evidence of an office. An explicit remote statement in the
+  // JD ("remote in Brazil", "fully remote") with no onsite/hybrid requirement wins.
+  const placeOnly = officeFromPlace && !/(on[\s-]*site|office|hybrid)/i.test(`${input.workplaceType || ""} ${locationClean}`);
+  const region = jdRemoteRegion(jd);
+  if (placeOnly && (jdSaysRemote(jd) || region)) { workplace = "remote"; officeFromPlace = false; }
+  const workplaceWeak = workplace === "onsite" && placeOnly && /\bremote(ly)?\b/i.test(jd);
   const workplaceBlob = workplace === "remote" ? "remote" : input.workplaceType || "";
   let g = geoClass(locationClean, workplaceBlob);
-  const noPlace = !locationClean || /^\s*remote\s*$/i.test(locationClean);
-  // Missing location cannot prove worldwide hiring eligibility.
+  // One named place is weak evidence of a geo lock when the JD opens the remote role to a
+  // wider region ("remote contractors across LATAM"). Exclusivity language still wins.
+  if (g === "hard_geo" && region && workplace === "remote" && !GEO_EXCLUSIVITY_RE.test(locationClean) && !usOnlyPlaces(locationClean)) {
+    const widened = geoClass(region, "remote");
+    if (widened === "brazil_friendly" || widened === "worldwideish") g = widened;
+  }
   const rc = remoteClass(locationClean, workplaceBlob);
-  return { workplace, geoClass: g, remoteClass: rc, locationDiscarded, locationClean };
+  return { workplace, geoClass: g, remoteClass: rc, locationDiscarded, locationClean, workplaceWeak };
+}
+
+const STRUCTURED_REMOTE = /^(remote|telecommute|fully[\s_-]?remote|remote[\s_-]?only)$/i;
+
+/** A hiring region on its own ("AMER", "Latin America (Contract)") is not an office. */
+const REGION_ONLY =
+  /^(amer|emea|apac|apj|latam|na|distributed|latin\s+america|south\s+america|north\s+america|americas|the\s+americas|europe|asia[\s-]pacific)(\s*[(\-–—,]\s*[\w\s/]*\)?)?$/i;
+
+const JD_REMOTE_RE =
+  /(?:\b(?:fully|100%|completely|entirely)\s+remote\b|\bremote[-\s]first\b|\bthis\s+is\s+an?\s+(?:fully\s+)?remote\s+(?:role|position|job|opportunity|contract)\b|\b(?:role|position|job|opportunity|contract)\s+is\s+(?:fully\s+|100%\s+)?remote\b|\bremote\s+(?:in|from|within|across)\s+(?!(?:the|our)\s+office\b)(?:the\s+)?[a-z]+|\bwork\s+(?:fully\s+)?remotely\s+from\b(?!\s+(?:the|our)\s+office)|#LI-Remote\b)/i;
+
+const JD_OFFICE_REQUIRED =
+  /\b((?:role|position|job)\s+is\s+(?:an?\s+)?(?:on[\s-]?site|in[\s-]office|office[\s-]based|hybrid)|on[\s-]?site\s+(?:only|role|position)|hybrid\s+(?:role|position|schedule|model|work)|\d\s*(?:\+\s*)?days?\s+(?:a|per)\s+week\s+(?:in|at|from)\s+(?:the|our)?\s*office|in[\s-]office\s+(?:role|position|\d)|(?:must|required\s+to)\s+(?:work\s+)?(?:on[\s-]?site|from\s+(?:the|our)\s+office)|relocation\s+(?:is\s+)?required)\b/i;
+
+/** The JD affirms the role is remote and does not require an office. */
+export function jdSaysRemote(jd = ""): boolean {
+  return JD_REMOTE_RE.test(jd) && !JD_OFFICE_REQUIRED.test(jd);
+}
+
+const JD_REGION_RE =
+  /\bremote(?:ly)?\b[^.\n]{0,60}?\b(latam|latin\s+america|south\s+america|the\s+americas|brazil|brasil)\b|\b(?:anywhere\s+in|across|throughout)\s+(latam|latin\s+america|south\s+america|the\s+americas)\b[^.\n]{0,60}?\bremote(?:ly)?\b|\bremote(?:ly)?[\s,(\-–—:]{1,3}(?:from\s+)?(worldwide|anywhere\s+in\s+the\s+world|anywhere)\b/i;
+
+/** The wider region a JD opens a remote role to, or null. Residency or authorization limits cancel it. */
+export function jdRemoteRegion(jd = ""): string | null {
+  const m = jd.match(JD_REGION_RE);
+  if (!m || JD_OFFICE_REQUIRED.test(jd)) return null;
+  if (/\b(must|required\s+to|need\s+to)\s+(reside|live|be\s+(?:based|located))\b|\b(?:us|uk|eu|emea|europe|canada)[\s-]only\b|\bauthori[sz]ed\s+to\s+work\b/i.test(stripTzPhrases(jd))) return null;
+  return (m[1] || m[2] || m[3] || "").replace(/\s+/g, " ");
 }
 
 export function listingClassifyNeeded(facts: {
   workplace: Workplace;
   geoClass: GeoClass;
   locationDiscarded: boolean;
+  workplaceWeak?: boolean;
 }): boolean {
-  return facts.workplace === "unknown" || facts.geoClass === "unknown" || facts.locationDiscarded;
+  return facts.workplace === "unknown" || facts.geoClass === "unknown" || facts.locationDiscarded || Boolean(facts.workplaceWeak);
 }
 
 const GEO_TIGHTENABLE = new Set<GeoClass>(["worldwideish", "unknown", "ambiguous_remote"]);
 
+/**
+ * The model's note names a real restriction: exclusivity ("US only", "must reside"),
+ * residency, work authorization, clearance or an office requirement. A bare place
+ * name, a remote modality or a timezone window is not enough to reach hard_geo.
+ */
+function strongGeoEvidence(why: string): boolean {
+  const t = stripTzPhrases(why);
+  return nonTzBlockers(t).length > 0 || GEO_EXCLUSIVITY_RE.test(t) || /\b(restricted|limited)\s+to\b|\bnot\s+(?:open|available|hiring)\s+(?:in|to|outside)\b|\b(?:us|uk|eu|emea|europe|canada)[\s-]based\b/i.test(t);
+}
+
 export function mergeListingClassify(
-  det: { workplace: Workplace; geoClass: GeoClass; locationRaw?: string | null },
+  det: { workplace: Workplace; geoClass: GeoClass; locationRaw?: string | null; workplaceWeak?: boolean },
   llm: { workplace?: Workplace | null; geoClass?: GeoClass | null; geoNote?: string; evidence?: string },
 ): { workplace: Workplace; geoClass: GeoClass } {
   let geo = det.geoClass;
   if (det.geoClass !== "hard_geo" && llm.geoClass === "hard_geo" && GEO_TIGHTENABLE.has(det.geoClass)) {
-    const why = [llm.geoNote, llm.evidence, det.locationRaw].filter(Boolean).join(" | ");
-    if (!isTzOverlapLocation(det.locationRaw || "") && !isTimezoneOnlyRestriction(why)) {
+    const note = [llm.geoNote, llm.evidence].filter(Boolean).join(" | ");
+    const why = [note, det.locationRaw].filter(Boolean).join(" | ");
+    // A restriction to a region the listing already treats as open (LATAM, Brazil) is not a lock.
+    const openRegion = BRAZIL_PLACE.test(stripTzPhrases(note)) || /\b(latam|latin\s+america|south\s+america)\b/i.test(stripTzPhrases(note));
+    if (!isTzOverlapLocation(det.locationRaw || "") && !isTimezoneOnlyRestriction(why) && !openRegion && strongGeoEvidence(note)) {
       geo = "hard_geo";
     }
   }
@@ -301,6 +373,8 @@ export function mergeListingClassify(
   if (workplace === "unknown" && llm.workplace && llm.workplace !== "unknown") {
     workplace = llm.workplace;
   }
+  // Onsite inferred only from a place name gives way to a model that read a remote JD.
+  if (det.workplaceWeak && det.workplace === "onsite" && llm.workplace === "remote") workplace = "remote";
   return { workplace, geoClass: geo };
 }
 
@@ -313,11 +387,12 @@ export function remoteClass(
   if (!blob.trim()) return "unknown";
   if (/brazil|brasil/.test(blob) && /remote|anywhere/.test(blob)) return "brazil";
   if (/latam|latin america/.test(blob)) return "latam";
-  if (/worldwide|anywhere|global|work from anywhere|fully remote/.test(blob)) return "worldwide";
-  if (/americas/.test(blob)) return "americas";
-  if (/(us|usa|united states)\s*only|remote\s*us|\bus only\b/.test(blob)) return "us_only";
+  // A region restriction outranks remote wording: "fully remote (EU)" is region-remote, not worldwide.
+  if (/(us|usa|united states)\s*only|remote\s*us\b|\bus only\b/.test(blob)) return "us_only";
   if (/\beu only|europe only/.test(blob)) return "eu_only";
-  if (/emea/.test(blob)) return "emea";
+  if (/emea|\beu\b|\beurope(an union)?\b/.test(blob)) return "emea";
+  if (/americas/.test(blob)) return "americas";
+  if (/worldwide|anywhere|global|work from anywhere/.test(blob)) return "worldwide";
   if (/hybrid/.test(blob)) return "hybrid";
   if (/on[\s-]*site|office based/.test(blob)) return "onsite";
   if (/remote|distributed/.test(blob)) return "ambiguous_remote";

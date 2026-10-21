@@ -41,7 +41,7 @@ function classificationInactive(pos: NonNullable<Awaited<ReturnType<typeof getPo
 
 export async function maybeEnqueueListingClassify(
   positionId: string,
-  facts: { workplace: Workplace; geoClass: GeoClass; locationDiscarded: boolean },
+  facts: { workplace: Workplace; geoClass: GeoClass; locationDiscarded: boolean; workplaceWeak?: boolean },
 ): Promise<{ enqueued: boolean; jobId?: string }> {
   const s = await getSettings();
   const cfg = s.llm.operations.listing_classify;
@@ -49,13 +49,14 @@ export async function maybeEnqueueListingClassify(
   const pos = await getPosition(positionId);
   if (!pos || classificationInactive(pos) || fullyOverridden(pos.metadata) || !(await currentJdText(pos.id)).trim()) return { enqueued: false };
   const fingerprint = await classificationFingerprint(pos, cfg.model);
-  const cache = pos.metadata?.listingClassify as { inputHash?: string; result?: Record<string, unknown> } | undefined;
+  const cache = pos.metadata?.listingClassify as { inputHash?: string; result?: Record<string, unknown>; evidence?: string | null } | undefined;
   if (cache?.inputHash === fingerprint && cache.result) {
     const parsed = ListingClassifyOutput.safeParse(cache.result);
     if (parsed.success) {
       const db = await getDb();
       const rev = (await db.select().from(jdRevisions).where(eq(jdRevisions.positionId, pos.id)).orderBy(desc(jdRevisions.revision)).limit(1))[0];
-      const result = applyClassificationOverride(pos.metadata, mergeListingClassify({ ...facts, locationRaw: rev?.locationRaw || "" }, parsed.data));
+      // Older caches keep the model's evidence beside the result, not inside it.
+      const result = applyClassificationOverride(pos.metadata, mergeListingClassify({ ...facts, locationRaw: rev?.locationRaw || "" }, { ...parsed.data, evidence: parsed.data.evidence ?? cache.evidence ?? undefined }));
       // afterAtsFetch recomputes deterministic facts: restore the same-input model result.
       await db.update(positions).set({ workplace: result.workplace, geoClass: result.geoClass,
         remoteClass: remoteClass(rev?.locationRaw || "", result.workplace === "remote" ? "remote" : ""),
@@ -94,13 +95,14 @@ export async function runListingClassify(positionId: string) {
     isRemote: ats?.isRemote,
     company: pos.company.name,
     title: pos.title,
+    descriptionText: jdText,
   });
   const cfg = await gateOperation("listing_classify");
   const messages: ChatMessage[] = [
     {
       role: "system",
       content:
-        "Classify workplace (remote|hybrid|onsite|unknown) and geoClass (brazil_friendly|worldwideish|hard_geo|ambiguous_remote|unknown). Use hard_geo only for US-only, EMEA-only, must-reside, or onsite-city restrictions with evidence from the JD. A remote posting that lists three or more countries without only/must-reside/must-be-located is a timezone or entity list, not hard_geo; Portugal in that list is allow, not a block. A timezone or working-hours window (US time zones, EST/PST overlap, GMT to GMT-8, EMEA/APAC hours) is never hard_geo by itself; only country residency, work authorization, clearance/US-person or onsite/hybrid count. Never invent a restriction. Never weaken an existing hard_geo.",
+        "Classify workplace (remote|hybrid|onsite|unknown) and geoClass (brazil_friendly|worldwideish|hard_geo|ambiguous_remote|unknown). Use hard_geo only for US-only, EMEA-only, must-reside, or onsite-city restrictions with evidence from the JD. A remote posting that lists three or more countries without only/must-reside/must-be-located is a timezone or entity list, not hard_geo; Portugal in that list is allow, not a block. A timezone or working-hours window (US time zones, EST/PST overlap, GMT to GMT-8, EMEA/APAC hours) is never hard_geo by itself; only country residency, work authorization, clearance/US-person or onsite/hybrid count. Read structured fields first (workplaceType, a JSON-LD jobLocationType of TELECOMMUTE, applicantLocationRequirements), then the JD. A remote role open to several countries stays multi-country: never narrow it to the first country named. Remote limited to a region (EU-only, US-only) is that region, never worldwideish; 'fully remote' is a work mode, not a geography. A city in the location is not onsite when the JD says the role is remote. Never invent a restriction. Never weaken an existing hard_geo.",
     },
     {
       role: "user",
@@ -149,7 +151,7 @@ export async function runListingClassify(positionId: string) {
           ...(pos.metadata || {}),
           listingClassify: {
             inputHash,
-            result: { workplace: merged.workplace, geoClass: merged.geoClass, geoNote: res.data.geoNote },
+            result: { workplace: merged.workplace, geoClass: merged.geoClass, geoNote: res.data.geoNote, evidence: res.data.evidence },
             at: new Date().toISOString(),
             model: res.model,
             evidence: res.data.evidence ?? null,
@@ -178,8 +180,9 @@ export async function runListingClassify(positionId: string) {
 }
 
 export async function backfillListingFacts(opts: { force?: boolean } = {}) {
-  // v11: a city office is not remote, and #LI-Remote fills a blank location.
-  const BACKFILL_VERSION = "11";
+  // v12: an ATS workplaceType of remote beats a city name, a JD that says remote overrides a
+  // place-only office, comma country lists are not offices, "fully remote" is not worldwide.
+  const BACKFILL_VERSION = "12";
   const s = await getSettings({ fresh: true });
   if (!opts.force && s.listingFactsBackfillVersion === BACKFILL_VERSION) {
     return { skipped: true as const, archivedSkipped: 0, updated: 0, enqueued: 0 };

@@ -61,7 +61,7 @@ describe("background mutations leave timeline events (PGlite)", () => {
 
   it("listing classification records geo/workplace changes only", async () => {
     await updateSettings({ llm: { operations: { listing_classify: { enabled: true, model: "test-model", dailyCap: 0 } } } });
-    const result = (geoClass: string) => ({ data: { workplace: "remote", geoClass, evidence: "test" }, content: "{}", model: "test-model", tokensIn: 1, tokensOut: 1, latencyMs: 1 });
+    const result = (geoClass: string) => ({ data: { workplace: "remote", geoClass, evidence: "US residents only" }, content: "{}", model: "test-model", tokensIn: 1, tokensOut: 1, latencyMs: 1 });
     vi.spyOn(getLlmClient(), "chatJson").mockResolvedValue(result("hard_geo") as never);
     const j = job("classify-example");
     const { position } = await upsertFromJob(j);
