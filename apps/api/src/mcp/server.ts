@@ -55,8 +55,15 @@ import {
   matchCareerOpsRow,
   createManualCareerOpsPosition,
   setCareerOpsUrl,
+  upsertLead,
+  listLeads,
+  getLead,
+  logLeadMessage,
+  promoteLead,
+  linkLeadPosition,
+  mergeLeads,
 } from "@job-scout/core";
-import { GeoClass, log as rootLog, Workplace } from "@job-scout/shared";
+import { GeoClass, LEAD_BUCKETS, LEAD_DIRECTIONS, LEAD_STATUSES, log as rootLog, redactContactText, Workplace } from "@job-scout/shared";
 import { env } from "../env.js";
 import { errorDetails } from "../error-details.js";
 import { text } from "./result.js";
@@ -121,21 +128,26 @@ function instrumentTools(server: McpServer) {
         const ms = Date.now() - t0;
         mcpCalls.labels({ tool: name, status }).inc();
         mcpDuration.labels({ tool: name }).observe(ms / 1000);
-        mcpLog[status === "ok" ? "info" : "warn"]("mcp.tool", { tool: name, status, ms, args: compactArgs(args[0]) });
+        mcpLog[status === "ok" ? "info" : "warn"]("mcp.tool", { tool: name, status, ms, args: compactArgs(args[0], name) });
         return out;
       } catch (e) {
         const ms = Date.now() - t0;
         mcpCalls.labels({ tool: name, status: "throw" }).inc();
         mcpDuration.labels({ tool: name }).observe(ms / 1000);
-        mcpLog.error("mcp.tool", { tool: name, status: "throw", ms, args: compactArgs(args[0]), err: e });
+        mcpLog.error("mcp.tool", { tool: name, status: "throw", ms, args: compactArgs(args[0], name), err: e });
         throw e;
       }
     });
 }
-function compactArgs(a: unknown): unknown {
+/** Lead tools carry recruiter contacts and message bodies: their logged args never include a phone number or email. */
+const CONTACT_TOOLS = /lead|interview/;
+export function compactArgs(a: unknown, tool = ""): unknown {
   if (!a || typeof a !== "object") return undefined;
-  const s = JSON.stringify(a);
-  return s.length > 300 ? s.slice(0, 300) + "…" : a;
+  const raw = JSON.stringify(a);
+  const s = CONTACT_TOOLS.test(tool) ? redactContactText(raw) : raw;
+  if (s.length > 300) return s.slice(0, 300) + "…";
+  if (s === raw) return a;
+  try { return JSON.parse(s); } catch { return s; }
 }
 
 /**
@@ -274,7 +286,7 @@ export function createJobScoutMcpServer() {
 
   server.registerTool(
     "work_queue",
-    { title: "Work queue", description: "Compact decision lanes with profile freshness. Use lane and page to read more; pagination reports totals and nextPage for each lane. Use get_position for full details.", inputSchema: WorkQueueInput, annotations: { readOnlyHint: true } },
+    { title: "Work queue", description: "Compact decision lanes with profile freshness, plus a leads lane of active recruiter leads, each with a bucket (call_soon: a screening within 72h · needs_reply: the recruiter wrote last · waiting: you replied in the last 7 days · stalled: nothing for 7 days). Use lane and page to read more; pagination reports totals and nextPage for each lane. Use get_position / get_lead for full details.", inputSchema: WorkQueueInput, annotations: { readOnlyHint: true } },
     async (a) => text(await workQueue(a)),
   );
 
@@ -703,9 +715,10 @@ export function createJobScoutMcpServer() {
     {
       title: "Create or update an interview round",
       description:
-        "Store a screen/interview: stage, interviewer, outcome, notes, review, transcript. If transcriptMarkdown is set, queues an AI brief against the JD and company pack unless skipBrief=true. Pass id to patch an existing round. Returns round metadata and char counts (verbose=true for the full round); get_interview reads the bodies.",
+        "Store a screen/interview: stage, interviewer, outcome, notes, review, transcript. If transcriptMarkdown is set, queues an AI brief against the JD and company pack unless skipBrief=true. Pass id to patch an existing round. For a recruiter screening before there is a position, pass leadId instead of idOrSlug (no AI brief, no alert; a scheduled round moves the lead to screening_scheduled, a completed one to screened). Returns round metadata and char counts (verbose=true for the full round); get_interview reads the bodies.",
       inputSchema: {
-        idOrSlug: z.string(),
+        idOrSlug: z.string().optional().describe("Position id or slug. Required unless leadId is set"),
+        leadId: z.string().optional().describe("Recruiter lead id, for a round on a lead with no position"),
         id: z.string().optional(),
         stage: z.string().optional(),
         title: z.string().optional(),
@@ -727,9 +740,10 @@ export function createJobScoutMcpServer() {
       },
     },
     async (a) => {
-      const p = await getPositionDetail(a.idOrSlug);
-      if (!p) return text({ error: "not found" }, true);
-      const { addInterview, patchInterview } = await import("@job-scout/core");
+      if (!a.idOrSlug && !a.leadId) return text({ error: "idOrSlug or leadId required" }, true);
+      const p = a.idOrSlug ? await getPositionDetail(a.idOrSlug) : null;
+      if (a.idOrSlug && !p) return text({ error: "not found" }, true);
+      const { addInterview, patchInterview, upsertLeadInterview } = await import("@job-scout/core");
       const input = {
         stage: a.stage,
         title: a.title,
@@ -749,7 +763,7 @@ export function createJobScoutMcpServer() {
         skipBrief: a.skipBrief,
       };
       try {
-        const row = a.id ? await patchInterview(p.id, a.id, input) : await addInterview(p.id, input);
+        const row = !p ? await upsertLeadInterview(a.leadId!, { ...input, id: a.id }) : a.id ? await patchInterview(p.id, a.id, input) : await addInterview(p.id, input);
         if (!row) return text({ error: "not found" }, true);
         return text(a.verbose ? row : interviewSummary(row));
       } catch (e) {
@@ -786,6 +800,143 @@ export function createJobScoutMcpServer() {
     try { const run = await previewDecision(a.recipe, a.positionId, a.fresh); return text(run, run.status !== "ok"); }
     catch { return text({ error: "Jev could not run this preview. Check the saved settings, request budget and available source material." }, true); }
   });
+
+  const LEAD_FIELDS = {
+    source: z.string().optional().describe("linkedin | email | whatsapp | referral | other"),
+    recruiterName: z.string().optional(),
+    recruiterCompany: z.string().optional().describe("The recruiting firm (or the employer, for an in-house recruiter)"),
+    recruiterProfileUrl: z.string().optional().describe("Recruiter profile URL; the dedupe key together with pitchedRole"),
+    recruiterEmail: z.string().optional(),
+    recruiterPhone: z.string().optional(),
+    pitchedRole: z.string().optional(),
+    clientHint: z.string().optional().describe("What is known about the hiring client (\"Series B fintech\"), or its name"),
+    statedPay: z.string().optional().describe("Pay as stated, free text. Only an explicit USD yearly figure is compared with the cash floor"),
+    statedGeo: z.string().optional().describe("Geography / remote terms as stated"),
+    statedContract: z.string().optional().describe("Contract terms as stated (PJ, contractor, FTE via EOR, duration)"),
+    openUnknowns: z.array(z.string()).optional().describe("Questions still open (replaces the list)"),
+    threadUrls: z.array(z.string()).optional().describe("Thread URLs to add"),
+    threadUrl: z.string().optional().describe("One thread URL to add"),
+    notes: z.string().optional(),
+    nextAction: z.string().optional(),
+    closedReason: z.string().optional(),
+  };
+  const MESSAGE = z.object({
+    direction: z.enum(LEAD_DIRECTIONS),
+    body: z.string().max(50_000).optional().describe("Message text; phone numbers and emails are redacted before storage"),
+    channel: z.string().optional(),
+    who: z.string().optional(),
+    occurredAt: z.string().optional(),
+    threadUrl: z.string().optional(),
+  });
+  const leadErr = (e: unknown) => errText(e);
+
+  server.registerTool(
+    "upsert_lead",
+    {
+      title: "Create or update a recruiter lead",
+      description: `Track a recruiter message that has no job URL yet (recruiter × pitched role × threads). Without id it dedupes on recruiter profile URL (else email, else name + firm) + pitchedRole: a second thread from the same recruiter about the same role updates that lead and appends its thread URL. With id it patches that lead (status: ${LEAD_STATUSES.join(" → ")}). Optional message logs the first message (phone numbers and emails redacted). Returns the lead with leadTriage (cash floor only on an explicit USD yearly figure, geography, stack, open unknowns). Tracking only: never sends a message and never raises a fit alert.`,
+      inputSchema: { id: z.string().optional(), status: z.enum(LEAD_STATUSES).optional(), ...LEAD_FIELDS, message: MESSAGE.optional() },
+    },
+    async (a, ctx) => {
+      try {
+        const r = await upsertLead(a, agentOf(ctx as ToolCtx));
+        return r ? text({ ...r.lead, created: r.created }) : text({ error: "not found" }, true);
+      } catch (e) {
+        return leadErr(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "list_leads",
+    {
+      title: "List recruiter leads",
+      description: `Lean lead rows, latest activity first: id, status, bucket (${LEAD_BUCKETS.join("|")}), recruiter, pitchedRole, clientHint, stated pay/geo, triageVerdict, unknownCount, threadCount, positionId, last inbound/outbound. Contacts and message bodies only via get_lead. Default leaves out promoted/closed; status takes a comma list or all. Paging: pass nextCursor back as cursor with the same filters until it is null.`,
+      inputSchema: {
+        status: z.string().optional(),
+        lane: z.enum(LEAD_BUCKETS).optional(),
+        q: z.string().optional(),
+        includeClosed: z.boolean().optional(),
+        pageSize: z.number().int().min(1).max(200).optional().describe("Rows per page, default 50"),
+        cursor: z.string().optional().describe("nextCursor from the previous page, unchanged"),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    async (a) => {
+      try {
+        const r = await listLeads({ ...a, pageSize: a.pageSize ?? 50 });
+        const page = fitPage(r.items, r.cursors, r.nextCursor);
+        return text({ items: page.items, total: r.total, pageSize: r.pageSize, nextCursor: page.nextCursor, ...(page.truncated ? { truncated: true } : {}) });
+      } catch (e) {
+        return leadErr(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "get_lead",
+    { title: "Get a recruiter lead", description: "Full lead: recruiter contact, stated terms, thread URLs, leadTriage, work-queue bucket, message log (newest first, redacted) and interview rounds.", inputSchema: { id: z.string() }, annotations: { readOnlyHint: true } },
+    async (a) => {
+      const r = await getLead(a.id);
+      return r ? text(r) : text({ error: "not found" }, true);
+    },
+  );
+
+  server.registerTool(
+    "log_lead_message",
+    { title: "Log a lead message", description: "Append an inbound/outbound/note message to a lead's outreach log. Phone numbers and emails in the body are redacted before storage. An outbound message moves a new/vetted lead to replied. Records only; nothing is sent.", inputSchema: { id: z.string(), ...MESSAGE.shape } },
+    async ({ id: leadId, ...msg }) => {
+      try {
+        const r = await logLeadMessage(leadId, msg);
+        return r ? text(r) : text({ error: "not found" }, true);
+      } catch (e) {
+        return leadErr(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "promote_lead",
+    {
+      title: "Promote a lead to a position",
+      description: "Once the recruiter shares a job: link an existing position (positionIdOrSlug) or create one from a job URL (url; fetch=false stores a manual record without fetching, and a failed fetch falls back to a manual record). The lead becomes promoted; its rounds and messages are linked to the position. Title defaults to pitchedRole, company to clientHint, then the recruiting firm.",
+      inputSchema: { id: z.string(), positionIdOrSlug: z.string().optional(), url: z.string().optional(), title: z.string().optional(), company: z.string().optional(), fetch: z.boolean().optional() },
+    },
+    async ({ id: leadId, ...input }, ctx) => {
+      try {
+        const r = await promoteLead(leadId, input, agentOf(ctx as ToolCtx));
+        return r ? text(r) : text({ error: "not found" }, true);
+      } catch (e) {
+        return leadErr(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "link_lead_position",
+    { title: "Link a lead to a position", description: "Attach a lead (and its rounds and messages) to an existing position without changing the lead status. Use promote_lead to also mark it promoted.", inputSchema: { id: z.string(), positionIdOrSlug: z.string() } },
+    async (a, ctx) => {
+      try {
+        const r = await linkLeadPosition(a.id, a.positionIdOrSlug, agentOf(ctx as ToolCtx));
+        return r ? text(r) : text({ error: "not found" }, true);
+      } catch (e) {
+        return leadErr(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "merge_leads",
+    { title: "Merge leads", description: "Merge sourceIds into id: messages and rounds move over, thread URLs and unknowns are combined, empty fields are filled from the sources. Sources are closed with mergedIntoId; nothing is deleted.", inputSchema: { id: z.string(), sourceIds: z.array(z.string()).min(1) } },
+    async (a, ctx) => {
+      try {
+        const r = await mergeLeads(a.id, a.sourceIds, agentOf(ctx as ToolCtx));
+        return r ? text(r) : text({ error: "not found" }, true);
+      } catch (e) {
+        return leadErr(e);
+      }
+    },
+  );
 
   server.registerTool(
     "screen_recruiter_threat",

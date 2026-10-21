@@ -14,6 +14,7 @@ import { handleMcpHttp } from "./mcp/handler.js";
 import { approvalsRoutes } from "./routes/approvals.js";
 import { chatRoutes } from "./routes/chat.js";
 import { companiesRoutes } from "./routes/companies.js";
+import { leadsRoutes } from "./routes/leads.js";
 import { positionsRoutes } from "./routes/positions.js";
 import { radarRoutes } from "./routes/radar.js";
 import { settingsRoutes } from "./routes/settings.js";
@@ -120,6 +121,7 @@ export function createApp() {
   app.route("/api/v1/processes", processesRoutes);
   app.route("/api/v1/positions", positionsRoutes);
   app.route("/api/v1/companies", companiesRoutes);
+  app.route("/api/v1/leads", leadsRoutes);
   app.route("/api/v1/radar", radarRoutes);
   app.route("/api/v1/settings", settingsRoutes);
   app.route("/api/v1/approvals", approvalsRoutes);

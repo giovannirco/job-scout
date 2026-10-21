@@ -23,14 +23,14 @@ A configured `API_TOKEN_SEED` is an admin credential; there is no built-in seed.
 
 | method | path | notes |
 |--|--|--|
-| GET | `/today` | decisions, follow-ups, changed, upcoming interviews, counts by status + last30d + appliedThisWeek, queue, LLM usage, pending approvals, recent activity |
+| GET | `/today` | decisions, follow-ups, changed, upcoming interviews (a round on a recruiter lead has `slug: null`, `leadId`, and the pitched role as `title`), counts by status + last30d + appliedThisWeek, queue, LLM usage, pending approvals, recent activity |
 | GET | `/today/changes?since=&limit=` | positions/evaluations changed after an ISO time (default 24 h) |
 
 ### Process / Interviews desk
 
 | method | path | notes |
 |--|--|--|
-| GET | `/interviews` | all rounds, slim. `lane` `all\|upcoming\|completed\|needs_brief`, `stage`, `q` (company/role/interviewer) |
+| GET | `/interviews` | all rounds, slim. `lane` `all\|upcoming\|completed\|needs_brief`, `stage`, `q` (company/role/interviewer/recruiter). Includes rounds on recruiter leads (`positionId: null`, `leadId`, `leadRole`, `leadStatus`, `leadRecruiter`; `companyName` is the client hint or recruiting firm) |
 | GET | `/processes` | live loops (`applied` `screen` `interview` `offer`) with round timeline, next/last round, `nextAction` |
 
 ### Positions
@@ -71,6 +71,23 @@ A configured `API_TOKEN_SEED` is an admin credential; there is no built-in seed.
 | GET | `/companies/:idOrSlug` | detail, positions, boards, latest research |
 | PATCH | `/companies/:idOrSlug` | |
 | POST | `/companies/:idOrSlug/actions/research` | enqueue `company_research` |
+
+### Leads
+
+Recruiter leads: a recruiter pitching a role with no job URL, pay band or named client yet. Tracking only: no route sends a message, queues a model job or raises an alert. See [DATA-MODEL](./DATA-MODEL.md#leads).
+
+| method | path | notes |
+|--|--|--|
+| GET | `/leads` | lean rows, latest activity first: `status` (comma list or `all`; default leaves out `promoted`/`closed`), `includeClosed=true`, `lane` `call_soon\|needs_reply\|waiting\|stalled`, `q`, `pageSize` (≤ 200), `cursor` (`meta.nextCursor`, same filters). Contacts and message bodies are not in list rows |
+| POST | `/leads` | create or update by dedupe key (recruiter profile URL, else email, else name + firm, × pitched role): `201` when created, `200` when an existing lead absorbed it (thread URLs appended). Body: `source`, `recruiterName`, `recruiterCompany`, `recruiterProfileUrl`, `recruiterEmail`, `recruiterPhone`, `pitchedRole`, `clientHint`, `statedPay`, `statedGeo`, `statedContract`, `openUnknowns[]`, `threadUrls[]` / `threadUrl`, `notes`, `nextAction`, optional `message` (`direction`, `body`, `channel`, `occurredAt`) |
+| GET | `/leads/:id` | full lead with `leadTriage`, `bucket`, `messages` (newest first) and `interviews` |
+| PATCH | `/leads/:id` | same fields plus `status` (`new` `vetted` `replied` `screening_scheduled` `screened` `promoted` `closed`) and `closedReason`. `409` when the change would collide with another lead's dedupe key |
+| POST | `/leads/:id/messages` | `direction` `inbound\|outbound\|note` (required), `body`, `channel`, `who`, `occurredAt`, `threadUrl`. Phone numbers and emails in `body` are stored as `[phone]` / `[email]`. Outbound moves `new`/`vetted` to `replied` |
+| GET / POST | `/leads/:id/interviews` | rounds on the lead (same body as position rounds; no AI brief, no alert). A pending round with `scheduledAt` moves the lead to `screening_scheduled`, a completed one to `screened` |
+| PATCH | `/leads/:id/interviews/:interviewId` | |
+| POST | `/leads/:id/actions/promote` | `positionIdOrSlug` (link) or `url` (+ `title`, `company`, `fetch`). `fetch: false` stores a manual position without reading the page; a failed fetch also falls back to a manual record (`fetchFailure`). The lead becomes `promoted`; its rounds and messages are linked to the position |
+| POST | `/leads/:id/actions/link-position` | `positionIdOrSlug`; links without changing the lead status |
+| POST | `/leads/:id/actions/merge` | `sourceIds[]` merged into `:id`; sources are closed with `mergedIntoId` |
 
 ### Radar
 

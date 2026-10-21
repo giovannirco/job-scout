@@ -214,7 +214,7 @@ export type TodayData = {
   decisions: TodaySlim[];
   followUps: TodaySlim[];
   changed: TodaySlim[];
-  upcoming: { id: string; positionId: string; stage: string; scheduledAt: string | null; status: string; title: string; company: string; slug: string }[];
+  upcoming: { id: string; positionId: string | null; leadId?: string | null; stage: string; scheduledAt: string | null; status: string; title: string; company: string; slug: string | null }[];
   counts: { byStatus: Record<string, number>; untriaged: number; last30d: Record<string, number>; appliedThisWeek: number };
   queue: { status: string; type: string; c: number }[];
   llm: UsageSummary;
@@ -235,7 +235,9 @@ export type Person = {
 
 export type Interview = {
   id: string;
-  positionId: string;
+  /** null for a round on a recruiter lead that has no position yet */
+  positionId: string | null;
+  leadId?: string | null;
   stage: string;
   title: string | null;
   interviewerName: string | null;
@@ -267,6 +269,9 @@ export type Interview = {
   positionStatus?: string;
   companyName?: string;
   companySlug?: string;
+  leadRole?: string | null;
+  leadStatus?: string | null;
+  leadRecruiter?: string | null;
 };
 
 export type ProcessRound = {

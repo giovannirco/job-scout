@@ -1,13 +1,14 @@
 import { z } from "zod";
-import { listPositions, type ListPositionsQuery } from "@job-scout/core";
+import { leadQueue, listPositions, type ListPositionsQuery } from "@job-scout/core";
 
-const lanes = ["decide", "review", "applied", "marginal", "failedReview", "needsJd"] as const;
+const positionLanes = ["decide", "review", "applied", "marginal", "failedReview", "needsJd"] as const;
+const lanes = [...positionLanes, "leads"] as const;
 export const WorkQueueInput = z.object({
   limit: z.number().int().min(1).max(100).default(20),
   page: z.number().int().min(1).default(1),
   lane: z.enum(lanes).optional(),
 });
-const filters: Record<typeof lanes[number], ListPositionsQuery> = {
+const filters: Record<typeof positionLanes[number], ListPositionsQuery> = {
   decide: { status: "triaged", verdict: "pass", sort: "score_desc", actionable: "true", collapseFamilies: "true" },
   review: { status: "review", reviewLane: "pending", sort: "updated_desc", actionable: "true", collapseFamilies: "true" },
   applied: { status: "applied", sort: "updated_desc" },
@@ -21,6 +22,17 @@ export async function workQueue(input: z.input<typeof WorkQueueInput> = {}) {
   const { limit, page, lane } = WorkQueueInput.parse(input);
   const selected = lane ? [lane] : lanes;
   const results = await Promise.all(selected.map(async name => {
+    if (name === "leads") {
+      // Active recruiter leads (no job URL yet), call_soon first. Never fit alerts.
+      const r = await leadQueue({ limit, page });
+      return { name, total: r.total, items: r.items.map(l => ({
+        id: l.id, bucket: l.bucket, status: l.status,
+        recruiterName: l.recruiterName?.slice(0, 120) ?? null, recruiterCompany: l.recruiterCompany?.slice(0, 120) ?? null,
+        pitchedRole: l.pitchedRole?.slice(0, 200) ?? null, clientHint: l.clientHint?.slice(0, 200) ?? null,
+        triageVerdict: l.triageVerdict, unknownCount: l.unknownCount, nextAction: l.nextAction?.slice(0, 200) ?? null,
+        lastInboundAt: l.lastInboundAt, lastOutboundAt: l.lastOutboundAt, updatedAt: l.updatedAt,
+      })) };
+    }
     const r = await listPositions({ ...filters[name], pageSize: String(limit), page: String(page) });
     return { name, total: r.total, items: r.items.map(p => ({
       id: p.id, slug: p.slug, title: p.title.slice(0, 200),

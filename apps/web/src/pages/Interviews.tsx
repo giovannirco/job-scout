@@ -77,7 +77,7 @@ export function InterviewsPage() {
                     <Monogram name={r.companyName || "?"} className="h-6 w-6 text-[10px]" />
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-[12.5px] font-medium">
-                        {r.companyName} · {r.title || r.stage.replace(/_/g, " ")}
+                        {r.companyName} · {r.title || r.leadRole || r.stage.replace(/_/g, " ")}
                       </div>
                       <div className="truncate text-[11px] text-muted">
                         {r.interviewerName || "unassigned"}
@@ -105,25 +105,35 @@ export function InterviewsPage() {
                     {current.interviewerRole ? ` · ${current.interviewerRole}` : ""}
                   </div>
                 </div>
-                <StatusBadge status={current.positionStatus || "review"} />
+                <StatusBadge status={current.positionStatus || current.leadStatus || "review"} />
               </div>
-              <div className="mt-2 flex flex-wrap gap-3 text-[12px]">
-                <Link to="/positions/$id" params={{ id: current.positionSlug || current.positionId }} className="text-accent hover:underline">
-                  {current.companyName} · {current.positionTitle}
-                </Link>
-                <Link to="/process" search={{ id: current.positionId }} className="text-muted hover:text-fg">
-                  Process
-                </Link>
-              </div>
-              <InterviewRoundBody
-                positionId={current.positionId}
-                row={current}
-                tall
-                onBrief={() => {
-                  void qc.invalidateQueries({ queryKey: ["interviews-desk"] });
-                  void qc.invalidateQueries({ queryKey: ["interview", current.positionId, current.id] });
-                }}
-              />
+              {current.positionId ? (
+                <>
+                  <div className="mt-2 flex flex-wrap gap-3 text-[12px]">
+                    <Link to="/positions/$id" params={{ id: current.positionSlug || current.positionId }} className="text-accent hover:underline">
+                      {current.companyName} · {current.positionTitle}
+                    </Link>
+                    <Link to="/process" search={{ id: current.positionId }} className="text-muted hover:text-fg">
+                      Process
+                    </Link>
+                  </div>
+                  <InterviewRoundBody
+                    positionId={current.positionId}
+                    row={current}
+                    tall
+                    onBrief={() => {
+                      void qc.invalidateQueries({ queryKey: ["interviews-desk"] });
+                      void qc.invalidateQueries({ queryKey: ["interview", current.positionId, current.id] });
+                    }}
+                  />
+                </>
+              ) : (
+                <div className="mt-2 text-[12px] text-muted">
+                  Recruiter lead{current.leadRecruiter ? ` · ${current.leadRecruiter}` : ""}
+                  {current.companyName ? ` · ${current.companyName}` : ""}
+                  {current.leadRole ? ` · ${current.leadRole}` : ""}. Promote the lead to a position (MCP promote_lead) to attach a JD and an AI brief.
+                </div>
+              )}
             </div>
           ) : null}
         </div>

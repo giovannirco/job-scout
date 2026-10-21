@@ -12,7 +12,7 @@ The API includes an MCP server for reading positions, managing the pipeline and 
 
 ## Paging
 
-`list_positions` and `list_changes` page with an opaque `nextCursor`. Pass it back unchanged as `cursor`, with the same filters and sort, until it is `null`. A cursor replayed with other filters or another sort is refused with `code: "invalid_cursor"`; so is an old-style `timestamp|id` cursor. `list_positions` cursors work with every `sort`: the default `updated_desc` (and `updated_asc`) page by keyset on `(updatedAt, id)` at full database precision, so rows that share a timestamp are neither skipped nor repeated; other sorts page by offset over a total order (`id` breaks ties). A row whose sort key changes between pages can move; for a full enumeration prefer `first_seen_asc`, which background checks do not change.
+`list_positions`, `list_changes` and `list_leads` page with an opaque `nextCursor`. Pass it back unchanged as `cursor`, with the same filters and sort, until it is `null`. A cursor replayed with other filters or another sort is refused with `code: "invalid_cursor"`; so is an old-style `timestamp|id` cursor. `list_positions` cursors work with every `sort`: the default `updated_desc` (and `updated_asc`) page by keyset on `(updatedAt, id)` at full database precision, so rows that share a timestamp are neither skipped nor repeated; other sorts page by offset over a total order (`id` breaks ties). A row whose sort key changes between pages can move; for a full enumeration prefer `first_seen_asc`, which background checks do not change.
 
 Rows are lean by default. `list_positions` rows carry `id`, `slug`, `title`, `company` (`slug`, `name`), `status`, `archiveReason`, `priority`, `primaryUrl`, `triageScore`, `triageVerdict`, `triageOneLiner`, `listingStatus`, `geoClass`, `workplace`, `appliedAt`, `lastChangedAt`, `updatedAt`, `careerOps` (tracker id, score, status, report path, sync times), `duplicateOfId`, `triageStale` and `careerOpsStale`. `fields: "full"` adds salary, `locationRaw`, `departments`, `postedAt`, repost, ATS, family and duplicate-count fields. Neither includes `triageJson` or JD text: use `get_position` or `scout_context`.
 
@@ -37,14 +37,16 @@ Positions are drained first; evaluations start on the page that returns the last
 | `scout_context` | everything to reason about one role: position, triage JSON, JD text, latest evaluation summary, profile brief |
 | `get_evaluation` | latest markdown + JSON for `evaluate` / `jd_review` / `company_research` |
 | `get_materials` | current resume + cover markdown |
-| `work_queue` | decision lanes: PASS awaiting a decision, review (including a deliberate operator override), applied, marginal, failed triage that has no operator override, and `needsJd` (triaged/review rows stored with too little JD to score). Closed rows are left out. Compact summaries; `lane`, `page`, `limit` (default 20 per lane), with totals and `nextPage` in `pagination`. Use `get_position` for full details |
+| `work_queue` | decision lanes: PASS awaiting a decision, review (including a deliberate operator override), applied, marginal, failed triage that has no operator override, `needsJd` (triaged/review rows stored with too little JD to score), and `leads` (active recruiter leads, each with a `bucket`, `call_soon` first; see [Recruiter leads](#recruiter-leads)). Closed rows are left out. Compact summaries; `lane`, `page`, `limit` (default 20 per lane), with totals and `nextPage` in `pagination`. Use `get_position` / `get_lead` for full details |
 | `list_discovery` | `lane`, `hours`, `q`, `reason` prefix; cursor pagination |
 | `list_companies` / `get_company` | companies with counts / detail with positions and latest research |
 | `get_profile` / `get_identity` | operator profile / identity + master resume + scout brief markdown |
 | `list_activity` | timeline events, optionally for one position |
 | `list_changes` | lean positions, then evaluations, changed after an ISO `since` — the sync primitive. `limit` rows per page (default 200), `cursor`, `fields`. See [Changes](#changes) |
 | `list_processes` | live loops (applied/screen/interview/offer) with round timeline |
-| `list_all_interviews` | every round across positions (`lane`, `q`, `stage`); slim |
+| `list_all_interviews` | every round across positions and recruiter leads (`lane`, `q`, `stage`); slim. A lead round has `positionId: null`, `leadId`, `leadRole` and `leadStatus` |
+| `list_leads` | lean recruiter-lead rows, latest activity first: `status` (comma list or `all`), `lane` (`call_soon` `needs_reply` `waiting` `stalled`), `q`, `includeClosed`, `pageSize`, `cursor` (see [Paging](#paging)). No contacts or message bodies |
+| `get_lead` | one lead: contact, stated terms, thread URLs, `leadTriage`, `bucket`, message log (redacted) and rounds |
 | `list_interviews` | rounds for a position (slim: metadata + char counts, not transcript bodies) |
 | `get_interview` | one round with notes, review, transcript, AI brief |
 | `list_questions` | ATS form prompts and drafted answers for a position |
@@ -59,7 +61,12 @@ Positions are drained first; evaluations start on the page that returns the last
 | `update_position` | PATCH status, priority, notes, nextAction, resumeSurface, watchEnabled, appliedAt, and the listing corrections below (`title`, `primaryUrl`, `workplace`, `geoClass`, `geoNotes`). The career-ops guard below applies to a `skip`/`archived` status; the other fields still apply. `status: materials` follows the materials rule below |
 | `set_position_status` | any pipeline status; `archived` requires a reason. Subject to the career-ops guard below; optional `actor` names the calling agent (see [Attribution](#attribution)); `materials` follows the materials rule below |
 | `log_activity` | append a timeline note |
-| `upsert_interview` | create/patch a screen or interview (transcript queues an AI brief unless `skipBrief`). `status` is `pending` (default), `completed` or `cancelled`; `scheduled` and `upcoming` are stored as `pending`, `canceled` as `cancelled`, `done` as `completed`. `outcome` is `advanced` `hold` `rejected` `cancelled` `unclear` |
+| `upsert_lead` | create or update a recruiter lead; dedupes on recruiter × pitched role (see [Recruiter leads](#recruiter-leads)). `id` patches that lead, including `status`. Optional `message` logs the first message |
+| `log_lead_message` | append `inbound` / `outbound` / `note` to the lead's outreach log; phone numbers and emails in `body` are redacted before storage |
+| `promote_lead` | link `positionIdOrSlug`, or create a position from `url` (`fetch: false` for a manual record; a failed fetch falls back to one). The lead becomes `promoted` and its rounds and messages are linked |
+| `link_lead_position` | attach a lead to an existing position without changing its status |
+| `merge_leads` | merge `sourceIds` into `id`; sources are closed with `mergedIntoId`, nothing is deleted |
+| `upsert_interview` | create/patch a screen or interview (transcript queues an AI brief unless `skipBrief`). Pass `leadId` instead of `idOrSlug` for a recruiter screening before there is a position (no brief, no alert). `status` is `pending` (default), `completed` or `cancelled`; `scheduled` and `upcoming` are stored as `pending`, `canceled` as `cancelled`, `done` as `completed`. `outcome` is `advanced` `hold` `rejected` `cancelled` `unclear` |
 | `brief_interview` | queue or `sync` the `interview_brief` model vs JD + company pack. A transcript does not queue a brief when no model key is set |
 | `update_question` | set `answer` and/or `status` (`open` `answered` `skipped`) |
 | `run_llm` | run `triage` / `evaluate` / `materials` / `jd_review` / `form_answers` / `listing_classify` synchronously with the model from Settings › AI |
@@ -101,6 +108,16 @@ A career-ops tracker label never removes a role from the pipeline on its own. `u
 - or the `note` starts with `career-ops` (`set_position_status`).
 
 Other statuses (applied, interview, rejected, …) apply normally. Tokens with any other name are treated as a person or operator agent: their skip/archive applies, and their restore of an archived or skipped role stops triage from re-archiving it until a person archives or skips it again.
+
+### Recruiter leads
+
+A lead is a recruiter pitching a role with no job URL, pay band or named client yet, so it cannot be a position. Leads are tracking only: no lead tool sends a message, queues a model job or raises a fit alert.
+
+- **Dedupe.** One lead per recruiter × pitched role. The recruiter is the profile URL (lowercased host and path, no scheme, `www`, query or trailing slash), else the email, else name + firm; the role is lowercased with punctuation collapsed. A second thread from the same recruiter about the same role updates that lead and appends its thread URL; the first recorded profile URL and role wording are kept. Different roles from one recruiter stay separate leads; `merge_leads` combines leads that are the same opportunity.
+- **Status.** `new` → `vetted` → `replied` → `screening_scheduled` → `screened` → `promoted` / `closed`. An outbound message moves `new`/`vetted` to `replied`; a scheduled round moves the lead forward to `screening_scheduled`, a completed one to `screened`. Any status can be set with `upsert_lead`.
+- **`leadTriage`** (deterministic, no model): `pay` compares the stated pay with the profile cash floor only when it is an explicit USD yearly figure (`$`/`USD`, not hourly, not monthly-looking); otherwise `usdYearlyMax` is `null` and `status` says why (`not_stated`, `floor_unset`, `not_comparable`). `geo` runs the listing geography and workplace classifiers on the stated geography and contract terms. `stack` lists catalog terms in the role and notes that the profile does or does not claim. `unknowns` is the open questions plus missing client, pay, geography and contract. `verdict` is `fail` (pay under the floor, hard geography, onsite/hybrid), `hold` (open unknowns) or `pass`. A failing lead is not closed or archived.
+- **Buckets** (`work_queue` lane `leads`, `list_leads` `lane`): `call_soon` a pending round within 72 h · `needs_reply` the recruiter wrote last, or a new/vetted lead you have not answered · `waiting` you wrote last within 7 days · `stalled` everything else. Promoted and closed leads have no bucket.
+- **Privacy.** Message bodies are stored with phone numbers and email addresses replaced by `[phone]` / `[email]`; the recruiter's own contact stays in its fields and is returned only by `get_lead`. Logged tool arguments for lead and interview tools are redacted the same way.
 
 ## External tracker integration
 

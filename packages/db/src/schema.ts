@@ -1,5 +1,6 @@
 import {
   boolean,
+  check,
   integer,
   jsonb,
   pgTable,
@@ -9,7 +10,8 @@ import {
   uniqueIndex,
   index,
 } from "drizzle-orm/pg-core";
-import type { DecisionRecipe, DecisionResult, DecisionSummary } from "@job-scout/shared";
+import { sql } from "drizzle-orm";
+import type { DecisionRecipe, DecisionResult, DecisionSummary, LeadStatus } from "@job-scout/shared";
 
 /**
  * job-scout schema.
@@ -369,9 +371,9 @@ export const interviews = pgTable(
   "interviews",
   {
     id: text("id").primaryKey(),
-    positionId: text("position_id")
-      .notNull()
-      .references(() => positions.id, { onDelete: "cascade" }),
+    /** Null only for a round on a recruiter lead that has no position yet (then lead_id is set). */
+    positionId: text("position_id").references(() => positions.id, { onDelete: "cascade" }),
+    leadId: text("lead_id").references(() => leads.id, { onDelete: "set null" }),
     stage: text("stage").notNull().default("screen"),
     title: text("title"),
     interviewerName: text("interviewer_name"),
@@ -395,19 +397,75 @@ export const interviews = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("interviews_position_idx").on(t.positionId)],
+  (t) => [
+    index("interviews_position_idx").on(t.positionId),
+    index("interviews_lead_idx").on(t.leadId),
+    check("interviews_position_or_lead_chk", sql`${t.positionId} is not null or ${t.leadId} is not null`),
+  ],
 );
 
-export const outreachEvents = pgTable("outreach_events", {
-  id: text("id").primaryKey(),
-  positionId: text("position_id").references(() => positions.id, { onDelete: "set null" }),
-  companyId: text("company_id").references(() => companies.id),
-  channel: text("channel").notNull().default("email"),
-  who: text("who"),
-  note: text("note"),
-  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+/**
+ * A recruiter lead: recruiter × pitched role, usually with no job URL, pay band
+ * or named client yet. Tracking only; nothing here sends a message.
+ */
+export const leads = pgTable(
+  "leads",
+  {
+    id: text("id").primaryKey(),
+    status: text("status").$type<LeadStatus>().notNull().default("new"),
+    source: text("source"),
+    recruiterName: text("recruiter_name"),
+    recruiterCompany: text("recruiter_company"),
+    recruiterProfileUrl: text("recruiter_profile_url"),
+    recruiterEmail: text("recruiter_email"),
+    recruiterPhone: text("recruiter_phone"),
+    pitchedRole: text("pitched_role"),
+    clientHint: text("client_hint"),
+    statedPay: text("stated_pay"),
+    statedGeo: text("stated_geo"),
+    statedContract: text("stated_contract"),
+    openUnknowns: jsonb("open_unknowns").$type<string[]>().notNull().default([]),
+    threadUrls: jsonb("thread_urls").$type<string[]>().notNull().default([]),
+    notes: text("notes"),
+    nextAction: text("next_action"),
+    closedReason: text("closed_reason"),
+    /** normalized recruiter profile (or email / name+firm) + "|" + normalized pitched role */
+    dedupeKey: text("dedupe_key"),
+    positionId: text("position_id").references(() => positions.id, { onDelete: "set null" }),
+    mergedIntoId: text("merged_into_id"),
+    triageJson: jsonb("triage_json").$type<Record<string, unknown>>(),
+    lastInboundAt: timestamp("last_inbound_at", { withTimezone: true }),
+    lastOutboundAt: timestamp("last_outbound_at", { withTimezone: true }),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("leads_dedupe_uidx").on(t.dedupeKey),
+    index("leads_status_updated_idx").on(t.status, t.updatedAt),
+    index("leads_position_idx").on(t.positionId),
+  ],
+);
+
+export const outreachEvents = pgTable(
+  "outreach_events",
+  {
+    id: text("id").primaryKey(),
+    positionId: text("position_id").references(() => positions.id, { onDelete: "set null" }),
+    companyId: text("company_id").references(() => companies.id),
+    channel: text("channel").notNull().default("email"),
+    who: text("who"),
+    note: text("note"),
+    leadId: text("lead_id").references(() => leads.id, { onDelete: "set null" }),
+    /** inbound (recruiter → me) | outbound (me → recruiter) | note */
+    direction: text("direction"),
+    /** message text with phone numbers and email addresses redacted */
+    body: text("body"),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("outreach_events_lead_idx").on(t.leadId, t.occurredAt)],
+);
 
 export const apiTokens = pgTable("api_tokens", {
   id: text("id").primaryKey(),
@@ -669,6 +727,7 @@ export const schema = {
   jobs,
   people,
   interviews,
+  leads,
   outreachEvents,
   apiTokens,
   applicationMaterials,

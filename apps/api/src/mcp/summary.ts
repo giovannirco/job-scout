@@ -63,7 +63,8 @@ export function positionSummary(p: PositionLike) {
 
 type InterviewLike = {
   id: string;
-  positionId: string;
+  positionId: string | null;
+  leadId?: string | null;
   stage: string;
   title?: string | null;
   interviewerName?: string | null;
@@ -93,6 +94,7 @@ export function interviewSummary(r: InterviewLike) {
   return {
     id: r.id,
     positionId: r.positionId,
+    ...(r.leadId ? { leadId: r.leadId } : {}),
     stage: r.stage,
     title: r.title ?? null,
     interviewerName: r.interviewerName ?? null,

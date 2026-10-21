@@ -1,5 +1,5 @@
 import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
-import { companies, getDb, id, interviews, positions } from "@job-scout/db";
+import { companies, getDb, id, interviews, leads, positions } from "@job-scout/db";
 import {
   INTERVIEW_OUTCOMES,
   INTERVIEW_STATUSES,
@@ -35,6 +35,7 @@ export type InterviewInput = {
 const INTERVIEW_ROW = {
   id: interviews.id,
   positionId: interviews.positionId,
+  leadId: interviews.leadId,
   stage: interviews.stage,
   title: interviews.title,
   interviewerName: interviews.interviewerName,
@@ -62,6 +63,7 @@ const INTERVIEW_ROW = {
 const INTERVIEW_LIST_ROW = {
   id: interviews.id,
   positionId: interviews.positionId,
+  leadId: interviews.leadId,
   stage: interviews.stage,
   title: interviews.title,
   interviewerName: interviews.interviewerName,
@@ -130,6 +132,15 @@ function parseDuration(v: number | null | undefined): number | null | undefined 
   return Math.round(v);
 }
 
+export async function listLeadInterviews(leadId: string) {
+  const db = await getDb();
+  return db
+    .select(INTERVIEW_LIST_ROW)
+    .from(interviews)
+    .where(eq(interviews.leadId, leadId))
+    .orderBy(sql`${interviews.occurredAt} asc nulls last`, sql`${interviews.scheduledAt} asc nulls last`, desc(interviews.createdAt));
+}
+
 export async function listInterviews(positionId: string) {
   const db = await getDb();
   return db
@@ -139,13 +150,21 @@ export async function listInterviews(positionId: string) {
     .orderBy(sql`${interviews.occurredAt} asc nulls last`, sql`${interviews.scheduledAt} asc nulls last`, desc(interviews.createdAt));
 }
 
+/**
+ * A round hangs off a position, or off a recruiter lead that has no position
+ * yet (position_id null). Lead rounds show the pitched role and the client or
+ * recruiting firm in place of the position and company.
+ */
 const INTERVIEW_DESK_ROW = {
   ...INTERVIEW_LIST_ROW,
   positionTitle: positions.title,
   positionSlug: positions.slug,
   positionStatus: positions.status,
-  companyName: companies.name,
+  companyName: sql<string | null>`coalesce(${companies.name}, ${leads.clientHint}, ${leads.recruiterCompany})`,
   companySlug: companies.slug,
+  leadRole: leads.pitchedRole,
+  leadStatus: leads.status,
+  leadRecruiter: leads.recruiterName,
 };
 
 export async function listAllInterviews(opts: { lane?: string; stage?: string; q?: string; limit?: number } = {}) {
@@ -170,6 +189,10 @@ export async function listAllInterviews(opts: { lane?: string; stage?: string; q
       or(
         ilike(positions.title, like),
         ilike(companies.name, like),
+        ilike(leads.pitchedRole, like),
+        ilike(leads.recruiterName, like),
+        ilike(leads.recruiterCompany, like),
+        ilike(leads.clientHint, like),
         ilike(interviews.interviewerName, like),
         ilike(interviews.title, like),
         ilike(interviews.notes, like),
@@ -184,9 +207,10 @@ export async function listAllInterviews(opts: { lane?: string; stage?: string; q
   return db
     .select(INTERVIEW_DESK_ROW)
     .from(interviews)
-    .innerJoin(positions, eq(interviews.positionId, positions.id))
-    .innerJoin(companies, eq(positions.companyId, companies.id))
-    .where(where)
+    .leftJoin(positions, eq(interviews.positionId, positions.id))
+    .leftJoin(companies, eq(positions.companyId, companies.id))
+    .leftJoin(leads, eq(interviews.leadId, leads.id))
+    .where(and(sql`(${positions.id} is not null or ${leads.id} is not null)`, where))
     .orderBy(...order)
     .limit(Math.min(Math.max(opts.limit ?? 200, 1), 500));
 }
@@ -265,6 +289,7 @@ export async function listProcesses(): Promise<ProcessRow[]> {
   const rounds = await db.select(INTERVIEW_LIST_ROW).from(interviews).where(inArray(interviews.positionId, rows.map((r) => r.id)));
   const byPos = new Map<string, ProcessRound[]>();
   for (const r of rounds) {
+    if (!r.positionId) continue;
     const list = byPos.get(r.positionId) || [];
     list.push(toProcessRound(r));
     byPos.set(r.positionId, list);
@@ -335,6 +360,16 @@ async function maybeEnqueueBrief(positionId: string, interviewId: string, transc
 }
 
 export async function addInterview(positionId: string, input: InterviewInput) {
+  return insertInterview({ positionId, leadId: null }, input);
+}
+
+/** A round on a recruiter lead: no JD to brief against and no alert, so neither is queued. */
+export async function addLeadInterview(leadId: string, input: InterviewInput) {
+  return insertInterview({ positionId: null, leadId }, { ...input, skipBrief: true });
+}
+
+async function insertInterview(owner: { positionId: string | null; leadId: string | null }, input: InterviewInput) {
+  const { positionId, leadId } = owner;
   const stage = (input.stage || "screen").trim();
   if (!stage) throw new Error("stage required");
   const status = parseInterviewStatus(input.status, "pending");
@@ -349,6 +384,7 @@ export async function addInterview(positionId: string, input: InterviewInput) {
   await db.insert(interviews).values({
     id: iid,
     positionId,
+    leadId,
     stage,
     title: trimOrNull(input.title),
     interviewerName: trimOrNull(input.interviewerName),
@@ -370,6 +406,7 @@ export async function addInterview(positionId: string, input: InterviewInput) {
   });
   const row = (await db.select(INTERVIEW_ROW).from(interviews).where(eq(interviews.id, iid)))[0];
   if (!row) throw new Error("interview insert failed");
+  if (!positionId) return { ...row, briefJobId: null };
   const briefJobId = await maybeEnqueueBrief(positionId, iid, transcriptMarkdown, input.skipBrief);
   if (scheduledAt && scheduledAt.getTime() > Date.now() - 60_000) {
     const { getPosition } = await import("./positions.js");
@@ -393,12 +430,22 @@ export async function addInterview(positionId: string, input: InterviewInput) {
 }
 
 export async function patchInterview(positionId: string, interviewId: string, input: InterviewInput) {
+  return updateInterview({ positionId }, interviewId, input);
+}
+
+/** Patch a round on a recruiter lead (also after the lead was promoted and the round linked to a position). */
+export async function patchLeadInterview(leadId: string, interviewId: string, input: InterviewInput) {
+  return updateInterview({ leadId }, interviewId, { ...input, skipBrief: true });
+}
+
+async function updateInterview(owner: { positionId: string } | { leadId: string }, interviewId: string, input: InterviewInput) {
   const db = await getDb();
+  const ownerCond = "positionId" in owner ? eq(interviews.positionId, owner.positionId) : eq(interviews.leadId, owner.leadId);
   const existing = (
     await db
       .select(INTERVIEW_ROW)
       .from(interviews)
-      .where(and(eq(interviews.id, interviewId), eq(interviews.positionId, positionId)))
+      .where(and(eq(interviews.id, interviewId), ownerCond))
       .limit(1)
   )[0];
   if (!existing) return null;
@@ -429,7 +476,7 @@ export async function patchInterview(positionId: string, interviewId: string, in
   const row = (await db.select(INTERVIEW_ROW).from(interviews).where(eq(interviews.id, interviewId)))[0];
   if (!row) throw new Error("interview update failed");
   const transcript = input.transcriptMarkdown !== undefined ? row.transcriptMarkdown : null;
-  const briefJobId = await maybeEnqueueBrief(positionId, interviewId, transcript, input.skipBrief);
+  const briefJobId = row.positionId ? await maybeEnqueueBrief(row.positionId, interviewId, transcript, input.skipBrief) : null;
   return { ...row, briefJobId };
 }
 

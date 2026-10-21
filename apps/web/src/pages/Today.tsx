@@ -166,17 +166,25 @@ export function TodayPage() {
               <div className="px-3 py-3 text-[12px] text-faint">None scheduled.</div>
             ) : (
               <div className="divide-y divide-border/60">
-                {d.upcoming.map((i) => (
-                  <Link key={i.id} to="/positions/$id" params={{ id: i.slug }} className="flex items-center justify-between gap-3 px-3 py-2 hover:bg-surface-2/60">
-                    <div className="min-w-0">
-                      <div className="truncate text-[12.5px]">{i.title}</div>
-                      <div className="text-[11px] text-muted truncate">
-                        {i.company} · {i.stage}
+                {d.upcoming.map((i) => {
+                  const body = (
+                    <>
+                      <div className="min-w-0">
+                        <div className="truncate text-[12.5px]">{i.title}</div>
+                        <div className="text-[11px] text-muted truncate">
+                          {i.company} · {i.slug ? i.stage : `recruiter lead · ${i.stage}`}
+                        </div>
                       </div>
-                    </div>
-                    <div className="font-mono text-[11px] text-accent shrink-0 tabular">{dateTime(i.scheduledAt)}</div>
-                  </Link>
-                ))}
+                      <div className="font-mono text-[11px] text-accent shrink-0 tabular">{dateTime(i.scheduledAt)}</div>
+                    </>
+                  );
+                  const cls = "flex items-center justify-between gap-3 px-3 py-2 hover:bg-surface-2/60";
+                  return i.slug ? (
+                    <Link key={i.id} to="/positions/$id" params={{ id: i.slug }} className={cls}>{body}</Link>
+                  ) : (
+                    <Link key={i.id} to="/interviews" search={{ id: i.id }} className={cls}>{body}</Link>
+                  );
+                })}
               </div>
             )}
           </Panel>

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { and, desc, eq, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
-import { companies, getDb, interviews, jobs, positions, timelineEvents } from "@job-scout/db";
+import { companies, getDb, interviews, jobs, leads, positions, timelineEvents } from "@job-scout/db";
 import { countFunnel, listApprovals, listChangesSince, listPositions, usageSummary } from "@job-scout/core";
 import { fail, ok } from "../envelope.js";
 
@@ -46,11 +46,23 @@ todayRoutes.get("/", async (c) => {
       .orderBy(desc(positions.lastChangedAt))
       .limit(25),
     db
-      .select({ id: interviews.id, positionId: interviews.positionId, stage: interviews.stage, scheduledAt: interviews.scheduledAt, status: interviews.status, title: positions.title, company: companies.name, slug: positions.slug })
+      // A round on a recruiter lead has no position yet: show the pitched role and the client or firm.
+      .select({
+        id: interviews.id,
+        positionId: interviews.positionId,
+        leadId: interviews.leadId,
+        stage: interviews.stage,
+        scheduledAt: interviews.scheduledAt,
+        status: interviews.status,
+        title: sql<string>`coalesce(${positions.title}, ${leads.pitchedRole}, 'Recruiter lead')`,
+        company: sql<string>`coalesce(${companies.name}, ${leads.clientHint}, ${leads.recruiterCompany}, ${leads.recruiterName}, '')`,
+        slug: positions.slug,
+      })
       .from(interviews)
-      .innerJoin(positions, eq(interviews.positionId, positions.id))
-      .innerJoin(companies, eq(positions.companyId, companies.id))
-      .where(and(gte(interviews.scheduledAt, new Date(Date.now() - 86_400_000)), eq(interviews.status, "pending")))
+      .leftJoin(positions, eq(interviews.positionId, positions.id))
+      .leftJoin(companies, eq(positions.companyId, companies.id))
+      .leftJoin(leads, eq(interviews.leadId, leads.id))
+      .where(and(gte(interviews.scheduledAt, new Date(Date.now() - 86_400_000)), eq(interviews.status, "pending"), sql`(${positions.id} is not null or ${leads.id} is not null)`))
       .orderBy(interviews.scheduledAt)
       .limit(10),
     db

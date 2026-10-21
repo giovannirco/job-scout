@@ -50,6 +50,13 @@
       "when": 1790290316999,
       "tag": "0006_jev_decisions",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792589163312,
+      "tag": "0007_recruiter_leads",
+      "breakpoints": true
     }
   ]
 }
