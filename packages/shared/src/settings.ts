@@ -220,7 +220,8 @@ export type ChatConfig = z.infer<typeof ChatConfig>;
 export const Settings = z.object({
   jev: JevConfig.prefault({}),
   llm: z.object({
-    operations: z.record(z.string(), LlmOperationConfig).default({}),
+    // Keyed by operation id; a stored or hand-built document can lack any of them.
+    operations: z.partialRecord(z.string(), LlmOperationConfig).default({}),
     fallbackModel: z.string().default(DEFAULT_LLM_FALLBACK_MODEL),
     /** Cached /v1/models catalog */
     modelsCatalog: z

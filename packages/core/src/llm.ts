@@ -143,7 +143,7 @@ function renderResponse(out: unknown): { text: string | null; chars: number | nu
 }
 
 /** Wrap one model call: log to llm_runs whether it succeeds or fails. */
-export async function logged<T extends Pick<ChatResult, "model" | "tokensIn" | "tokensOut" | "latencyMs">>(
+export async function logged<T extends Pick<ChatResult, "model" | "tokensIn" | "tokensOut"> & { latencyMs?: number }>(
   operation: LlmOperation,
   model: string,
   positionId: string | null,

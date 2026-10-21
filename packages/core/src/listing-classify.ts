@@ -77,7 +77,8 @@ export async function runListingClassify(positionId: string) {
   const jdText = await currentJdText(pos.id);
   if (!jdText.trim()) return { skipped: true, reason: "missing_jd" };
   const settings = await getSettings();
-  const inputHash = await classificationFingerprint(pos, settings.llm.operations.listing_classify.model);
+  // resolveSettings() merges the default operations, so this one is always present.
+  const inputHash = await classificationFingerprint(pos, settings.llm.operations.listing_classify!.model);
   if ((pos.metadata?.listingClassify as { inputHash?: string } | undefined)?.inputHash === inputHash) return { skipped: true, reason: "unchanged_input" };
   const db = await getDb();
   const rev = (
