@@ -1,6 +1,6 @@
 image:
   repository: job-scout
-  tag: "2.13.1"
+  tag: "2.14.0"
   pullPolicy: IfNotPresent
 
 nameOverride: job-scout
