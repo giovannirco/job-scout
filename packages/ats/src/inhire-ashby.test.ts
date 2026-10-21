@@ -26,6 +26,16 @@ describe("InHire", () => {
     expect(job.descriptionText).toContain("Kubernetes");
   });
 
+  it("decodes named entities so the JD is plain text", async () => {
+    const description = "<p>Estamos &agrave; procura de algu&eacute;m para log&iacute;stica &amp; opera&ccedil;&otilde;es.</p><ul><li>Experi&ecirc;ncia com Kubernetes&nbsp;&ndash; 5 anos</li></ul>";
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ jobId: JOB_ID, displayName: "Engenheiro de Plataforma S&ecirc;nior", description, status: "published" }), { status: 200 })));
+    const job = await fetchJobFromUrl(URL_);
+    expect(job.title).toBe("Engenheiro de Plataforma Sênior");
+    expect(job.descriptionText).toContain("Estamos à procura de alguém para logística & operações.");
+    expect(job.descriptionText).toContain("Experiência com Kubernetes – 5 anos");
+    expect(job.descriptionText).not.toMatch(/&[a-z]+;/i);
+  });
+
   it("refuses an API answer for a different job id", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ jobId: "other", displayName: "Senior DevOps Engineer" }), { status: 200 })));
     const job = await fetchJobFromUrl(URL_);

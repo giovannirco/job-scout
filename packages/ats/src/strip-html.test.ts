@@ -25,4 +25,9 @@ describe("stripHtml", () => {
     expect(decodeHtmlEntities("&amp;lt;")).toBe("&lt;");
     expect(decodeHtmlEntities(decodeHtmlEntities("&amp;lt;"))).toBe("<");
   });
+
+  it("decodes named Latin-1 and numeric entities, keeping unknown ones", () => {
+    expect(decodeHtmlEntities("log&iacute;stica &Agrave; &agrave; &ccedil;&atilde;o &euro;5 &#233; &#x1F680; &bogus;")).toBe("logística À à ção €5 é 🚀 &bogus;");
+    expect(stripHtml("<p>Estamos &agrave; procura</p>")).toBe("Estamos à procura");
+  });
 });

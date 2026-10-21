@@ -83,4 +83,11 @@ describe("Workable", () => {
     expect(job.descriptionText).toContain("Terraform modules");
     expect((job.rawPayload as { apiFallback?: string }).apiFallback).toMatch(/503/);
   });
+
+  it("decodes named entities in the JD sections", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ ...apiJob, description: "<p>Op&eacute;rations &agrave; distance, s&eacute;curit&eacute; &amp; fiabilit&eacute;.</p>" }), { status: 200 })));
+    const job = await fetchJobFromUrl(URL_);
+    expect(job.descriptionText).toContain("Opérations à distance, sécurité & fiabilité.");
+    expect(job.descriptionText).not.toMatch(/&[a-z]+;/i);
+  });
 });

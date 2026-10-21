@@ -53,6 +53,15 @@ describe("Recruitee", () => {
     expect(job.descriptionText).toContain("Terraform & on-call");
   });
 
+  it("decodes named entities in the offer body", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(offer({ title: "Ingeniero de Plataforma (Se&ntilde;or)", description: "<p>Gesti&oacute;n de log&iacute;stica y pa&iacute;ses</p>", requirements: "<p>Fran&ccedil;ais &amp; Espa&ntilde;ol</p>" })), { status: 200 })));
+    const job = await fetchJobFromUrl(URL_);
+    expect(job.title).toBe("Ingeniero de Plataforma (Señor)");
+    expect(job.descriptionText).toContain("Gestión de logística y países");
+    expect(job.descriptionText).toContain("Français & Español");
+    expect(job.descriptionText).not.toMatch(/&[a-z]+;/i);
+  });
+
   it("404 or unpublished is closed; another offer's slug is a failed fetch", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 404 })));
     expect((await fetchJobFromUrl(URL_)).listingStatus).toBe("closed");
