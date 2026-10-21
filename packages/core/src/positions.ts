@@ -533,12 +533,25 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
   if (!pos) throw new Error("position not found");
 
   // A soft-404 / "Job Not Found" page is a closure signal, never content: keep title + JD.
-  const page = opts.job.listingStatus === "closed" ? null : snapshotPageVerdict(pos.title, opts.job);
-  if (page?.refuse && page.signature === "not_found") {
-    log.warn("jd.snapshot_not_found", { positionId: pos.id, where: page.where, url: opts.job.url });
-    opts = { ...opts, job: { ...opts.job, listingStatus: "closed", title: "", descriptionText: "", locationRaw: undefined, salaryRaw: pos.salaryRaw || undefined, rawPayload: { ...(opts.job.rawPayload || {}), closedReason: "not_found_page" } } };
+  // Page text alone is weak evidence (a CDN hiccup, an A/B shell), so it closes the listing
+  // only on a second consecutive soft-404 at least SOFT_404_CONFIRM_MS after the first.
+  // HTTP 404/410 (listingStatus already "closed" from the fetcher) still closes at once.
+  let prevBody: string | null = null;
+  if (opts.job.listingStatus !== "closed") {
+    prevBody = (await db.select({ d: jdRevisions.descriptionText }).from(jdRevisions).where(eq(jdRevisions.positionId, pos.id)).orderBy(desc(jdRevisions.revision)).limit(1))[0]?.d ?? null;
   }
-  const blocked = snapshotBlockReason(pos, opts.job);
+  const page = opts.job.listingStatus === "closed" ? null : snapshotPageVerdict(pos.title, opts.job, { prevBody });
+  let softNotFoundSince: string | undefined;
+  if (page?.refuse && page.signature === "not_found") {
+    const streak = softNotFoundStreak(pos.metadata);
+    softNotFoundSince = streak ?? new Date().toISOString();
+    if (streak && Date.now() - Date.parse(streak) >= SOFT_404_CONFIRM_MS) {
+      log.warn("jd.snapshot_not_found", { positionId: pos.id, where: page.where, url: opts.job.url, since: streak });
+      opts = { ...opts, job: { ...opts.job, listingStatus: "closed", title: "", descriptionText: "", locationRaw: undefined, salaryRaw: pos.salaryRaw || undefined, rawPayload: { ...(opts.job.rawPayload || {}), closedReason: "not_found_page", softNotFoundSince: streak } } };
+      softNotFoundSince = undefined;
+    }
+  }
+  const blocked = snapshotBlockReason(pos, opts.job, { prevBody });
   if (blocked) {
     // Keep the last good revision: no jd_revision, no jd_change, no re-scoring. Record why.
     const now = new Date();
@@ -547,7 +560,10 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
       .set({
         lastCheckedAt: now,
         updatedAt: now,
-        metadata: { ...(pos.metadata || {}), lastAtsFetch: { at: now.toISOString(), provider: opts.job.provider, listingStatus: opts.job.listingStatus, rejected: blocked } },
+        metadata: {
+          ...(pos.metadata || {}),
+          lastAtsFetch: { at: now.toISOString(), provider: opts.job.provider, listingStatus: opts.job.listingStatus, rejected: blocked, ...(softNotFoundSince ? { softNotFoundSince } : {}) },
+        },
       })
       .where(eq(positions.id, pos.id));
     await addEvent({
@@ -936,6 +952,17 @@ export async function repairObjectSalaries(): Promise<{ checked: number; updated
   return { checked: rows.length, updated, failed, failedIds };
 }
 
+/** Minimum gap between the first and the confirming soft-404 observation. */
+export const SOFT_404_CONFIRM_MS = 30 * 60_000;
+
+/** When the current run of soft-404 observations began (the previous fetch was one), else null. */
+function softNotFoundStreak(metadata: Record<string, unknown> | null | undefined): string | null {
+  const last = (metadata?.lastAtsFetch || null) as { at?: unknown; rejected?: unknown; softNotFoundSince?: unknown } | null;
+  if (!last || typeof last.rejected !== "string" || !last.rejected.startsWith("not_a_jd:not_found")) return null;
+  const since = typeof last.softNotFoundSince === "string" ? last.softNotFoundSince : typeof last.at === "string" ? last.at : null;
+  return since && Number.isFinite(Date.parse(since)) ? since : null;
+}
+
 /**
  * Why a fetched posting must NOT be applied to this position (null = apply):
  *  - not a JD: JS wall, loading shell, placeholder or vendor boilerplate
@@ -945,9 +972,10 @@ export async function repairObjectSalaries(): Promise<{ checked: number; updated
 export function snapshotBlockReason(
   pos: { title?: string | null; primaryUrl?: string | null; atsProvider?: string | null; atsJobId?: string | null; externalIdentity?: string | null; company: { name: string } },
   job: AtsJob,
+  opts: { prevBody?: string | null } = {},
 ): string | null {
   if (job.listingStatus !== "closed") {
-    const page = snapshotPageVerdict(pos.title, job);
+    const page = snapshotPageVerdict(pos.title, job, opts);
     if (page.refuse) return `not_a_jd:${page.signature}:${page.where}`;
   }
   const failed = (job.rawPayload as { fetchFailed?: string } | undefined)?.fetchFailed;

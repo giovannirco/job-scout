@@ -442,10 +442,18 @@ export function ashbySalaryRaw(comp: unknown): string | undefined {
   if (salary) {
     const cur = salary.currencyCode || "USD";
     const range = salary.minValue && salary.maxValue && salary.minValue !== salary.maxValue ? `${salary.minValue}–${salary.maxValue}` : String(salary.maxValue || salary.minValue);
-    const per = /month/i.test(salary.interval || "") ? " per month" : /hour/i.test(salary.interval || "") ? " per hour" : /week|day/i.test(salary.interval || "") ? "" : " per year";
+    const iv = salary.interval || "";
+    // Same suffixes parseSalary reads; week/day must never fall through to "per year".
+    const per = /month/i.test(iv) ? " per month" : /hour/i.test(iv) ? " per hour" : /week/i.test(iv) ? " per week" : /day/i.test(iv) ? " per day" : " per year";
     return `${cur} ${range}${per}`;
   }
   return c.scrapeableCompensationSalarySummary?.trim() || undefined;
+}
+
+/** InHire statuses that mean the posting is gone. Anything else (published, active, unknown) stays open. */
+const INHIRE_CLOSED_STATUS_RE = /^(closed|expired|unpublished|archived|cancell?ed|filled|finished|deleted|inactive|paused|encerrad[ao]|finalizad[ao]|cancelad[ao]|arquivad[ao]|expirad[ao])$/i;
+export function inhireListingStatus(status?: string | null): "open" | "closed" {
+  return INHIRE_CLOSED_STATUS_RE.test((status || "").trim()) ? "closed" : "open";
 }
 
 /** InHire public job API: GET https://api.inhire.app/job-posts/public/pages/{jobId} with X-Tenant: {tenant}. Never renders the page. */
@@ -479,15 +487,30 @@ export async function fetchInhireJob(tenant: string, jobId: string, url?: string
     isRemote: /remote/i.test(d.workplaceType || "") || undefined,
     employmentType: d.contractType?.join(", "),
     postedAt: d.publishedAt,
-    listingStatus: d.status && d.status !== "published" ? "closed" : "open",
+    listingStatus: inhireListingStatus(d.status),
     rawPayload: { source: "inhire_api", status: d.status, tenant },
   };
+}
+
+/** The board's own job URLs name this org (a renamed / aliased board is not evidence of closure). */
+function ashbyBoardMatches(org: string, jobs: Array<{ jobUrl?: string }>): boolean {
+  const urls = jobs.map((j) => j.jobUrl).filter((u): u is string => typeof u === "string" && Boolean(u));
+  if (!urls.length) return true;
+  const want = org.toLowerCase();
+  return urls.some((u) => {
+    try {
+      return decodeURIComponent(new URL(u).pathname).toLowerCase().split("/").includes(want);
+    } catch {
+      return false;
+    }
+  });
 }
 
 export async function fetchAshbyJob(org: string, jobId: string, opts: { render?: HtmlRenderer } = {}): Promise<AtsJob> {
   const pageUrl = `https://jobs.ashbyhq.com/${org}/${jobId}`;
   // Ashby posting API (public)
   const apiUrl = `https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(org)}?includeCompensation=true`;
+  let notOnBoard: { httpStatus: number; boardJobs: number } | null = null;
   try {
     const { ok, body, status } = await fetchText(apiUrl);
     if (ok) {
@@ -503,7 +526,8 @@ export async function fetchAshbyJob(org: string, jobId: string, opts: { render?:
           compensation?: { compensationTier?: Array<{ title?: string }> };
         }>;
       };
-      const job = (data.jobs || []).find((j) => j.id === jobId) as
+      const wantId = jobId.toLowerCase();
+      const job = (data.jobs || []).find((j) => String(j.id || "").toLowerCase() === wantId) as
         | {
             id: string;
             title: string;
@@ -585,19 +609,10 @@ export async function fetchAshbyJob(org: string, jobId: string, opts: { render?:
           },
         };
       }
-      // The board answered and this job is not on it: the posting is gone. The job page
-      // still answers 200 (SPA shell), so it must not be used for liveness.
-      if (Array.isArray(data.jobs) && !isPlaceholderJobId("ashby", jobId)) {
-        return {
-          provider: "ashby",
-          boardToken: org,
-          jobId,
-          externalIdentity: `ashby:${org}:${jobId}`,
-          title: "",
-          url: pageUrl,
-          listingStatus: "closed",
-          rawPayload: { provider: "ashby", httpStatus: status, closedReason: "not_on_board", boardJobs: data.jobs.length },
-        };
+      // The board answered with postings and this job is not among them. That alone is
+      // not proof (unlisted postings, a renamed board): the job page decides below.
+      if (Array.isArray(data.jobs) && data.jobs.length > 0 && !isPlaceholderJobId("ashby", jobId) && ashbyBoardMatches(org, data.jobs)) {
+        notOnBoard = { httpStatus: status, boardJobs: data.jobs.length };
       }
     } else if (status === 404) {
       /* fall through */
@@ -633,6 +648,20 @@ export async function fetchAshbyJob(org: string, jobId: string, opts: { render?:
     };
   }
   const ld = extractJsonLdJob(page.body);
+  // Not on the board and the page carries no posting (the SPA shell answers 200 for
+  // any id): the posting is gone. A page that still shows it is live (e.g. unlisted).
+  if (notOnBoard && page.ok && !ld?.title && !/"posting"\s*:\s*\{/.test(page.body)) {
+    return {
+      provider: "ashby",
+      boardToken: org,
+      jobId,
+      externalIdentity: `ashby:${org}:${jobId}`,
+      title: "",
+      url: pageUrl,
+      listingStatus: "closed",
+      rawPayload: { provider: "ashby", ...notOnBoard, closedReason: "not_on_board" },
+    };
+  }
   const titleMatch = page.body.match(/<title>([^<]+)<\/title>/i);
   const rawTitle =
     ld?.title || titleMatch?.[1]?.replace(/\s*\|.*/, "").trim() || "";

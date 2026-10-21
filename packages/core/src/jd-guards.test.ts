@@ -6,7 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { closeDb, evaluations, getDb, jdRevisions, jobs, positions, timelineEvents } from "@job-scout/db";
 import type { AtsJob } from "@job-scout/ats";
 import { bootstrap } from "./bootstrap.js";
-import { applySnapshot, getPosition, patchPosition, stampCareerOps, upsertFromJob } from "./positions.js";
+import { applySnapshot, getPosition, patchPosition, SOFT_404_CONFIRM_MS, stampCareerOps, upsertFromJob } from "./positions.js";
 import { createApproval, resolveApproval } from "./autopilot.js";
 import { saveMaterial } from "./materials.js";
 import { coreEnv } from "./env.js";
@@ -65,12 +65,58 @@ describe("JD snapshot guards and last-good repair (isolated PGlite)", () => {
     expect((await getPosition(position.id))!.title).toBe("Site Reliability Engineer - Senior");
   });
 
-  it("a soft-404 page closes the listing and keeps the JD", async () => {
+  /** Move the recorded first soft-404 observation back in time (the confirm window is SOFT_404_CONFIRM_MS). */
+  async function ageSoftNotFound(positionId: string, ms = SOFT_404_CONFIRM_MS + 60_000) {
+    const db = await getDb();
+    const meta = { ...((await getPosition(positionId))!.metadata || {}) } as Record<string, unknown>;
+    const last = { ...(meta.lastAtsFetch as Record<string, unknown>) };
+    last.softNotFoundSince = new Date(Date.parse(String(last.softNotFoundSince)) - ms).toISOString();
+    await db.update(positions).set({ metadata: { ...meta, lastAtsFetch: last } }).where(eq(positions.id, positionId));
+  }
+  const soft404 = (slug: string) => inhire(slug, { title: "Job Not Found", descriptionText: "Sorry, job not found." });
+
+  it("a soft-404 page closes the listing only on a second, later observation and keeps the JD", async () => {
     const { position } = await upsertFromJob(inhire("c3"), { status: "review" });
-    await applySnapshot({ positionId: position.id, job: inhire("c3", { title: "Job Not Found", descriptionText: "Sorry, job not found." }) });
-    const after = (await getPosition(position.id))!;
+    const first = await applySnapshot({ positionId: position.id, job: soft404("c3") });
+    expect(first).toMatchObject({ changed: false, rejected: expect.stringMatching(/^not_a_jd:not_found/) });
+    let after = (await getPosition(position.id))!;
+    expect(after).toMatchObject({ listingStatus: "open", status: "review", title: "Cloud Platform Engineer III" });
+    // A confirming fetch seconds later (scan + refresh_jd) is not enough.
+    await applySnapshot({ positionId: position.id, job: soft404("c3") });
+    expect((await getPosition(position.id))!).toMatchObject({ listingStatus: "open", status: "review" });
+    await ageSoftNotFound(position.id);
+    await applySnapshot({ positionId: position.id, job: soft404("c3") });
+    after = (await getPosition(position.id))!;
     expect(after.listingStatus).toBe("closed");
+    expect(after.status).toBe("archived");
     expect(after.title).toBe("Cloud Platform Engineer III");
+  });
+
+  it("a good fetch between soft-404s resets the streak", async () => {
+    const { position } = await upsertFromJob(inhire("k11"), { status: "review" });
+    await applySnapshot({ positionId: position.id, job: soft404("k11") });
+    await ageSoftNotFound(position.id);
+    await applySnapshot({ positionId: position.id, job: inhire("k11") });
+    await applySnapshot({ positionId: position.id, job: soft404("k11") });
+    expect((await getPosition(position.id))!).toMatchObject({ listingStatus: "open", status: "review" });
+  });
+
+  it("an HTTP-level closure (fetcher listingStatus closed) still closes at once", async () => {
+    const { position } = await upsertFromJob(inhire("l12"), { status: "review" });
+    await applySnapshot({ positionId: position.id, job: inhire("l12", { title: "", descriptionText: "", listingStatus: "closed" }) });
+    expect((await getPosition(position.id))!).toMatchObject({ listingStatus: "closed", status: "archived", title: "Cloud Platform Engineer III" });
+  });
+
+  it("a real short JD that mentions a filled position is applied, never closed", async () => {
+    const shortJd = "Frontend Engineer. Requires JavaScript, TypeScript and React. This position is no longer available? Ask us: we hire all year.";
+    const { position } = await upsertFromJob(inhire("m13", { title: "Frontend Engineer", descriptionText: shortJd }), { status: "review" });
+    const edited = `${shortJd} Remote in Brazil.`;
+    for (let i = 0; i < 2; i++) {
+      await applySnapshot({ positionId: position.id, job: inhire("m13", { title: "Frontend Engineer", descriptionText: edited }) });
+      await ageSoftNotFound(position.id).catch(() => undefined);
+    }
+    const after = (await getPosition(position.id))!;
+    expect(after).toMatchObject({ listingStatus: expect.not.stringMatching(/^closed$/), status: "review" });
   });
 
   it("last-good repair: dry-run plans, --apply restores, supersedes and queues", async () => {

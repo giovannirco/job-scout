@@ -41,8 +41,8 @@ The API includes an MCP server for reading positions, managing the pipeline and 
 |--|--|
 | `intake` | create/refresh a position from a job URL; queues triage when a model key is set |
 | `refresh_jd` | re-fetch the ATS page; revision if changed |
-| `update_position` | PATCH status, priority, notes, nextAction, resumeSurface, watchEnabled, appliedAt. The career-ops guard below applies to a `skip`/`archived` status; the other fields still apply |
-| `set_position_status` | any pipeline status; `archived` requires a reason. Subject to the career-ops guard below |
+| `update_position` | PATCH status, priority, notes, nextAction, resumeSurface, watchEnabled, appliedAt. The career-ops guard below applies to a `skip`/`archived` status; the other fields still apply. `status: materials` follows the materials rule below |
+| `set_position_status` | any pipeline status; `archived` requires a reason. Subject to the career-ops guard below; `materials` follows the materials rule below |
 | `log_activity` | append a timeline note |
 | `upsert_interview` | create/patch a screen or interview (transcript queues an AI brief unless `skipBrief`) |
 | `brief_interview` | queue or `sync` the `interview_brief` model vs JD + company pack. A transcript does not queue a brief when no model key is set |
@@ -51,6 +51,8 @@ The API includes an MCP server for reading positions, managing the pipeline and 
 | `run_discovery_radar` | enqueue board scans for due boards (`all=true` forces every enabled board) |
 | `promote_discovery` | create a position from a discovery row and triage it |
 | `retry_failed_llm` | re-enqueue latest failed LLM ops (`hours`, `scope=failed|failed_and_missing`). Does not re-run successful evaluate/materials |
+
+**Materials rule.** `materials` means materials exist. `update_position` and `set_position_status` refuse `status: materials` with a `materials_missing: …` error while the position has no non-failed resume or cover in job-scout and no career-ops stamp with `pdfPath`; the status is left unchanged. Generate drafts first (`run_llm` `materials`, which moves the stage itself) or, when career-ops packaged the application, call `upsert_career_ops_stamp` with `pdfPath` and then set the status.
 
 ### career-ops bridge
 

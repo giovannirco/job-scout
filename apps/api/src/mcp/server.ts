@@ -198,7 +198,7 @@ export function createJobScoutMcpServer() {
 
   server.registerTool(
     "update_position",
-    { title: "Update position", description: "PATCH status, priority, notes, nextAction, resumeSurface, watchEnabled, appliedAt. A status of skip/archived from the career-ops sync (token named career-ops…, or source=career-ops) is recorded as a note and not applied; the other fields still apply.", inputSchema: { idOrSlug: z.string(), status: z.string().optional(), priority: z.string().optional(), notes: z.string().optional(), nextAction: z.string().optional(), resumeSurface: z.string().optional(), watchEnabled: z.boolean().optional(), appliedAt: z.string().optional(), source: z.string().optional() } },
+    { title: "Update position", description: "PATCH status, priority, notes, nextAction, resumeSurface, watchEnabled, appliedAt. A status of skip/archived from the career-ops sync (token named career-ops…, or source=career-ops) is recorded as a note and not applied; the other fields still apply. status=materials is refused with a materials_missing error until the position has a resume/cover in job-scout or a career-ops stamp with pdfPath: create materials (run_llm materials) or upsert_career_ops_stamp with pdfPath first.", inputSchema: { idOrSlug: z.string(), status: z.string().optional(), priority: z.string().optional(), notes: z.string().optional(), nextAction: z.string().optional(), resumeSurface: z.string().optional(), watchEnabled: z.boolean().optional(), appliedAt: z.string().optional(), source: z.string().optional() } },
     async ({ idOrSlug, source, ...patch }, ctx) => {
       try {
         const p = await patchFromCaller(idOrSlug, patch, { actor: agentOf(ctx as ToolCtx), source });
@@ -211,7 +211,7 @@ export function createJobScoutMcpServer() {
 
   server.registerTool(
     "set_position_status",
-    { title: "Set status", description: "Set pipeline status (triaged|review|materials|applied|screen|interview|offer|rejected|skip|archived). archived requires reason. A skip/archive from the career-ops sync (source=career-ops, or a note starting 'career-ops') is recorded as a note and not applied.", inputSchema: { idOrSlug: z.string(), status: z.string(), reason: z.string().optional(), note: z.string().optional(), source: z.string().optional() } },
+    { title: "Set status", description: "Set pipeline status (triaged|review|materials|applied|screen|interview|offer|rejected|skip|archived). archived requires reason. A skip/archive from the career-ops sync (source=career-ops, or a note starting 'career-ops') is recorded as a note and not applied. materials is refused with a materials_missing error until the position has a resume/cover in job-scout or a career-ops stamp with pdfPath: create materials (run_llm materials) or upsert_career_ops_stamp with pdfPath first.", inputSchema: { idOrSlug: z.string(), status: z.string(), reason: z.string().optional(), note: z.string().optional(), source: z.string().optional() } },
     async (a, ctx) => {
       try {
         const p = await setStatusFromCaller(a.idOrSlug, a.status, { actor: agentOf(ctx as ToolCtx), reason: a.reason, note: a.note, source: a.source });

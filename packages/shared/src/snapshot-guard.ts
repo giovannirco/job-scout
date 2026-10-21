@@ -25,6 +25,12 @@ function hostOf(url?: string | null): string {
   }
 }
 
+/** Job ids that identify one posting across every tenant of the provider (not Workday-style "R1234" reqs). */
+const GLOBAL_ID_PROVIDERS = new Set(["greenhouse", "lever", "ashby", "inhire"]);
+function globallyUniqueJobId(provider: string, jobId: string): boolean {
+  return GLOBAL_ID_PROVIDERS.has(provider) || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(jobId);
+}
+
 export type SnapshotTarget = {
   companyName?: string | null;
   primaryUrl?: string | null;
@@ -47,14 +53,18 @@ export type SnapshotIncoming = {
  * is NOT, or null when it is safe to apply.
  */
 export function snapshotIdentityMismatch(pos: SnapshotTarget, job: SnapshotIncoming): string | null {
-  if (!companiesMatch(pos.companyName, job.company)) return `company:${job.company}≠${pos.companyName}`;
+  // The canonical ATS identity is the strongest evidence: a matching one wins over
+  // display-name drift ("Acme" vs "Acme Payments Ltd"), so it is checked first.
   const pi = canonicalExternalIdentity(pos.externalIdentity);
   const ji = canonicalExternalIdentity(job.externalIdentity);
-  if (pi && ji && pi === ji) return null;
-  if (pos.atsProvider && job.provider && pos.atsProvider === job.provider && pos.atsJobId && job.jobId && pos.atsJobId !== job.jobId) {
+  if (pi && ji && pi.toLowerCase() === ji.toLowerCase() && !/^(other|unknown):/i.test(pi)) return null;
+  const sameProvider = Boolean(pos.atsProvider && job.provider && pos.atsProvider === job.provider && !["other", "unknown"].includes(pos.atsProvider!));
+  if (sameProvider && pos.atsJobId && job.jobId && pos.atsJobId.toLowerCase() === job.jobId.toLowerCase() && globallyUniqueJobId(pos.atsProvider!, pos.atsJobId)) return null;
+  if (!companiesMatch(pos.companyName, job.company)) return `company:${job.company}≠${pos.companyName}`;
+  if (sameProvider && pos.atsJobId && job.jobId && pos.atsJobId.toLowerCase() !== job.jobId.toLowerCase()) {
     return `ats_job_id:${job.jobId}≠${pos.atsJobId}`;
   }
-  if (pi && ji && pi !== ji && !/^(other|unknown):/.test(pi) && !/^(other|unknown):/.test(ji)) return `external_identity:${ji}≠${pi}`;
+  if (pi && ji && pi.toLowerCase() !== ji.toLowerCase() && !/^(other|unknown):/.test(pi) && !/^(other|unknown):/.test(ji)) return `external_identity:${ji}≠${pi}`;
   const ph = hostOf(pos.primaryUrl);
   const jh = hostOf(job.url);
   if (ph && jh && ph !== jh && normalizePostingUrl(pos.primaryUrl) !== normalizePostingUrl(job.url)) return `url_host:${jh}≠${ph}`;
