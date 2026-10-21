@@ -11,11 +11,11 @@ export async function resolveCompanyForName(
   const db = await getDb();
   const companySlug = canonicalCompanySlug(name);
   const displayName = preferredCompanyName(name, name);
-  let company = (await db.select().from(companies).where(eq(companies.slug, companySlug)).limit(1))[0];
+  let company = (await db.select().from(companies).where(eq(companies.slug, companySlug)).limit(1)).at(0);
   if (!company) {
     const rawSlug = slugify(name);
     if (rawSlug && rawSlug !== companySlug) {
-      company = (await db.select().from(companies).where(eq(companies.slug, rawSlug)).limit(1))[0];
+      company = (await db.select().from(companies).where(eq(companies.slug, rawSlug)).limit(1)).at(0);
     }
   }
   if (!company) {
@@ -36,11 +36,11 @@ export async function resolveCompanyForName(
         overview: extras?.overview || null,
         metadata: {},
       }).onConflictDoNothing({ target: companies.slug });
-      company = (await db.select().from(companies).where(eq(companies.slug, slug)).limit(1))[0];
+      company = (await db.select().from(companies).where(eq(companies.slug, slug)).limit(1)).at(0);
       if (!company) throw new Error("company insert failed");
     } catch (err) {
       if (!isUniqueViolation(err)) throw err;
-      company = (await db.select().from(companies).where(eq(companies.slug, slug)).limit(1))[0];
+      company = (await db.select().from(companies).where(eq(companies.slug, slug)).limit(1)).at(0);
       if (!company) throw err;
     }
   }
@@ -82,8 +82,8 @@ export async function getCompany(idOrSlug: string) {
   const db = await getDb();
   const find = (where: SQL | undefined) => db.select().from(companies).where(where).limit(1);
   // Slugs replaced by a repair stay resolvable through metadata.previousSlugs.
-  const row = (await find(or(eq(companies.id, idOrSlug), eq(companies.slug, idOrSlug))))[0]
-    ?? (await find(sql`jsonb_exists(coalesce(${companies.metadata}->'previousSlugs', '[]'::jsonb), ${idOrSlug})`))[0];
+  const row = (await find(or(eq(companies.id, idOrSlug), eq(companies.slug, idOrSlug)))).at(0)
+    ?? (await find(sql`jsonb_exists(coalesce(${companies.metadata}->'previousSlugs', '[]'::jsonb), ${idOrSlug})`)).at(0);
   if (!row) return null;
   const pos = await db
     .select({
@@ -116,7 +116,7 @@ export async function getCompany(idOrSlug: string) {
       .where(and(eq(evaluations.companyId, row.id), eq(evaluations.kind, "company_research")))
       .orderBy(desc(evaluations.createdAt))
       .limit(1)
-  )[0];
+  ).at(0);
   const boards = await db
     .select()
     .from(boardSources)

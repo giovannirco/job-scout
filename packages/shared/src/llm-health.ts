@@ -172,7 +172,7 @@ export function assessLlmHealth(runs: LlmRunSample[], opts: { now?: Date; operat
   const degraded = operations.filter((o) => o.state === "degraded");
   const providerFailing = failing.filter((o) => providerWideKind(o.kind));
   const state: LlmHealthState = failing.length ? "failing" : degraded.length ? "degraded" : operations.some((o) => o.state === "ok") ? "ok" : "idle";
-  const since = failing.map((o) => o.failingSince).filter((s): s is string => Boolean(s)).sort()[0] ?? null;
+  const since = failing.map((o) => o.failingSince).filter((s): s is string => Boolean(s)).sort().at(0) ?? null;
   return {
     state,
     providerDown: providerFailing.length > 0,

@@ -339,7 +339,7 @@ export function createJobScoutMcpServer() {
         if (a.id) {
           const db = await getDb();
           const { discoveryFeed } = await import("@job-scout/db");
-          const row = (await db.select().from(discoveryFeed).where(eq(discoveryFeed.id, a.id)).limit(1))[0];
+          const row = (await db.select().from(discoveryFeed).where(eq(discoveryFeed.id, a.id)).limit(1)).at(0);
           if (!row?.url) return text({ error: "discovery row not found or has no url" }, true);
           url = row.url;
           company = company || row.company || undefined;

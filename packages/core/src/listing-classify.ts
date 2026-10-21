@@ -29,7 +29,7 @@ const ListingClassifyOutput = z.object({
 
 async function classificationFingerprint(pos: NonNullable<Awaited<ReturnType<typeof getPosition>>>, model: string) {
   const db = await getDb();
-  const rev = (await db.select().from(jdRevisions).where(eq(jdRevisions.positionId, pos.id)).orderBy(desc(jdRevisions.revision)).limit(1))[0];
+  const rev = (await db.select().from(jdRevisions).where(eq(jdRevisions.positionId, pos.id)).orderBy(desc(jdRevisions.revision)).limit(1)).at(0);
   const ats = pos.metadata?.ats as { workplaceType?: string; isRemote?: boolean } | undefined;
   return createHash("sha256").update(JSON.stringify({ version: 1, model, title: pos.title, company: pos.company.name,
     location: rev?.locationRaw, ats: { workplaceType: ats?.workplaceType, isRemote: ats?.isRemote }, jd: (await currentJdText(pos.id)).slice(0, 8000) })).digest("hex");
@@ -54,7 +54,7 @@ export async function maybeEnqueueListingClassify(
     const parsed = ListingClassifyOutput.safeParse(cache.result);
     if (parsed.success) {
       const db = await getDb();
-      const rev = (await db.select().from(jdRevisions).where(eq(jdRevisions.positionId, pos.id)).orderBy(desc(jdRevisions.revision)).limit(1))[0];
+      const rev = (await db.select().from(jdRevisions).where(eq(jdRevisions.positionId, pos.id)).orderBy(desc(jdRevisions.revision)).limit(1)).at(0);
       // Older caches keep the model's evidence beside the result, not inside it.
       const result = applyClassificationOverride(pos.metadata, mergeListingClassify({ ...facts, locationRaw: rev?.locationRaw || "" }, { ...parsed.data, evidence: parsed.data.evidence ?? cache.evidence ?? undefined }));
       // afterAtsFetch recomputes deterministic facts: restore the same-input model result.
@@ -87,7 +87,7 @@ export async function runListingClassify(positionId: string) {
       .where(eq(jdRevisions.positionId, pos.id))
       .orderBy(desc(jdRevisions.revision))
       .limit(1)
-  )[0];
+  ).at(0);
   const ats = ((pos.metadata || {}) as { ats?: { workplaceType?: string | null; isRemote?: boolean | null } }).ats;
   const det = classifyListing({
     locationRaw: rev?.locationRaw || "",
@@ -220,7 +220,7 @@ export async function backfillListingFacts(opts: { force?: boolean } = {}) {
         .where(eq(jdRevisions.positionId, row.id))
         .orderBy(desc(jdRevisions.revision))
         .limit(1)
-    )[0];
+    ).at(0);
     const ats = ((row.metadata || {}) as { ats?: { workplaceType?: string | null; isRemote?: boolean | null } }).ats;
     const facts = applyClassificationOverride(row.metadata, classifyListing({
       locationRaw: rev?.locationRaw || "",

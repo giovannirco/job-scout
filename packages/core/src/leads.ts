@@ -94,7 +94,7 @@ export function triageOfLead(l: Pick<Lead, "pitchedRole" | "clientHint" | "state
 
 async function retriage(leadId: string) {
   const db = await getDb();
-  const row = (await db.select().from(leads).where(eq(leads.id, leadId)).limit(1))[0];
+  const row = (await db.select().from(leads).where(eq(leads.id, leadId)).limit(1)).at(0);
   if (!row) return null;
   const triage = triageOfLead(row, await profileForTriage());
   await db.update(leads).set({ triageJson: triage as unknown as Record<string, unknown> }).where(eq(leads.id, leadId));
@@ -208,7 +208,7 @@ async function messagesOf(leadId: string, limit = 200) {
 
 async function findLead(leadId: string) {
   const db = await getDb();
-  return (await db.select({ ...getTableColumns(leads), bucket: BUCKET }).from(leads).where(eq(leads.id, leadId)).limit(1))[0] ?? null;
+  return (await db.select({ ...getTableColumns(leads), bucket: BUCKET }).from(leads).where(eq(leads.id, leadId)).limit(1)).at(0) ?? null;
 }
 
 /** Full lead: fields, leadTriage, message log (newest first), interview rounds, linked position id. */
@@ -247,12 +247,12 @@ export async function upsertLead(input: LeadInput & { id?: string; message?: Lea
   const db = await getDb();
   let existing: Lead | null = null;
   if (input.id) {
-    existing = (await db.select().from(leads).where(eq(leads.id, input.id)).limit(1))[0] ?? null;
+    existing = (await db.select().from(leads).where(eq(leads.id, input.id)).limit(1)).at(0) ?? null;
     if (!existing) return null;
   }
   const merged = { ...(existing || {}), ...Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined)) } as LeadInput;
   const dedupeKey = existing?.mergedIntoId ? null : leadDedupeKey(merged);
-  if (!existing && dedupeKey) existing = (await db.select().from(leads).where(eq(leads.dedupeKey, dedupeKey)).limit(1))[0] ?? null;
+  if (!existing && dedupeKey) existing = (await db.select().from(leads).where(eq(leads.dedupeKey, dedupeKey)).limit(1)).at(0) ?? null;
   if (!existing && !trimOrNull(input.recruiterName) && !trimOrNull(input.recruiterProfileUrl) && !trimOrNull(input.recruiterEmail) && !trimOrNull(input.recruiterCompany)) {
     throw new Error("a lead needs a recruiter: recruiterName, recruiterProfileUrl, recruiterEmail or recruiterCompany");
   }
@@ -268,7 +268,7 @@ export async function upsertLead(input: LeadInput & { id?: string; message?: Lea
   if (existing) {
     leadId = existing.id;
     if (dedupeKey && dedupeKey !== existing.dedupeKey) {
-      const clash = (await db.select({ id: leads.id }).from(leads).where(eq(leads.dedupeKey, dedupeKey)).limit(1))[0];
+      const clash = (await db.select({ id: leads.id }).from(leads).where(eq(leads.dedupeKey, dedupeKey)).limit(1)).at(0);
       if (clash && clash.id !== existing.id) throw Object.assign(new Error(`another lead has this recruiter and role: ${clash.id} (merge_leads to combine them)`), { code: "duplicate_lead", leadId: clash.id });
       patch.dedupeKey = dedupeKey;
     }
@@ -290,7 +290,7 @@ export async function upsertLead(input: LeadInput & { id?: string; message?: Lea
  */
 export async function logLeadMessage(leadId: string, input: LeadMessageInput) {
   const db = await getDb();
-  const lead = (await db.select().from(leads).where(eq(leads.id, leadId)).limit(1))[0];
+  const lead = (await db.select().from(leads).where(eq(leads.id, leadId)).limit(1)).at(0);
   if (!lead) return null;
   const direction: LeadDirection = parseLeadDirection(input.direction);
   const body = trimOrNull(redactContactText(input.body));
@@ -322,7 +322,7 @@ export async function logLeadMessage(leadId: string, input: LeadMessageInput) {
 /** Log a screening round on a lead. A pending round with a time moves the lead to screening_scheduled; a completed one to screened. */
 export async function upsertLeadInterview(leadId: string, input: InterviewInput & { id?: string }) {
   const db = await getDb();
-  const lead = (await db.select().from(leads).where(eq(leads.id, leadId)).limit(1))[0];
+  const lead = (await db.select().from(leads).where(eq(leads.id, leadId)).limit(1)).at(0);
   if (!lead) return null;
   const row = input.id ? await patchLeadInterview(leadId, input.id, input) : await addLeadInterview(leadId, input);
   if (!row) return null;
@@ -348,7 +348,7 @@ export async function linkLeadPosition(leadId: string, positionIdOrSlug: string,
   const pos = await getPosition(positionIdOrSlug);
   if (!pos) throw Object.assign(new Error("position not found"), { code: "not_found" });
   const db = await getDb();
-  const lead = (await db.select().from(leads).where(eq(leads.id, leadId)).limit(1))[0];
+  const lead = (await db.select().from(leads).where(eq(leads.id, leadId)).limit(1)).at(0);
   if (!lead) return null;
   await db.update(leads).set({ positionId: pos.id, updatedAt: new Date() }).where(eq(leads.id, leadId));
   await attachPosition(leadId, pos.id);
@@ -374,7 +374,7 @@ export type PromoteLeadInput = {
  */
 export async function promoteLead(leadId: string, input: PromoteLeadInput, actor = "system") {
   const db = await getDb();
-  const lead = (await db.select().from(leads).where(eq(leads.id, leadId)).limit(1))[0];
+  const lead = (await db.select().from(leads).where(eq(leads.id, leadId)).limit(1)).at(0);
   if (!lead) return null;
   if (lead.mergedIntoId) throw new Error(`lead was merged into ${lead.mergedIntoId}`);
   const { getPosition, upsertFromJob, recordAtsFetchFailure } = await import("./positions.js");
@@ -427,7 +427,7 @@ export async function mergeLeads(targetId: string, sourceIds: string[], actor = 
   const db = await getDb();
   const ids = [...new Set(sourceIds.filter((s) => s && s !== targetId))];
   if (!ids.length) throw new Error("sourceIds must name at least one other lead");
-  const target = (await db.select().from(leads).where(eq(leads.id, targetId)).limit(1))[0];
+  const target = (await db.select().from(leads).where(eq(leads.id, targetId)).limit(1)).at(0);
   if (!target) return null;
   const sources = await db.select().from(leads).where(inArray(leads.id, ids));
   if (sources.length !== ids.length) throw Object.assign(new Error("lead not found"), { code: "not_found" });
@@ -439,7 +439,7 @@ export async function mergeLeads(targetId: string, sourceIds: string[], actor = 
   }
   patch.threadUrls = uniq([...target.threadUrls, ...sources.flatMap((s) => s.threadUrls)]);
   patch.openUnknowns = uniq([...target.openUnknowns, ...sources.flatMap((s) => s.openUnknowns)]);
-  const latest = (xs: Array<Date | null>) => xs.filter((d): d is Date => !!d).sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+  const latest = (xs: Array<Date | null>) => xs.filter((d): d is Date => !!d).sort((a, b) => b.getTime() - a.getTime()).at(0) ?? null;
   patch.lastInboundAt = latest([target.lastInboundAt, ...sources.map((s) => s.lastInboundAt)]);
   patch.lastOutboundAt = latest([target.lastOutboundAt, ...sources.map((s) => s.lastOutboundAt)]);
   if (!target.positionId) patch.positionId = sources.map((s) => s.positionId).find(Boolean) ?? null;

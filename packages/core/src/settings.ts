@@ -9,7 +9,7 @@ const TTL_MS = 5_000;
 export async function getSettings(opts: { fresh?: boolean } = {}): Promise<Settings> {
   if (!opts.fresh && cache && Date.now() - cache.at < TTL_MS) return cache.value;
   const db = await getDb();
-  const row = (await db.select().from(settings).where(eq(settings.id, ROW_ID)).limit(1))[0];
+  const row = (await db.select().from(settings).where(eq(settings.id, ROW_ID)).limit(1)).at(0);
   const value = resolveSettings(row?.data);
   cache = { at: Date.now(), value };
   return value;

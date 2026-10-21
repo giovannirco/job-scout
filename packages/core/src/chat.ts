@@ -63,7 +63,7 @@ export async function listThreads(q: { scope?: ChatScope; positionId?: string | 
 
 export async function getThread(threadId: string) {
   const db = await getDb();
-  return (await db.select().from(chatThreads).where(eq(chatThreads.id, threadId)).limit(1))[0] ?? null;
+  return (await db.select().from(chatThreads).where(eq(chatThreads.id, threadId)).limit(1)).at(0) ?? null;
 }
 
 export async function createThread(input: { scope: ChatScope; positionId?: string | null; companyId?: string | null; title?: string | null }) {

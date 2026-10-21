@@ -321,8 +321,8 @@ export async function getPosition(idOrSlug: string) {
     .where(where)
     .limit(1);
   // Slugs replaced by a repair stay resolvable through metadata.previousSlugs.
-  const row = (await find(or(eq(positions.id, idOrSlug), eq(positions.slug, idOrSlug))))[0]
-    ?? (await find(sql`jsonb_exists(coalesce(${positions.metadata}->'previousSlugs', '[]'::jsonb), ${idOrSlug})`))[0];
+  const row = (await find(or(eq(positions.id, idOrSlug), eq(positions.slug, idOrSlug)))).at(0)
+    ?? (await find(sql`jsonb_exists(coalesce(${positions.metadata}->'previousSlugs', '[]'::jsonb), ${idOrSlug})`)).at(0);
   if (!row) return null;
   return { ...row.position, company: row.company };
 }
@@ -432,7 +432,7 @@ export async function getRevision(positionId: string, revision: number) {
       .from(jdRevisions)
       .where(and(eq(jdRevisions.positionId, positionId), eq(jdRevisions.revision, revision)))
       .limit(1)
-  )[0] ?? null;
+  ).at(0) ?? null;
 }
 
 export async function currentJdText(positionId: string): Promise<string> {
@@ -444,7 +444,7 @@ export async function currentJdText(positionId: string): Promise<string> {
       .where(eq(jdRevisions.positionId, positionId))
       .orderBy(desc(jdRevisions.revision))
       .limit(1)
-  )[0];
+  ).at(0);
   return r?.t || "";
 }
 
@@ -486,7 +486,7 @@ async function listingEdits(pos: PositionRow, patch: Record<string, unknown>, ac
       let slug = slugForRetitle({ id: pos.id, slug: pos.slug, title: pos.title, companySlug: pos.company.slug }, title);
       if (slug) {
         const db = await getDb();
-        const taken = (await db.select({ id: positions.id }).from(positions).where(and(eq(positions.slug, slug), sql`${positions.id} <> ${pos.id}`)).limit(1))[0];
+        const taken = (await db.select({ id: positions.id }).from(positions).where(and(eq(positions.slug, slug), sql`${positions.id} <> ${pos.id}`)).limit(1)).at(0);
         if (taken) slug = `${slug}-${pos.id.slice(-8, -4).toLowerCase()}`;
       }
       if (slug && slug !== pos.slug) {
@@ -657,7 +657,7 @@ export async function stampCareerOps(idOrSlug: string, stamp: Record<string, unk
 async function freeSlug(positionId: string, slug: string | null): Promise<string | null> {
   if (!slug) return null;
   const db = await getDb();
-  const holder = (await db.select({ id: positions.id }).from(positions).where(eq(positions.slug, slug)).limit(1))[0];
+  const holder = (await db.select({ id: positions.id }).from(positions).where(eq(positions.slug, slug)).limit(1)).at(0);
   return holder && holder.id !== positionId ? null : slug;
 }
 
@@ -829,7 +829,7 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
 
   const prevRev = (
     await db.select().from(jdRevisions).where(eq(jdRevisions.positionId, pos.id)).orderBy(desc(jdRevisions.revision)).limit(1)
-  )[0];
+  ).at(0);
   const nextRev = (prevRev?.revision ?? 0) + 1;
   const bodyText = descriptionText || (listingClosed ? prevRev?.descriptionText || "" : "");
 
@@ -1041,7 +1041,7 @@ export async function decodeStoredJdEntities(): Promise<{ updated: number }> {
         .where(eq(jdRevisions.positionId, positionId))
         .orderBy(desc(jdRevisions.revision))
         .limit(1)
-    )[0];
+    ).at(0);
     if (!rev?.descriptionText) continue;
     const next = decodeHtmlEntities(rev.descriptionText);
     if (next === rev.descriptionText) continue;
@@ -1151,7 +1151,7 @@ export async function repairObjectSalaries(): Promise<{ checked: number; updated
       }
       const prev = (
         await db.select().from(jdRevisions).where(eq(jdRevisions.positionId, row.id)).orderBy(desc(jdRevisions.revision)).limit(1)
-      )[0];
+      ).at(0);
       const hash = contentHash({
         title: row.title,
         descriptionText: prev?.descriptionText || "",
@@ -1473,7 +1473,7 @@ async function aggregatorOriginal(companyId: string, title: string) {
     .filter(r => decisionTitle(r.title) === want && !(r.metadata as Record<string, unknown> | null)?.duplicateOfId)
     .sort((a, b) => Number(hot(b.status)) - Number(hot(a.status))
       || Number(b.listingStatus !== "closed") - Number(a.listingStatus !== "closed")
-      || (a.firstSeenAt?.getTime() || 0) - (b.firstSeenAt?.getTime() || 0))[0] ?? null;
+      || (a.firstSeenAt?.getTime() || 0) - (b.firstSeenAt?.getTime() || 0)).at(0) ?? null;
 }
 
 async function afterAtsFetch(positionId: string, job: AtsJob, facts?: ReturnType<typeof classifyListing>) {
@@ -1535,7 +1535,7 @@ export async function expandStoredOfficeLocations(): Promise<{ checked: number; 
     if (offices.length < 2) continue;
     const rev = (
       await db.select().from(jdRevisions).where(eq(jdRevisions.positionId, row.id)).orderBy(desc(jdRevisions.revision)).limit(1)
-    )[0];
+    ).at(0);
     if (!rev?.locationRaw) continue;
     let next = greenhouseListingLocation(rev.locationRaw, offices).locationRaw?.trim();
     const distributed = greenhouseListingLocation("Distributed", offices).locationRaw?.trim();

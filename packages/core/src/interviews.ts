@@ -343,12 +343,12 @@ export async function getInterview(positionId: string, interviewId: string) {
       .from(interviews)
       .where(and(eq(interviews.id, interviewId), eq(interviews.positionId, positionId)))
       .limit(1)
-  )[0] ?? null;
+  ).at(0) ?? null;
 }
 
 export async function getInterviewById(interviewId: string) {
   const db = await getDb();
-  return (await db.select(INTERVIEW_ROW).from(interviews).where(eq(interviews.id, interviewId)).limit(1))[0] ?? null;
+  return (await db.select(INTERVIEW_ROW).from(interviews).where(eq(interviews.id, interviewId)).limit(1)).at(0) ?? null;
 }
 
 async function maybeEnqueueBrief(positionId: string, interviewId: string, transcript: string | null, skip?: boolean) {
@@ -404,7 +404,7 @@ async function insertInterview(owner: { positionId: string | null; leadId: strin
     createdAt: now,
     updatedAt: now,
   });
-  const row = (await db.select(INTERVIEW_ROW).from(interviews).where(eq(interviews.id, iid)))[0];
+  const row = (await db.select(INTERVIEW_ROW).from(interviews).where(eq(interviews.id, iid))).at(0);
   if (!row) throw new Error("interview insert failed");
   if (!positionId) return { ...row, briefJobId: null };
   const briefJobId = await maybeEnqueueBrief(positionId, iid, transcriptMarkdown, input.skipBrief);
@@ -447,7 +447,7 @@ async function updateInterview(owner: { positionId: string } | { leadId: string 
       .from(interviews)
       .where(and(eq(interviews.id, interviewId), ownerCond))
       .limit(1)
-  )[0];
+  ).at(0);
   if (!existing) return null;
   const patch: Record<string, unknown> = { updatedAt: new Date() };
   if (input.stage !== undefined) {
@@ -473,7 +473,7 @@ async function updateInterview(owner: { positionId: string } | { leadId: string 
   const keys = Object.keys(patch).filter((k) => k !== "updatedAt");
   if (!keys.length) throw new Error("nothing to update");
   await db.update(interviews).set(patch).where(eq(interviews.id, interviewId));
-  const row = (await db.select(INTERVIEW_ROW).from(interviews).where(eq(interviews.id, interviewId)))[0];
+  const row = (await db.select(INTERVIEW_ROW).from(interviews).where(eq(interviews.id, interviewId))).at(0);
   if (!row) throw new Error("interview update failed");
   const transcript = input.transcriptMarkdown !== undefined ? row.transcriptMarkdown : null;
   const briefJobId = row.positionId ? await maybeEnqueueBrief(row.positionId, interviewId, transcript, input.skipBrief) : null;
@@ -488,7 +488,7 @@ export async function deleteInterview(positionId: string, interviewId: string) {
       .from(interviews)
       .where(and(eq(interviews.id, interviewId), eq(interviews.positionId, positionId)))
       .limit(1)
-  )[0];
+  ).at(0);
   if (!row) return false;
   await db.delete(interviews).where(eq(interviews.id, interviewId));
   return true;

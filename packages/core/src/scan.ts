@@ -43,7 +43,7 @@ export type ScanResult = {
 export async function scanBoard(boardId: string, opts: { force?: boolean } = {}): Promise<ScanResult> {
   const db = await getDb();
   const settings = await getSettings();
-  const board = (await db.select().from(boardSources).where(eq(boardSources.id, boardId)).limit(1))[0];
+  const board = (await db.select().from(boardSources).where(eq(boardSources.id, boardId)).limit(1)).at(0);
   if (!board) throw new Error("board not found");
   const res: ScanResult = { boardId, company: board.company, total: 0, seen: 0, passed: 0, filtered: 0, created: 0, updated: 0, closed: 0, triageEnqueued: 0 };
 
@@ -65,7 +65,7 @@ export async function scanBoard(boardId: string, opts: { force?: boolean } = {})
 
   const prev = (
     await db.select().from(boardSnapshots).where(eq(boardSnapshots.boardSourceId, board.id)).orderBy(desc(boardSnapshots.observedAt)).limit(1)
-  )[0];
+  ).at(0);
   const prevIdents = (Array.isArray(prev?.identities) ? prev!.identities : []) as Ident[];
   const prevById = new Map(prevIdents.map((x) => [x.externalIdentity, x]));
   const isBaseline = !prev;
@@ -164,7 +164,7 @@ export async function scanBoard(boardId: string, opts: { force?: boolean } = {})
         .from(positions)
         .where(eq(positions.externalIdentity, p.externalIdentity))
         .limit(1)
-    )[0];
+    ).at(0);
     await db.insert(boardDeltas).values({
       id: id("bd"),
       boardSourceId: board.id,
@@ -207,7 +207,7 @@ export async function scanBoard(boardId: string, opts: { force?: boolean } = {})
         listingStatus: positions.listingStatus,
         metadata: positions.metadata,
       }).from(positions).where(eq(positions.externalIdentity, j.externalIdentity)).limit(1)
-    )[0];
+    ).at(0);
     if (existing && !opts.force) {
       if (existing.status === "archived") {
         res.passed = Math.max(0, res.passed - 1);
@@ -412,7 +412,7 @@ async function withdrawUntouchedScanPosition(
       .from(positions)
       .where(eq(positions.id, positionId))
       .limit(1)
-  )[0];
+  ).at(0);
   if (!pos || pos.status !== "triaged" || pos.triagedAt || pos.triageVerdict) return false;
   const fromScan = Boolean(pos.source?.startsWith("scan:"));
   const misstampedManual = Boolean(opts?.allowManual && pos.source === "manual");
@@ -582,7 +582,7 @@ export async function repairOfficeDiscoveryFilings(): Promise<{ withdrawn: numbe
         .from(discoveryFeed)
         .where(eq(discoveryFeed.positionId, row.id))
         .limit(1)
-    )[0];
+    ).at(0);
     if (row.source === "manual" && !feed) continue;
     const verdict = listingGate({
       title: row.title,
@@ -623,7 +623,7 @@ export async function repairHomeMarketFilings(): Promise<{ withdrawn: number }> 
         .from(discoveryFeed)
         .where(eq(discoveryFeed.positionId, row.id))
         .limit(1)
-    )[0];
+    ).at(0);
     if (row.source === "manual" && !feed) continue;
     const verdict = listingGate({
       title: row.title,
@@ -655,7 +655,7 @@ export async function repairProfileGateFilings(): Promise<{ withdrawn: number; r
         .from(discoveryFeed)
         .where(eq(discoveryFeed.positionId, row.id))
         .limit(1)
-    )[0];
+    ).at(0);
     if (row.source === "manual" && !feed) continue;
     const rev = (
       await db
@@ -664,7 +664,7 @@ export async function repairProfileGateFilings(): Promise<{ withdrawn: number; r
         .where(eq(jdRevisions.positionId, row.id))
         .orderBy(desc(jdRevisions.revision))
         .limit(1)
-    )[0];
+    ).at(0);
     const discovered = (feed?.locationRaw || "").trim();
     const fetched = (rev?.locationRaw || "").trim();
     const locationRaw = !discovered || JUNK_PLACE.test(discovered) ? fetched || discovered : discovered;

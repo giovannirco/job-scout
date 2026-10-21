@@ -67,7 +67,7 @@ export async function enqueueNotify(input: {
         .from(notificationOutbox)
         .where(eq(notificationOutbox.dedupeKey, dedupeKey))
         .limit(1)
-    )[0];
+    ).at(0);
     if (existing?.id) return { id: existing.id, status: existing.status };
   }
   await db.insert(notificationOutbox).values({
@@ -97,7 +97,7 @@ export async function flushNotify(rowId: string): Promise<void> {
         and(eq(notificationOutbox.id, rowId), eq(notificationOutbox.status, "pending"), isNull(notificationOutbox.providerRef)),
       )
       .returning()
-  )[0];
+  ).at(0);
   if (!row) return;
   if (row.scheduledFor && row.scheduledFor.getTime() > Date.now()) {
     await db.update(notificationOutbox).set({ providerRef: null }).where(eq(notificationOutbox.id, rowId));
@@ -168,7 +168,7 @@ export async function sendTestNotify(channel: string): Promise<{ ok: boolean; er
     chatId: ch.chatId,
     body: `job-scout test · ${channel} · ${new Date().toISOString()}`,
   });
-  const row = (await getDb().then((db) => db.select().from(notificationOutbox).where(eq(notificationOutbox.id, r.id)).limit(1)))[0];
+  const row = (await getDb().then((db) => db.select().from(notificationOutbox).where(eq(notificationOutbox.id, r.id)).limit(1))).at(0);
   if (!row) return { ok: false, error: "outbox row missing", chatId: ch.chatId };
   return { ok: row.status === "sent", error: row.error ?? undefined, chatId: ch.chatId };
 }

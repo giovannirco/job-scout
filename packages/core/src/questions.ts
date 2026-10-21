@@ -114,7 +114,7 @@ export async function harvestFromJob(positionId: string, job: AtsJob): Promise<{
   const successful = !job.formHarvestError && (job.questionPrompts !== undefined || job.questions !== undefined);
   const upserted = successful ? (await harvestQuestions(positionId, prompts)).upserted : 0;
   const db = await getDb();
-  const pos = (await db.select({ metadata: positions.metadata }).from(positions).where(eq(positions.id, positionId)).limit(1))[0];
+  const pos = (await db.select({ metadata: positions.metadata }).from(positions).where(eq(positions.id, positionId)).limit(1)).at(0);
   const prev = (pos?.metadata || {}) as Record<string, unknown>;
   const forms = { ...((prev.forms as Record<string, unknown>) || {}) };
   if (job.formHarvestError) forms.harvestError = job.formHarvestError;
@@ -131,7 +131,7 @@ export async function patchQuestion(questionId: string, patch: { answer?: string
   if (patch.answer !== undefined) set.answer = patch.answer;
   if (patch.status) set.status = patch.status;
   await db.update(applicationQuestions).set(set).where(eq(applicationQuestions.id, questionId));
-  return (await db.select().from(applicationQuestions).where(eq(applicationQuestions.id, questionId)).limit(1))[0] ?? null;
+  return (await db.select().from(applicationQuestions).where(eq(applicationQuestions.id, questionId)).limit(1)).at(0) ?? null;
 }
 
 export async function runFormAnswers(positionId: string) {

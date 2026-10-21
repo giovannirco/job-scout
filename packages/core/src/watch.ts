@@ -18,7 +18,7 @@ function watchableUrl(url: string | null) {
  */
 export async function checkWatch(watchId: string) {
   const db = await getDb();
-  const w = (await db.select().from(watches).where(eq(watches.id, watchId)).limit(1))[0];
+  const w = (await db.select().from(watches).where(eq(watches.id, watchId)).limit(1)).at(0);
   if (!w) throw new Error("watch not found");
   if (!watchableUrl(w.url)) return { skipped: "unsupported_url", positionId: w.positionId };
   const job = await fetchJobFromUrl(w.url);
@@ -70,7 +70,7 @@ async function fetchPositionJob(positionId: string) {
       .from(positions)
       .where(eq(positions.id, positionId))
       .limit(1)
-  )[0];
+  ).at(0);
   if (!p?.url) throw new Error("position has no URL");
   const detected = detectAts(p.url);
   if (detected.provider === "greenhouse" && detected.jobId && !detected.boardToken && p.atsBoardToken) {

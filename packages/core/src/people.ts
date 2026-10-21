@@ -46,7 +46,7 @@ export async function addPerson(companyId: string, input: PersonInput) {
     notes: trimOrNull(input.notes),
     metadata: {},
   });
-  const row = (await db.select(PERSON_ROW).from(people).where(eq(people.id, pid)))[0];
+  const row = (await db.select(PERSON_ROW).from(people).where(eq(people.id, pid))).at(0);
   if (!row) throw new Error("person insert failed");
   return row;
 }
@@ -59,7 +59,7 @@ export async function deletePerson(companyId: string, personId: string) {
       .from(people)
       .where(and(eq(people.id, personId), eq(people.companyId, companyId)))
       .limit(1)
-  )[0];
+  ).at(0);
   if (!row) return false;
   await db.delete(people).where(eq(people.id, personId));
   return true;

@@ -30,7 +30,7 @@ export function triageBriefOf(p: Profile): string {
 
 export async function getProfile(): Promise<Profile> {
   const db = await getDb();
-  const row = (await db.select().from(profiles).limit(1))[0];
+  const row = (await db.select().from(profiles).limit(1)).at(0);
   if (row) return row;
   const pid = id("prof");
   await db.insert(profiles).values({

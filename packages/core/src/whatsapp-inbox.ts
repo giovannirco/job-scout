@@ -132,7 +132,7 @@ async function ensureWhatsAppThread(): Promise<string> {
       .from(chatThreads)
       .where(and(eq(chatThreads.scope, "global"), eq(chatThreads.title, THREAD_TITLE), isNull(chatThreads.positionId)))
       .limit(1)
-  )[0];
+  ).at(0);
   if (existing?.id) return existing.id;
   const rowId = id("cht");
   await db.insert(chatThreads).values({ id: rowId, scope: "global", title: THREAD_TITLE, messages: [] });

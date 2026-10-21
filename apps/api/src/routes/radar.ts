@@ -28,7 +28,7 @@ radarRoutes.get("/discovery/summary", async (c) => ok(c, await discoverySummary(
 /** Promote a discovery row (usually filtered) into the pipeline: fetch JD, create position, triage. */
 radarRoutes.post("/discovery/:id/promote", async (c) => {
   const db = await getDb();
-  const row = (await db.select().from(discoveryFeed).where(eq(discoveryFeed.id, c.req.param("id"))).limit(1))[0];
+  const row = (await db.select().from(discoveryFeed).where(eq(discoveryFeed.id, c.req.param("id"))).limit(1)).at(0);
   if (!row) return fail(c, "NOT_FOUND", "discovery row not found");
   if (!row.url) return fail(c, "VALIDATION_ERROR", "row has no url");
   try {
@@ -54,7 +54,7 @@ radarRoutes.post("/boards", async (c) => {
     .insert(boardSources)
     .values({ id: bid, company: b.company, provider: b.provider, token: b.token, careersUrl: b.careersUrl ?? null, tags: b.tags ?? [], enabled: true, sourceKind: "ats", capability: "list_api" })
     .onConflictDoNothing();
-  const row = (await db.select().from(boardSources).where(eq(boardSources.id, bid)).limit(1))[0];
+  const row = (await db.select().from(boardSources).where(eq(boardSources.id, bid)).limit(1)).at(0);
   if (!row) return fail(c, "CONFLICT", "board with that provider/token already exists");
   await enqueueJob("board_scan", { boardId: bid, company: b.company }, { dedupeKey: `board_scan:${bid}`, priority: 50 });
   return ok(c, { ...row, errorKind: boardErrorKind(row.lastError) }, {}, 201);
@@ -69,13 +69,13 @@ radarRoutes.patch("/boards/:id", async (c) => {
   if (Array.isArray(b.tags)) set.tags = b.tags;
   if (!Object.keys(set).length) return fail(c, "VALIDATION_ERROR", "nothing to update");
   await db.update(boardSources).set(set).where(eq(boardSources.id, c.req.param("id")));
-  const row = (await db.select().from(boardSources).where(eq(boardSources.id, c.req.param("id"))).limit(1))[0];
+  const row = (await db.select().from(boardSources).where(eq(boardSources.id, c.req.param("id"))).limit(1)).at(0);
   return row ? ok(c, { ...row, errorKind: boardErrorKind(row.lastError) }) : fail(c, "NOT_FOUND", "board not found");
 });
 
 radarRoutes.post("/boards/:id/scan", async (c) => {
   const db = await getDb();
-  const row = (await db.select().from(boardSources).where(eq(boardSources.id, c.req.param("id"))).limit(1))[0];
+  const row = (await db.select().from(boardSources).where(eq(boardSources.id, c.req.param("id"))).limit(1)).at(0);
   if (!row) return fail(c, "NOT_FOUND", "board not found");
   const q = await enqueueJob("board_scan", { boardId: row.id, company: row.company, force: c.req.query("force") === "1" }, { dedupeKey: `board_scan:${row.id}`, priority: 40 });
   return ok(c, { jobId: q.id, deduped: q.deduped }, {}, 202);

@@ -50,12 +50,12 @@ export async function reconcileBoardSources({ dryRun = true } = {}) {
   const conflicts: string[] = [];
 
   for (const m of BOARD_MIGRATIONS) {
-    const src = (await db.select().from(boardSources).where(and(eq(boardSources.provider, m.from.provider), eq(boardSources.token, m.from.token))).limit(1))[0];
+    const src = (await db.select().from(boardSources).where(and(eq(boardSources.provider, m.from.provider), eq(boardSources.token, m.from.token))).limit(1)).at(0);
     if (!src) continue;
     // The unique index is (provider, token): if the destination already exists as
     // its own row, moving this one would collide. Demote the stale row instead so
     // the scanner stops calling a dead endpoint, and keep both histories.
-    const dest = (await db.select({ id: boardSources.id }).from(boardSources).where(and(eq(boardSources.provider, m.to.provider), eq(boardSources.token, m.to.token))).limit(1))[0];
+    const dest = (await db.select({ id: boardSources.id }).from(boardSources).where(and(eq(boardSources.provider, m.to.provider), eq(boardSources.token, m.to.token))).limit(1)).at(0);
     if (dest && dest.id !== src.id) {
       conflicts.push(`${m.company}: ${m.to.provider}/${m.to.token} already exists as ${dest.id}`);
       if (!dryRun) {
@@ -78,7 +78,7 @@ export async function reconcileBoardSources({ dryRun = true } = {}) {
   }
 
   for (const u of UNSUPPORTED_BOARDS) {
-    const src = (await db.select().from(boardSources).where(and(eq(boardSources.provider, u.provider), eq(boardSources.token, u.token), ne(boardSources.capability, "manual_watch"))).limit(1))[0];
+    const src = (await db.select().from(boardSources).where(and(eq(boardSources.provider, u.provider), eq(boardSources.token, u.token), ne(boardSources.capability, "manual_watch"))).limit(1)).at(0);
     if (!src) continue;
     demoted.push(`${u.company}: ${u.provider}/${u.token} -> manual_watch`);
     if (!dryRun) {

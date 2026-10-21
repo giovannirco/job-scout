@@ -55,7 +55,7 @@ async function nextVersion(db: MaterialDb, positionId: string, kind: string) {
       .select({ v: sql<number>`coalesce(max(${applicationMaterials.version}),0)::int` })
       .from(applicationMaterials)
       .where(and(eq(applicationMaterials.positionId, positionId), eq(applicationMaterials.kind, kind)))
-  )[0];
+  ).at(0);
   return (r?.v ?? 0) + 1;
 }
 
@@ -142,7 +142,7 @@ export async function runMaterials(positionId: string, opts: { surface?: string 
     || currentProfile.masterCoverMarkdown !== profile.masterCoverMarkdown
     || JSON.stringify(currentProfile.resumeSurfaces) !== JSON.stringify(profile.resumeSurfaces);
   const completion = await db.transaction(async tx => {
-    const current = (await tx.select().from(positions).where(eq(positions.id, pos.id)).for("update"))[0];
+    const current = (await tx.select().from(positions).where(eq(positions.id, pos.id)).for("update")).at(0);
     if (!current) throw new Error("position removed during materials generation");
     const currentMaterials = await tx.select({ id: applicationMaterials.id, kind: applicationMaterials.kind }).from(applicationMaterials).where(and(eq(applicationMaterials.positionId, pos.id), eq(applicationMaterials.isCurrent, true)));
     const stale = profileChanged || current.updatedAt.getTime() !== pos.updatedAt.getTime()

@@ -285,7 +285,7 @@ export async function resolveApproval(approvalId: string, decision: "approved" |
   // Lock both records: approval resolution and the position transition are one action.
   // An old suggestion is not authority to resurrect an archived/closed job or regress an application.
   return db.transaction(async (tx) => {
-    const row = (await tx.select().from(approvals).where(eq(approvals.id, approvalId)).limit(1).for("update"))[0];
+    const row = (await tx.select().from(approvals).where(eq(approvals.id, approvalId)).limit(1).for("update")).at(0);
     if (!row) throw new Error("approval not found");
     if (row.status !== "pending") return { id: row.id, status: row.status, applied: false };
     let applied = false;
@@ -300,7 +300,7 @@ export async function resolveApproval(approvalId: string, decision: "approved" |
       else if (!["triaged", "review", ...(row.kind === "materials_draft" ? ["materials"] : [])].includes(pos.status)) staleReason = "operator_already_decided";
       else if (row.kind === "status_suggestion" && p.toStatus !== "materials") staleReason = "unsupported_transition";
       if (!staleReason && pos && typeof p.evaluationId === "string") {
-        const latest = (await tx.select().from(evaluations).where(and(eq(evaluations.positionId, pos.id), eq(evaluations.kind, "evaluate"))).orderBy(desc(evaluations.createdAt), desc(evaluations.id)).limit(1))[0];
+        const latest = (await tx.select().from(evaluations).where(and(eq(evaluations.positionId, pos.id), eq(evaluations.kind, "evaluate"))).orderBy(desc(evaluations.createdAt), desc(evaluations.id)).limit(1)).at(0);
         if (latest?.id !== p.evaluationId) staleReason = "evaluation_superseded";
       }
       if (staleReason) status = "expired";

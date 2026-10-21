@@ -92,7 +92,7 @@ export function hardDisqualifierKinds(text: string | null | undefined): HardDisq
 
 /** Classify one hard-disqualifier or archive-reason phrase. null = not a hard disqualifier (skill gap, fit, score). */
 export function hardDisqualifierKind(text: string | null | undefined): HardDisqualifierKind | null {
-  return hardDisqualifierKinds(text)[0] ?? null;
+  return hardDisqualifierKinds(text).at(0) ?? null;
 }
 
 /** Posted pay as a yearly USD maximum, or null when unknown or not USD. */

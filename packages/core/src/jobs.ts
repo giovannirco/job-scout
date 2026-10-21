@@ -23,7 +23,7 @@ export async function enqueueJob(
           ),
         )
         .limit(1)
-    )[0];
+    ).at(0);
     if (dup) return { id: dup.id, deduped: true };
     payload = { ...payload, dedupeKey: opts.dedupeKey };
   }
@@ -95,7 +95,7 @@ export async function settleExpectedQueueFailures(): Promise<{ cleared: number }
     if (row.type === "scan_url" && /insert into "companies"/i.test(err)) {
       const url = String((row.payload as { url?: string } | null)?.url || "");
       if (!url) continue;
-      const filed = (await db.select({ id: positions.id }).from(positions).where(eq(positions.primaryUrl, url)).limit(1))[0];
+      const filed = (await db.select({ id: positions.id }).from(positions).where(eq(positions.primaryUrl, url)).limit(1)).at(0);
       if (!filed) continue;
       await completeJob(row.id, { skipped: "company_race" });
       cleared++;

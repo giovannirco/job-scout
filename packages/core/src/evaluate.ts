@@ -76,7 +76,7 @@ export async function runEvaluate(positionId: string, opts: { auto?: boolean } =
   // Never hold a database lock during the model call. Revalidate under lock when
   // it returns; keep the report even when an operator decision superseded it.
   const completion = await db.transaction(async tx => {
-    const current = (await tx.select().from(positions).where(eq(positions.id, pos.id)).limit(1).for("update"))[0];
+    const current = (await tx.select().from(positions).where(eq(positions.id, pos.id)).limit(1).for("update")).at(0);
     if (!current) throw new Error("position removed during evaluation");
     const stale = profileChanged || current.updatedAt.getTime() !== pos.updatedAt.getTime()
       || current.status !== pos.status || current.listingStatus !== pos.listingStatus || current.contentHash !== pos.contentHash

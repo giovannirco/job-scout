@@ -304,7 +304,7 @@ describe("core on pglite", () => {
     });
     const result = await regateRecentDiscovery();
     expect(result.nowPassed).toBeGreaterThanOrEqual(1);
-    const row = (await db.select().from(discoveryFeed).where(eq(discoveryFeed.id, rowId)))[0];
+    const row = (await db.select().from(discoveryFeed).where(eq(discoveryFeed.id, rowId))).at(0);
     expect(row?.lane).toBe("passed");
     const queued = await db.select({ payload: jobs.payload, priority: jobs.priority }).from(jobs).where(eq(jobs.type, "scan_url"));
     const mine = queued.find((r) => (r.payload as { url?: string }).url?.includes("java-regate"));
@@ -340,7 +340,7 @@ describe("core on pglite", () => {
     const synced = await syncGateFromTargetRoles(["Java Engineer"]);
     expect(synced?.titleInclude).toEqual(["java engineer", "java"]);
     expect((await getSettings({ fresh: true })).gate.titleInclude).toEqual(["java engineer", "java"]);
-    const row = (await db.select().from(discoveryFeed).where(eq(discoveryFeed.id, rowId)))[0];
+    const row = (await db.select().from(discoveryFeed).where(eq(discoveryFeed.id, rowId))).at(0);
     expect(row?.lane).toBe("passed");
   });
 
@@ -461,7 +461,7 @@ describe("core on pglite", () => {
     expect(result.withdrawn).toBeGreaterThanOrEqual(1);
     expect((await getPosition(office.position.id))?.status).toBe("archived");
     expect((await getPosition(office.position.id))?.archiveReason).toBe("left the location gate (geo_block:onsite)");
-    const officeFeed = (await db.select().from(discoveryFeed).where(eq(discoveryFeed.positionId, office.position.id)))[0];
+    const officeFeed = (await db.select().from(discoveryFeed).where(eq(discoveryFeed.positionId, office.position.id))).at(0);
     expect(officeFeed?.lane).toBe("filtered");
     expect(officeFeed?.gateReason).toBe("geo_block:onsite");
     expect((await getPosition(remote.position.id))?.status).toBe("triaged");
@@ -603,7 +603,7 @@ describe("core on pglite", () => {
         .select()
         .from(applicationQuestions)
         .where(and(eq(applicationQuestions.positionId, position.id), eq(applicationQuestions.question, "Name")))
-    )[0];
+    ).at(0);
     expect(again?.answer).toBe("Alex");
     expect(again?.status).toBe("answered");
     const { listQuestions, harvestFromJob } = await import("./questions.js");
@@ -851,7 +851,7 @@ describe("core on pglite", () => {
     await db.update(positions).set({ workplace: "unknown", geoClass: "unknown" }).where(eq(positions.id, archived.position.id));
     const r = await backfillListingFacts({ force: true });
     expect(r.archivedSkipped).toBeGreaterThanOrEqual(1);
-    const again = (await db.select().from(positions).where(eq(positions.id, archived.position.id)))[0];
+    const again = (await db.select().from(positions).where(eq(positions.id, archived.position.id))).at(0);
     expect(again?.workplace).toBe("unknown");
   });
 
@@ -872,7 +872,7 @@ describe("core on pglite", () => {
           .select()
           .from(boardSources)
           .where(and(eq(boardSources.token, "remoteok"), eq(boardSources.provider, "remoteok")))
-      )[0];
+      ).at(0);
       expect(remote).toBeTruthy();
       expect(remote?.capability).toBe("list_api");
       expect(remote?.enabled).toBe(true);
@@ -886,7 +886,7 @@ describe("core on pglite", () => {
           .select()
           .from(boardSources)
           .where(and(eq(boardSources.token, "weworkremotely"), eq(boardSources.provider, "market")))
-      )[0];
+      ).at(0);
       expect(wwr).toBeTruthy();
       expect(wwr?.capability).toBe("list_api");
       expect(wwr?.enabled).toBe(true);
@@ -895,7 +895,7 @@ describe("core on pglite", () => {
           .select()
           .from(boardSources)
           .where(and(eq(boardSources.token, "remotive"), eq(boardSources.provider, "market")))
-      )[0];
+      ).at(0);
       expect(remotive).toBeTruthy();
       expect(remotive?.capability).toBe("list_api");
       expect(remotive?.enabled).toBe(true);
@@ -926,7 +926,7 @@ describe("core on pglite", () => {
           .select()
           .from(boardSources)
           .where(and(eq(boardSources.token, "remoteok"), eq(boardSources.provider, "remoteok")))
-      )[0];
+      ).at(0);
       expect(remote).toBeTruthy();
       await db.delete(jobs).where(eq(jobs.type, "board_scan"));
       const scanned = new Date(Date.now() - 2 * 60 * 60 * 1000);

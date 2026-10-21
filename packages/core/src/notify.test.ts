@@ -62,7 +62,7 @@ describe("flushNotify", () => {
     await racing;
 
     expect(sent).toEqual(["job-scout test · desk · race"]);
-    const row = (await db.select().from(notificationOutbox).where(eq(notificationOutbox.id, rowId)))[0];
+    const row = (await db.select().from(notificationOutbox).where(eq(notificationOutbox.id, rowId))).at(0);
     expect(row?.status).toBe("sent");
   });
 });

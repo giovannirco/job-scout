@@ -99,7 +99,7 @@ export async function totalsToday(): Promise<{ calls: number; tokens: number }> 
       })
       .from(llmRuns)
       .where(gte(llmRuns.createdAt, start))
-  )[0];
+  ).at(0);
   return { calls: r?.calls ?? 0, tokens: r?.tokens ?? 0 };
 }
 
@@ -343,7 +343,7 @@ export async function getLlmRun(runId: string) {
       .leftJoin(positions, eq(llmRuns.positionId, positions.id))
       .where(eq(llmRuns.id, runId))
       .limit(1)
-  )[0];
+  ).at(0);
   if (!row) return null;
   return {
     ...row.run,
