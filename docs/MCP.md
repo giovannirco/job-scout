@@ -10,6 +10,14 @@ The API includes an MCP server for reading positions, managing the pipeline and 
 | **Payloads** | JSON, with a 100 KB UTF-8 result limit. Oversized results return `isError: true` with `RESULT_TOO_LARGE`; request fewer rows or narrower filters. JSON is never cut mid-response |
 | **Code** | `apps/api/src/mcp/server.ts` (tools) · `apps/api/src/mcp/handler.ts` (HTTP + auth) |
 
+## Paging
+
+`list_positions` and `list_changes` page with an opaque `nextCursor`. Pass it back unchanged as `cursor`, with the same filters and sort, until it is `null`. A cursor replayed with other filters or another sort is refused with `code: "invalid_cursor"`; so is an old-style `timestamp|id` cursor. `list_positions` cursors work with every `sort`: the default `updated_desc` (and `updated_asc`) page by keyset on `(updatedAt, id)` at full database precision, so rows that share a timestamp are neither skipped nor repeated; other sorts page by offset over a total order (`id` breaks ties). A row whose sort key changes between pages can move; for a full enumeration prefer `first_seen_asc`, which background checks do not change.
+
+Rows are lean by default. `list_positions` rows carry `id`, `slug`, `title`, `company` (`slug`, `name`), `status`, `archiveReason`, `priority`, `primaryUrl`, `triageScore`, `triageVerdict`, `triageOneLiner`, `listingStatus`, `geoClass`, `workplace`, `appliedAt`, `lastChangedAt`, `updatedAt`, `careerOps` (tracker id, score, status, report path, sync times), `duplicateOfId`, `triageStale` and `careerOpsStale`. `fields: "full"` adds salary, `locationRaw`, `departments`, `postedAt`, repost, ATS, family and duplicate-count fields. Neither includes `triageJson` or JD text: use `get_position` or `scout_context`.
+
+Each page is cut to about 80 KB of rows so it stays under the result limit. A cut page has `truncated: true`, fewer rows than `pageSize`, and a `nextCursor` that resumes after its last row. `total` counts the whole result, not the page.
+
 ## Tools
 
 ### Read
@@ -18,7 +26,7 @@ The API includes an MCP server for reading positions, managing the pipeline and 
 |--|--|
 | `server_info` | identity, version, endpoints, LLM status |
 | `market_summary` | counts by status/verdict, discovery lanes for the last N hours, LLM usage |
-| `list_positions` | slim rows; `status` (comma list, `hot`, `active`, `all`), `verdict`, `q`, `company`, `minScore`, `sort`, cursor pagination |
+| `list_positions` | lean rows; `status` (comma list, `hot`, `active`, `all`), `verdict`, `q`, `company`, `minScore`, `sort`, `fields`, cursor pagination. See [Paging](#paging) |
 | `get_position` | full detail: company, current JD text, revisions, evaluations, materials |
 | `scout_context` | everything to reason about one role: position, triage JSON, JD text, latest evaluation summary, profile brief |
 | `get_evaluation` | latest markdown + JSON for `evaluate` / `jd_review` / `company_research` |

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, gte, ilike, inArray, notInArray, lt, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, ilike, inArray, notInArray, or, sql, type SQL } from "drizzle-orm";
 import {
   applicationMaterials,
   applicationQuestions,
@@ -41,6 +41,7 @@ import { hasMaterials, MaterialsMissingError, refreshedCareerOpsStamp } from "./
 import { jdChanges, watchChecks, ingestQuality } from "./metrics.js";
 import { careerStamp, groupingRows, groupRows, groupSummary, repostFor, terminalCareerStatus, validOperatorRow } from "./position-groups.js";
 import { getProfile, profileFingerprint } from "./profile.js";
+import { decodeCursor, encodeCursor, filterFingerprint } from "./list-cursor.js";
 import { log as rootLog } from "@job-scout/shared";
 const log = rootLog.child({ scope: "positions" });
 
@@ -101,7 +102,7 @@ const LIST_ROW = {
 export type ListPositionsQuery = {
   page?: string;
   pageSize?: string;
-  /** cursor = updatedAt ISO|id from previous page (for MCP) */
+  /** Opaque nextCursor from the previous page (any sort); bound to the sort and filters it was issued for. */
   cursor?: string;
   status?: string; // comma list; "hot" alias; "active" = not archived
   verdict?: string; // comma list
@@ -200,30 +201,38 @@ export async function listPositions(q: ListPositionsQuery) {
       )!);
     }
   }
-  if (q.cursor) {
-    if (q.sort && q.sort !== "updated_desc") throw new Error("cursor requires sort=updated_desc; use page for other sorts");
-    const [ts, cid] = q.cursor.split("|");
-    const d = new Date(ts);
-    if (!Number.isNaN(d.getTime())) {
-      conds.push(or(lt(positions.updatedAt, d), and(eq(positions.updatedAt, d), lt(positions.id, cid || "")))!);
-    }
-  }
-
-  const where = conds.length ? and(...conds) : undefined;
   const { field, dir } = parseListSort(
     q.sort,
     ["updated", "score", "company", "status", "first_seen", "last_changed", "posted", "title", "workplace", "geo", "location"],
     "updated",
     "desc",
   );
+  // Cursor paging works for every sort. updated_* pages by keyset on (updated_at, id), compared at
+  // full database precision; the other sorts page by offset over a total order (id breaks ties).
+  const sortKey = `${field}_${dir}`;
+  const fingerprint = filterFingerprint({ ...q, page: undefined, pageSize: undefined, cursor: undefined, sort: undefined });
+  // geoClass=home filters in memory after the query, so it pages by offset to keep `total` whole.
+  const keyset = field === "updated" && !homeOnly;
+  const cursor = q.cursor ? decodeCursor(q.cursor, { s: sortKey, f: fingerprint }) : null;
+  let offset = cursor ? 0 : (page - 1) * pageSize;
+  // `where` counts the whole result; `pageWhere` adds the keyset position for this page.
+  const where = conds.length ? and(...conds) : undefined;
+  let pageWhere = where;
+  if (cursor?.k && keyset) {
+    const [ts, cid] = cursor.k;
+    pageWhere = and(...conds, dir === "asc"
+      ? sql`(${positions.updatedAt}, ${positions.id}) > (${ts}::timestamptz, ${cid})`
+      : sql`(${positions.updatedAt}, ${positions.id}) < (${ts}::timestamptz, ${cid})`);
+  } else if (cursor) offset = cursor.o ?? 0;
+
   const d = <T>(col: T) => (dir === "asc" ? asc(col as never) : desc(col as never));
   const order =
     field === "score"
       ? [d(sql`coalesce(${positions.triageScore}, -1)`), desc(positions.updatedAt), desc(positions.id)]
       : field === "company"
-        ? [d(companies.name), desc(positions.updatedAt)]
+        ? [d(companies.name), desc(positions.updatedAt), desc(positions.id)]
         : field === "status"
-          ? [d(positions.status), desc(positions.updatedAt)]
+          ? [d(positions.status), desc(positions.updatedAt), desc(positions.id)]
           : field === "first_seen"
             ? [d(positions.firstSeenAt), desc(positions.id)]
             : field === "last_changed"
@@ -238,26 +247,28 @@ export async function listPositions(q: ListPositionsQuery) {
             : field === "title"
               ? [d(positions.title), desc(positions.id)]
               : field === "workplace"
-                ? [d(positions.workplace), desc(positions.updatedAt)]
+                ? [d(positions.workplace), desc(positions.updatedAt), desc(positions.id)]
                 : field === "geo"
-                  ? [d(positions.geoClass), desc(positions.updatedAt)]
+                  ? [d(positions.geoClass), desc(positions.updatedAt), desc(positions.id)]
                   : field === "location"
                     ? [
                         d(
                           sql`(select jr.location_raw from jd_revisions jr where jr.position_id = ${positions.id} order by jr.revision desc limit 1)`,
                         ),
                         desc(positions.updatedAt),
+                        desc(positions.id),
                       ]
-                    : [d(positions.updatedAt), desc(positions.id)];
+                    : [d(positions.updatedAt), d(positions.id)];
 
   const query = db
-    .select(LIST_ROW)
+    .select({ ...LIST_ROW, cursorTs: sql<string>`${positions.updatedAt}::text` })
     .from(positions)
     .innerJoin(companies, eq(positions.companyId, companies.id))
-    .where(where)
+    .where(pageWhere)
     .orderBy(...order)
     .$dynamic();
-  const queried = await (homeOnly ? query : query.limit(pageSize).offset(q.cursor ? 0 : (page - 1) * pageSize));
+  // One extra row says whether another page exists.
+  const queried = await (homeOnly ? query : query.limit(pageSize + 1).offset(offset));
 
   let listed = queried;
   let total = 0;
@@ -265,8 +276,7 @@ export async function listPositions(q: ListPositionsQuery) {
     const home = profile.location || "";
     const matched = homeMarket(home) ? queried.filter((row) => listedAtHome(row.geoClass, row.locationRaw, home)) : [];
     total = matched.length;
-    const start = q.cursor ? 0 : (page - 1) * pageSize;
-    listed = matched.slice(start, start + pageSize);
+    listed = matched.slice(offset, offset + pageSize + 1);
   } else {
     total = (
       await db
@@ -276,14 +286,17 @@ export async function listPositions(q: ListPositionsQuery) {
         .where(where)
     )[0]?.c ?? 0;
   }
-  const rows = listed;
-
-  const last = rows[rows.length - 1];
-  const nextCursor = field === "updated" && dir === "desc" && rows.length === pageSize && last ? `${last.updatedAt.toISOString()}|${last.id}` : null;
-  return { items: rows.map(row => ({ ...row, ...summaries.get(row.id),
+  const hasMore = listed.length > pageSize;
+  const rows = listed.slice(0, pageSize);
+  // cursors[i] resumes right after rows[i], so a caller that keeps only part of a page can continue.
+  const cursors = rows.map((row, i) => encodeCursor(keyset
+    ? { s: sortKey, f: fingerprint, k: [row.cursorTs, row.id] }
+    : { s: sortKey, f: fingerprint, o: offset + i + 1 }));
+  const nextCursor = hasMore ? cursors[cursors.length - 1] ?? null : null;
+  return { items: rows.map(({ cursorTs: _cursorTs, ...row }) => ({ ...row, ...summaries.get(row.id),
     triageStale: !!row.triagedAt && row.triageProfileHash !== profileHash,
     careerOpsStale: !!row.careerOps?.trackerUpdatedAt && (!row.careerOps.syncedAt || String(row.careerOps.trackerUpdatedAt) > String(row.careerOps.syncedAt)),
-  })), page, pageSize, total, nextCursor };
+  })), page, pageSize, total, nextCursor, cursors };
 }
 
 export async function getPosition(idOrSlug: string) {

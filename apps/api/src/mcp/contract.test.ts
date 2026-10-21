@@ -3,11 +3,12 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import bcrypt from "bcryptjs";
-import { eq } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { apiTokens, closeDb, getDb, positions } from "@job-scout/db";
 import { bootstrap, upsertFromJob } from "@job-scout/core";
 import { env } from "../env.js";
 import { handleMcpHttp } from "./handler.js";
+import { fitPage } from "./page.js";
 
 const dir = mkdtempSync(join(tmpdir(), "job-scout-mcp-contract-"));
 const original = { ...env };
@@ -99,6 +100,85 @@ describe("MCP contract", () => {
       const bad = await call("upsert_interview", { idOrSlug: p.id, status: "postponed" });
       expect(bad.isError).toBe(true);
       expect(bad.data.error).toMatch(/scheduled/);
+    });
+  });
+
+  describe("list_positions paging", () => {
+    const ids: string[] = [];
+    beforeAll(async () => {
+      for (let i = 0; i < 12; i++) ids.push((await position({ title: `Paging Probe Engineer ${String(i).padStart(2, "0")}` })).id);
+      const db = await getDb();
+      // Ties at microsecond precision: the cursor must not drop or repeat rows that share updated_at.
+      await db.update(positions).set({ updatedAt: sql`'2026-01-01 00:00:00.123456+00'::timestamptz` }).where(inArray(positions.id, ids.slice(0, 6)));
+      await db.update(positions).set({ updatedAt: sql`'2026-01-01 00:00:00.123999+00'::timestamptz`, triageScore: 4.2 }).where(inArray(positions.id, ids.slice(6, 9)));
+    });
+
+    async function drain(args: Record<string, unknown>) {
+      const seen: string[] = [];
+      let cursor: string | undefined;
+      let pages = 0;
+      do {
+        const r = await call("list_positions", { q: "Paging Probe", pageSize: 5, ...args, ...(cursor ? { cursor } : {}) });
+        expect(r.isError).toBe(false);
+        expect(r.data.total).toBe(12);
+        seen.push(...r.data.items.map((x: { id: string }) => x.id));
+        cursor = r.data.nextCursor ?? undefined;
+        pages++;
+      } while (cursor && pages < 10);
+      return { seen, pages };
+    }
+
+    it.each([{}, { sort: "score_desc" }, { sort: "title_asc" }, { sort: "updated_asc" }, { sort: "first_seen_asc" }])("visits every row exactly once with %o", async (args) => {
+      const { seen, pages } = await drain(args);
+      expect(pages).toBe(3);
+      expect(seen).toHaveLength(12);
+      expect(new Set(seen)).toEqual(new Set(ids));
+    });
+
+    it("returns nextCursor while rows remain and null on the last page", async () => {
+      const first = await call("list_positions", { q: "Paging Probe", pageSize: 12 });
+      expect(first.data.items).toHaveLength(12);
+      expect(first.data.nextCursor).toBeNull();
+      const partial = await call("list_positions", { q: "Paging Probe", pageSize: 11 });
+      expect(typeof partial.data.nextCursor).toBe("string");
+    });
+
+    it("lean rows leave out heavy fields; fields=full keeps them", async () => {
+      const lean = await call("list_positions", { q: "Paging Probe", pageSize: 1 });
+      const row = lean.data.items[0];
+      expect(row).toMatchObject({ id: expect.any(String), slug: expect.any(String), status: "review", company: { name: expect.any(String) } });
+      for (const k of ["triageJson", "metadata", "departments", "locationRaw", "salaryMin", "repost", "postedAt"]) expect(row).not.toHaveProperty(k);
+      const full = await call("list_positions", { q: "Paging Probe", pageSize: 1, fields: "full" });
+      expect(full.data.items[0]).toHaveProperty("locationRaw");
+      expect(full.data.items[0]).not.toHaveProperty("triageJson");
+    });
+
+    it("refuses a cursor replayed with other filters or sort", async () => {
+      const first = await call("list_positions", { q: "Paging Probe", pageSize: 5 });
+      const other = await call("list_positions", { q: "Paging Probe", pageSize: 5, sort: "score_desc", cursor: first.data.nextCursor });
+      expect(other.isError).toBe(true);
+      expect(other.data.code).toBe("invalid_cursor");
+      const garbage = await call("list_positions", { q: "Paging Probe", cursor: "not-a-cursor" });
+      expect(garbage).toMatchObject({ isError: true, data: { code: "invalid_cursor" } });
+    });
+
+    it("fitPage cuts a page to the byte budget and resumes after the last row kept", () => {
+      const rows = Array.from({ length: 10 }, (_, i) => ({ id: `r${i}`, pad: "x".repeat(100) }));
+      const cursors = rows.map((r) => `after-${r.id}`);
+      const cut = fitPage(rows, cursors, "after-r9", 400);
+      expect(cut.truncated).toBe(true);
+      expect(cut.items.length).toBe(3);
+      expect(cut.nextCursor).toBe("after-r2");
+      expect(fitPage(rows, cursors, null, 1_000_000)).toEqual({ items: rows, nextCursor: null, truncated: false });
+      expect(fitPage(rows, cursors, null, 10).items).toHaveLength(1);
+    });
+
+    it("a large page stays under the result cap", async () => {
+      const db = await getDb();
+      await db.update(positions).set({ notes: "n".repeat(5_000) }).where(inArray(positions.id, ids));
+      const r = await call("list_positions", { q: "Paging Probe", pageSize: 200, fields: "full" });
+      expect(r.isError).toBe(false);
+      expect(r.bytes).toBeLessThan(100_000);
     });
   });
 });

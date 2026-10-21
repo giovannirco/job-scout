@@ -40,4 +40,5 @@ export * from "./decision-events.js";
 export * from "./jd-repair.js";
 export * from "./pipeline-integrity.js";
 export * from "./slug-repair.js";
+export * from "./list-cursor.js";
 export * from "./threat-intel.js";

@@ -34,6 +34,7 @@ import {
   usageSummary,
   retryFailedLlm,
   LlmGateError,
+  CursorError,
   getCurrentMaterial,
   listEvents,
   briefOf,
@@ -53,6 +54,7 @@ import { log as rootLog } from "@job-scout/shared";
 import { env } from "../env.js";
 import { text } from "./result.js";
 import { interviewSummary, positionSummary } from "./summary.js";
+import { fitPage, leanRow } from "./page.js";
 import { workQueue, WorkQueueInput } from "./work-queue.js";
 
 type ToolAuth = { clientId?: string; scopes?: string[]; extra?: Record<string, unknown> };
@@ -79,7 +81,7 @@ type Summarizable = Parameters<typeof positionSummary>[0];
 /** Write echo: compact by default, the full position row with verbose. */
 const echo = (p: Summarizable | null | undefined, verbose?: boolean) => (p ? text(verbose ? p : positionSummary(p)) : text({ error: "not found" }, true));
 
-const errText = (e: unknown) => text({ error: e instanceof Error ? e.message : String(e), code: e instanceof LlmGateError ? e.code : undefined }, true);
+const errText = (e: unknown) => text({ error: e instanceof Error ? e.message : String(e), code: e instanceof LlmGateError || e instanceof CursorError ? e.code : undefined }, true);
 
 async function resolvePositionId(idOrSlug?: string, q?: string) {
   if (idOrSlug) {
@@ -153,7 +155,7 @@ export function createJobScoutMcpServer() {
     "list_positions",
     {
       title: "List positions",
-      description: "Slim rows. Filters: status (comma list, 'hot', 'active', 'all' incl. archived), verdict (pass|marginal|fail|none), q, company, minScore, sort (updated_desc|score_desc|company|status|first_seen_desc|last_changed_desc), includeArchived. Cursor pagination via nextCursor.",
+      description: "Lean rows by default (id, slug, title, company, status, priority, primaryUrl, triage score/verdict/oneLiner, listingStatus, geoClass, workplace, appliedAt, lastChangedAt, updatedAt, careerOps stamp); fields=full adds salary, location, departments, repost and ATS fields. Never includes triageJson or JD text (use get_position). Filters: status (comma list, 'hot', 'active', 'all' incl. archived), verdict (pass|marginal|fail|none), q, company, minScore, sort (updated_desc|score_desc|company|status|first_seen_desc|last_changed_desc|title_asc|...), includeArchived. Paging: pass nextCursor back as cursor with the same filters and sort until it is null; works for every sort. A page is cut to stay under the result size limit (truncated=true) and nextCursor then resumes after the last row returned. For a full sync use the default sort or first_seen_asc.",
       inputSchema: {
         status: z.string().optional(),
         verdict: z.string().optional(),
@@ -167,31 +169,39 @@ export function createJobScoutMcpServer() {
         listingStatus: z.string().optional(),
         geoClass: z.string().optional(),
         staleProfile: z.boolean().optional(),
-        pageSize: z.number().int().min(1).max(200).optional(),
-        cursor: z.string().optional(),
+        pageSize: z.number().int().min(1).max(200).optional().describe("Rows per page, default 50. Large pages are cut to the result size limit; follow nextCursor"),
+        cursor: z.string().optional().describe("nextCursor from the previous page, unchanged"),
         page: z.number().int().positive().optional(),
+        fields: z.enum(["lean", "full"]).optional().describe("lean (default) or full row projection"),
       },
       annotations: { readOnlyHint: true },
     },
     async (a) => {
-      const r = await listPositions({
-        status: a.status,
-        verdict: a.verdict,
-        q: a.q,
-        company: a.company,
-        minScore: a.minScore != null ? String(a.minScore) : undefined,
-        sort: a.sort,
-        includeArchived: a.includeArchived ? "true" : undefined,
-        includeDuplicates: a.includeDuplicates ? "true" : undefined,
-        collapseFamilies: a.collapseFamilies ? "true" : undefined,
-        listingStatus: a.listingStatus,
-        geoClass: a.geoClass,
-        staleProfile: a.staleProfile ? "true" : undefined,
-        pageSize: String(a.pageSize ?? 50),
-        cursor: a.cursor,
-        page: a.page ? String(a.page) : undefined,
-      });
-      return text({ items: r.items, total: r.total, nextCursor: r.nextCursor });
+      let r;
+      try {
+        r = await listPositions({
+          status: a.status,
+          verdict: a.verdict,
+          q: a.q,
+          company: a.company,
+          minScore: a.minScore != null ? String(a.minScore) : undefined,
+          sort: a.sort,
+          includeArchived: a.includeArchived ? "true" : undefined,
+          includeDuplicates: a.includeDuplicates ? "true" : undefined,
+          collapseFamilies: a.collapseFamilies ? "true" : undefined,
+          listingStatus: a.listingStatus,
+          geoClass: a.geoClass,
+          staleProfile: a.staleProfile ? "true" : undefined,
+          pageSize: String(a.pageSize ?? 50),
+          cursor: a.cursor,
+          page: a.page ? String(a.page) : undefined,
+        });
+      } catch (e) {
+        return errText(e);
+      }
+      const rows = a.fields === "full" ? r.items : r.items.map(leanRow);
+      const page = fitPage(rows, r.cursors, r.nextCursor);
+      return text({ items: page.items, total: r.total, pageSize: r.pageSize, nextCursor: page.nextCursor, ...(page.truncated ? { truncated: true } : {}) });
     },
   );
 
