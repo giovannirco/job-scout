@@ -14,10 +14,12 @@ import { decisionListingOf, sameJevConfig, tryDecision } from "./decisions.js";
 import { fastTriageOutput } from "./fast-triage.js";
 
 /** Score one position and record the result. */
-export async function runTriage(positionId: string, opts: { force?: boolean; refreshOnly?: boolean } = {}) {
+export async function runTriage(positionId: string, opts: { force?: boolean; refreshOnly?: boolean; retry?: boolean } = {}) {
   const pos = await getPosition(positionId);
   if (!pos) throw new Error("position not found");
-  if (opts.refreshOnly && (!["triaged", "review"].includes(pos.status) || pos.listingStatus === "closed" || pos.metadata?.quarantined))
+  // A retry after a discarded first score rechecks eligibility like a refresh, but
+  // keeps the first triage's archive, autopilot and notification effects.
+  if ((opts.refreshOnly || opts.retry) && (!["triaged", "review"].includes(pos.status) || pos.listingStatus === "closed" || pos.metadata?.quarantined))
     return { skipped: true as const, reason: "position_no_longer_eligible", verdict: pos.triageVerdict };
   const profile = await getProfile();
   if (pos.triagedAt && pos.triageJson?.profileHash === profileFingerprint(profile) && !opts.force) return { skipped: true as const, reason: "already triaged", verdict: pos.triageVerdict };

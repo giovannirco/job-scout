@@ -53,7 +53,7 @@ export async function processJob(job: JobRow): Promise<Record<string, unknown>> 
       return { positionId: r.position.id, created: r.created, triageJobId: r.triageJobId };
     }
     case "triage":
-      return (await runTriage(String(p.positionId), { force: Boolean(p.force), refreshOnly: Boolean(p.refreshOnly) })) as unknown as Record<string, unknown>;
+      return (await runTriage(String(p.positionId), { force: Boolean(p.force), refreshOnly: Boolean(p.refreshOnly), retry: Boolean(p.retry) })) as unknown as Record<string, unknown>;
     case "evaluate":
       return await runEvaluate(String(p.positionId), { auto: Boolean(p.auto) });
     case "materials":
@@ -122,7 +122,7 @@ export function startWorker(opts: WorkerOptions = {}) {
       if (job.type === "triage" && result.reason === "position_changed" && result.retryable === true) {
         if (job.attempts >= 3) throw new Error("Position kept changing during triage; retry limit reached.");
         await failJob(job.id, "Position changed during triage; retrying with current evidence.", {
-          retryInMs: 30_000, payload: { ...job.payload, refreshOnly: true },
+          retryInMs: 30_000, payload: { ...job.payload, retry: true },
         });
         jobDuration.labels({ type: job.type }).observe((Date.now() - t0) / 1000);
         jobsProcessed.labels({ type: job.type, outcome: "retry" }).inc();

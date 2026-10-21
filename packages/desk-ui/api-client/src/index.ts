@@ -23,6 +23,12 @@ export function createApiClient(opts: ApiClientOptions = {}) {
       if (typeof localStorage !== "undefined") localStorage.setItem(tokenKey, t);
     });
   const baseUrl = opts.baseUrl ?? "";
+  // A stored token the server no longer accepts (revoked, or a password saved as
+  // a token by older builds) would block cookie sign-in forever: forget it.
+  const dropRejectedToken = (status: number, token: string, msg: string) => {
+    if (status === 401 && token && msg === "Invalid bearer token" && typeof localStorage !== "undefined" && localStorage.getItem(tokenKey) === token)
+      localStorage.removeItem(tokenKey);
+  };
 
   async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     const headers = new Headers(init.headers || {});
@@ -39,6 +45,7 @@ export function createApiClient(opts: ApiClientOptions = {}) {
         typeof json.error === "string"
           ? json.error
           : json.error?.message || `request failed ${res.status}`;
+      dropRejectedToken(res.status, token, msg);
       throw new Error(msg);
     }
     return json.data as T;
@@ -55,6 +62,7 @@ export function createApiClient(opts: ApiClientOptions = {}) {
         typeof json.error === "string"
           ? json.error
           : json.error?.message || "failed";
+      dropRejectedToken(res.status, token, msg);
       throw new Error(msg);
     }
     return { data: json.data as T, meta: json.meta || {} };

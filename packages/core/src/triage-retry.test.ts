@@ -28,7 +28,7 @@ describe("discarded triage recovery", () => {
   afterEach(() => vi.restoreAllMocks());
   afterAll(async () => { await closeDb(); rmSync(dir, { recursive: true, force: true }); });
 
-  it("requeues a discarded result and refreshes the score without auto-archiving the position", async () => {
+  it("requeues a discarded first score as a retry, not a refresh", async () => {
     const p = await position("retry"); const db = await getDb();
     const model = vi.spyOn(getLlmClient(), "chatJson").mockImplementationOnce(async () => {
       await db.update(positions).set({ updatedAt: new Date(Date.now() + 1000) }).where(eq(positions.id, p.id)); return result as never;
@@ -37,7 +37,8 @@ describe("discarded triage recovery", () => {
     const row = async () => (await db.select().from(jobs).where(eq(jobs.id, q.id)))[0];
     const worker = startWorker({ scheduler: false, pollMs: 10, concurrency: 1, types: ["triage"] });
     try {
-      await vi.waitFor(async () => expect(await row()).toMatchObject({ status: "queued", attempts: 1, payload: { refreshOnly: true } }));
+      await vi.waitFor(async () => expect(await row()).toMatchObject({ status: "queued", attempts: 1, payload: { retry: true } }));
+      expect((await row()).payload).not.toHaveProperty("refreshOnly");
       expect((await row()).runAfter.getTime()).toBeGreaterThan(Date.now());
       await db.update(jobs).set({ runAfter: new Date() }).where(eq(jobs.id, q.id));
       await vi.waitFor(async () => expect(await row()).toMatchObject({ status: "succeeded", attempts: 2 }));
