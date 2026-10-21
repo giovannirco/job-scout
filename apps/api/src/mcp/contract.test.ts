@@ -182,8 +182,19 @@ describe("MCP contract", () => {
       expect(r.isError).toBe(false);
       expect(r.bytes).toBeLessThan(100_000);
       expect(r.data.truncated).toBe(true);
-      const rest = await call("list_positions", { q: "Paging Probe", pageSize: 200, fields: "full", cursor: r.data.nextCursor });
-      expect(r.data.items.length + rest.data.items.length).toBe(12);
+      // The number of pages depends on the row width; every page stays under the cap and none drops a row.
+      const seen: string[] = r.data.items.map((x: { id: string }) => x.id);
+      let cursor: string | null = r.data.nextCursor;
+      for (let pages = 1; cursor && pages < 12; pages++) {
+        const next = await call("list_positions", { q: "Paging Probe", pageSize: 200, fields: "full", cursor });
+        expect(next.isError).toBe(false);
+        expect(next.bytes).toBeLessThan(100_000);
+        seen.push(...next.data.items.map((x: { id: string }) => x.id));
+        cursor = next.data.nextCursor;
+      }
+      expect(cursor).toBeNull();
+      expect(seen).toHaveLength(12);
+      expect(new Set(seen)).toEqual(new Set(ids));
     });
   });
 

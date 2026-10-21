@@ -92,7 +92,7 @@ describe("JD ingestion gaps (isolated PGlite)", () => {
     });
 
     it("a JD that shrinks back to the title sets needsJd again without a new paid review", async () => {
-      const { position } = await upsertFromJob(role("t3"), { status: "interview" });
+      const { position } = await upsertFromJob(role("t3"), { status: "applied" });
       await applySnapshot({ positionId: position.id, job: role("t3", { descriptionText: "Senior Platform Engineer" }) });
       expect((await getPosition(position.id))!.metadata?.needsJd).toMatchObject({ reason: "title_only" });
       expect(await jobsFor("jd_review", position.id)).toHaveLength(0);
@@ -214,7 +214,7 @@ describe("JD ingestion gaps (isolated PGlite)", () => {
   describe("5. JD churn", () => {
     it("whitespace, tracking params, date stamps and reordered blocks write no revision", async () => {
       const body = `${JD}\n\nApply: https://apply.workable.com/acme-example/j/C1XXXXXXXX/apply\n\nPosted 3 days ago`;
-      const { position } = await upsertFromJob(role("c1", { descriptionText: body }), { status: "interview" });
+      const { position } = await upsertFromJob(role("c1", { descriptionText: body }), { status: "applied" });
       const [p1, p2, p3] = JD.split("\n\n");
       const cosmetic = `${p3}\n\n${p1}\n\n  ${p2}  \n\nApply: https://apply.workable.com/acme-example/j/C1XXXXXXXX/apply?utm_source=board&utm_medium=feed\n\nPosted 5 days ago`;
       const r = await applySnapshot({ positionId: position.id, job: role("c1", { descriptionText: cosmetic }) });
@@ -224,7 +224,7 @@ describe("JD ingestion gaps (isolated PGlite)", () => {
     });
 
     it("jd_review runs at most once per day for description edits; a title change still queues one", async () => {
-      const { position } = await upsertFromJob(role("c2"), { status: "interview" });
+      const { position } = await upsertFromJob(role("c2"), { status: "applied" });
       await applySnapshot({ positionId: position.id, job: role("c2", { descriptionText: `${JD}\n\nVisa sponsorship is not available.` }) });
       const first = await jobsFor("jd_review", position.id);
       expect(first).toHaveLength(1);

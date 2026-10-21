@@ -17,12 +17,15 @@ import { registry } from "./metrics.js";
 import { resetWahaSender, setWahaSender } from "./waha.js";
 import { startWorker } from "../../../apps/worker/src/loop.js";
 
+/** Synthetic role detail: enough JD to score (see jdSufficiency). */
+const DUTIES = " You will own CI/CD pipelines, on-call rotations, incident reviews, capacity planning and cost reports. We expect solid Linux, networking and scripting skills, clear written communication, and care for reliable, observable services that teams can trust.";
+
 const dir = mkdtempSync(join(tmpdir(), "job-scout-llm-outage-"));
 const scored = { data: { score: 2.5, hardDq: [], oneLiner: "Synthetic fit" }, model: "test-model", tokensIn: 10, tokensOut: 5, latencyMs: 5 };
 const sent: string[] = [];
 
 async function position(name: string) {
-  return (await upsertFromJob({ provider: "unknown", company: "Example Outage Co", title: `Platform Engineer ${name}`, url: `https://jobs.example/outage/${name}`, listingStatus: "open", descriptionText: "Operate Kubernetes." })).position;
+  return (await upsertFromJob({ provider: "unknown", company: "Example Outage Co", title: `Platform Engineer ${name}`, url: `https://jobs.example/outage/${name}`, listingStatus: "open", descriptionText: "Operate Kubernetes." + DUTIES })).position;
 }
 
 describe("LLM outage handling", () => {

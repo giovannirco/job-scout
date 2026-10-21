@@ -13,6 +13,9 @@ import { updateSettings } from "./settings.js";
 import { runTriage } from "./triage.js";
 import { retriageTimezoneFails } from "./retriage-timezone.js";
 
+/** Synthetic role detail: enough JD to score (see jdSufficiency). */
+const DUTIES = " You will own CI/CD pipelines, on-call rotations, incident reviews, capacity planning and cost reports. We expect solid Linux, networking and scripting skills, clear written communication, and care for reliable, observable services that teams can trust.";
+
 const dir = mkdtempSync(join(tmpdir(), "job-scout-retriage-tz-"));
 const out = (hardDq: string[], extra: Record<string, unknown> = {}) => ({
   data: { score: 2.4, archetype: 4.5, comp: 4, location: 1, cvMatch: 4, hardDq, softFlags: [], archetypeLabel: "platform", compNote: "not stated", locationNote: "US time zones", oneLiner: "Timezone mismatch", ...extra },
@@ -21,7 +24,7 @@ const out = (hardDq: string[], extra: Record<string, unknown> = {}) => ({
 async function position(name: string) {
   const { position } = await upsertFromJob({ provider: "greenhouse", boardToken: name, jobId: "1", company: name,
     title: "Senior Platform Engineer", url: `https://boards.greenhouse.io/${name}/jobs/1`, locationRaw: "Remote",
-    descriptionText: "Operate Kubernetes for an example product.", listingStatus: "open" }, { status: "triaged" });
+    descriptionText: "Operate Kubernetes for an example product." + DUTIES, listingStatus: "open" }, { status: "triaged" });
   return position;
 }
 
