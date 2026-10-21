@@ -100,7 +100,7 @@ export async function runListingClassify(positionId: string) {
     {
       role: "system",
       content:
-        "Classify workplace (remote|hybrid|onsite|unknown) and geoClass (brazil_friendly|worldwideish|hard_geo|ambiguous_remote|unknown). Use hard_geo only for US-only, EMEA-only, must-reside, or onsite-city restrictions with evidence from the JD. A remote posting that lists three or more countries without only/must-reside/must-be-located is a timezone or entity list, not hard_geo; Portugal in that list is allow, not a block. Never invent a restriction. Never weaken an existing hard_geo.",
+        "Classify workplace (remote|hybrid|onsite|unknown) and geoClass (brazil_friendly|worldwideish|hard_geo|ambiguous_remote|unknown). Use hard_geo only for US-only, EMEA-only, must-reside, or onsite-city restrictions with evidence from the JD. A remote posting that lists three or more countries without only/must-reside/must-be-located is a timezone or entity list, not hard_geo; Portugal in that list is allow, not a block. A timezone or working-hours window (US time zones, EST/PST overlap, GMT to GMT-8, EMEA/APAC hours) is never hard_geo by itself; only country residency, work authorization, clearance/US-person or onsite/hybrid count. Never invent a restriction. Never weaken an existing hard_geo.",
     },
     {
       role: "user",

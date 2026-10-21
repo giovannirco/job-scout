@@ -1,4 +1,5 @@
 import { parseSalary, salaryPeriodGuard } from "./salary.js";
+import { stripTzPhrases } from "./tz-policy.js";
 
 /**
  * Auto-archive policy. A triage verdict may archive a position only for a hard
@@ -84,8 +85,8 @@ const RULES: Array<[HardDisqualifierKind, RegExp]> = [
 export function hardDisqualifierKinds(text: string | null | undefined): HardDisqualifierKind[] {
   const t = (text || "").trim();
   if (!t) return [];
-  // Timezone overlap alone is not residency.
-  const withoutTz = t.replace(/\b(time\s*zones?|timezones?|[A-Z]{2,4}\s+hours|overlap)\b/gi, " ");
+  // Timezone overlap alone is not residency ("US time zones only" is not "US only").
+  const withoutTz = stripTzPhrases(t);
   return RULES.filter(([, re]) => re.test(withoutTz)).map(([kind]) => kind);
 }
 

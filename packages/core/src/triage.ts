@@ -7,7 +7,7 @@ import { currentJdText, getPosition } from "./positions.js";
 import { triageBriefOf, getProfile, profileFingerprint } from "./profile.js";
 import { getSettings } from "./settings.js";
 import { addEvent } from "./timeline.js";
-import { log, triageArchiveDecision } from "@job-scout/shared";
+import { acceptableTzRangeOf, applyTzPolicy, log, triageArchiveDecision } from "@job-scout/shared";
 import { humanRestore } from "./archive-guard.js";
 import { ingestQuality } from "./metrics.js";
 import { decisionListingOf, sameJevConfig, tryDecision } from "./decisions.js";
@@ -29,6 +29,7 @@ export async function runTriage(positionId: string, opts: { force?: boolean; ref
   const jdText = await currentJdText(pos.id);
   const listing = await decisionListingOf(pos, jdText);
   const ats = ((pos.metadata || {}) as { ats?: { workplaceType?: string | null } }).ats;
+  const tzRange = acceptableTzRangeOf(profile.metadata);
 
   const messages = buildTriageMessages({
     title: pos.title,
@@ -42,6 +43,7 @@ export async function runTriage(positionId: string, opts: { force?: boolean; ref
     jdMaxChars: settings.triage.jdMaxChars,
     passThreshold: settings.triage.passThreshold,
     marginalThreshold: settings.triage.marginalThreshold,
+    acceptableTzRange: tzRange,
   });
 
   const decision = settings.jev.enabled && settings.jev.triage !== "off" ? await tryDecision({
@@ -66,7 +68,10 @@ export async function runTriage(positionId: string, opts: { force?: boolean; ref
     );
   };
   const res = fast && decision?.run?.result ? { data: fast, model: decision.run.result.model, tokensIn: decision.run.result.inputTokens, tokensOut: decision.run.result.outputTokens } : await runNormal();
-  const out = res.data;
+  // Timezone policy: a timezone window alone never fails or archives a role.
+  const tz = applyTzPolicy(res.data, tzRange);
+  const out = tz.out;
+  if (tz.adjusted) log.info("triage.tz_policy", { positionId: pos.id, removed: tz.removed.length, penalty: tz.penalty, score: out.score });
   const score = Math.round(out.score * 10) / 10;
   if (score === 0) {
     ingestQuality.labels({ reason: "triage_zero_score" }).inc();
@@ -78,7 +83,7 @@ export async function runTriage(positionId: string, opts: { force?: boolean; ref
   const set: Record<string, unknown> = {
     triageScore: score,
     triageVerdict: verdict,
-    triageJson: { ...out, verdict, model: res.model, at: now.toISOString(), profileHash: profileFingerprint(profile), ...(decision ? { jev: { runId: decision.run?.id, used: Boolean(fast), summary: decision.run?.summary, error: decision.error || decision.run?.error } } : {}) },
+    triageJson: { ...out, verdict, model: res.model, at: now.toISOString(), profileHash: profileFingerprint(profile), ...(tz.adjusted ? { tzPolicy: { removedHardDq: tz.removed, penalty: tz.penalty, rawScore: res.data.score } } : {}), ...(decision ? { jev: { runId: decision.run?.id, used: Boolean(fast), summary: decision.run?.summary, error: decision.error || decision.run?.error } } : {}) },
     triagedAt: now,
     triageModel: res.model,
     updatedAt: now,

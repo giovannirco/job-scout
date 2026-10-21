@@ -113,7 +113,7 @@ A configured `API_TOKEN_SEED` is an admin credential; there is no built-in seed.
 | GET / PATCH | `/settings` | the whole document / deep-merge a partial (`gate`, `triage`, `scan`, `retention`, `llm.operations`, `autopilot`, `chat`, `notifications`) |
 | GET | `/settings/notifications` | channels, events, quiet hours, chat model, `wahaConfigured` |
 | POST | `/settings/notifications/test` | `{channel}` `desk` `new` `process` `research` `chat` — enqueue a test WhatsApp send |
-| GET / PATCH | `/settings/profile` | identity, master resume, surfaces, scout brief |
+| GET / PATCH | `/settings/profile` | identity, master resume, surfaces, scout brief. Optional `metadata.acceptableTzRange` `{ min, max }` (UTC offsets): a listing's timezone window outside it is one soft flag (-0.5 max); unset, timezone windows only inform. A timezone window never disqualifies |
 | GET | `/settings/llm/models?refresh=1` | `/v1/models` catalog (cached) |
 | GET | `/settings/llm/status` | per-operation model, enabled, cap, calls today |
 | GET | `/settings/llm/runs?limit=` | recent `llm_runs` |

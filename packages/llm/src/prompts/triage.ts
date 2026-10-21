@@ -33,7 +33,16 @@ export type TriageInput = {
   jdMaxChars: number;
   passThreshold: number;
   marginalThreshold: number;
+  /** Candidate's acceptable working-hours window as UTC offsets. Unset: timezone only informs. */
+  acceptableTzRange?: { min: number; max: number } | null;
 };
+
+function tzRule(r?: { min: number; max: number } | null): string {
+  const base = "- timezone: a timezone, working-hours or 'must reside within UTC-x..UTC-y' window is NEVER a hardDq and never lowers location below 4. Only country residency, work authorization, clearance/US-person or onsite/hybrid requirements are hardDqs.";
+  if (!r) return `${base} The candidate set no timezone range: mention any window in locationNote only, never as a flag.`;
+  const f = (n: number) => `UTC${n >= 0 ? "+" : ""}${n}`;
+  return `${base} If the window overlaps the candidate's acceptable range (${f(r.min)}..${f(r.max)}) it is not a flag at all; if it is entirely outside it add one soft flag.`;
+}
 
 export function buildTriageMessages(input: TriageInput): ChatMessage[] {
   const jd = trimJd(input.jdText, input.jdMaxChars);
@@ -46,6 +55,7 @@ export function buildTriageMessages(input: TriageInput): ChatMessage[] {
     "- comp: the profile cash floor is the only pay disqualifier. Posted pay below the floor => 0-1 and add a hardDq. For an advertised range, apply the floor to the range maximum (wide ranges are geo bands); a minimum below the floor is a soft flag, not a hardDq. Last/current/previous cash, the ask or a target are negotiation context: never a hardDq. Not stated => 4 unless the role/level implies low pay, and never a hardDq.",
     "- location: use the brief's location scoring table. On-site with no remote path => 1 and hardDq.",
     "- eligibility: if the listing restricts who may apply and the candidate is outside that group (affirmative postings for a specific group, citizenship or security-clearance requirements, employment limited to countries the candidate cannot work from with no contractor path) => hardDq.",
+    tzRule(input.acceptableTzRange),
     "- cvMatch: how many must-haves the proof points cover. Missing a required stack the candidate does not claim => hardDq.",
     "- score = weighted overall: archetype 35%, location 25%, cvMatch 25%, comp 15%, then subtract 0.5 per soft flag.",
     `- Any hardDq forces score < ${input.marginalThreshold.toFixed(1)}.`,

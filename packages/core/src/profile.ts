@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { getDb, id, profiles } from "@job-scout/db";
-import { DEFAULT_GATE, isStarterScoutBrief } from "@job-scout/shared";
+import { acceptableTzRangeOf, DEFAULT_GATE, isStarterScoutBrief, tzRangeLabel } from "@job-scout/shared";
 import { createHash } from "node:crypto";
 import { updateSettings, getSettings } from "./settings.js";
 import { regateRecentDiscovery } from "./scan.js";
@@ -9,7 +9,9 @@ export type Profile = typeof profiles.$inferSelect;
 
 /** Scores depend on these inputs; contact-only edits do not invalidate them. */
 export function profileFingerprint(p: Profile): string {
-  return createHash("sha256").update(triageBriefOf(p)).digest("hex").slice(0, 20);
+  // An unset timezone range leaves the hash as it was, so existing scores stay current.
+  const tz = acceptableTzRangeOf(p.metadata);
+  return createHash("sha256").update(triageBriefOf(p) + (tz ? `\nacceptableTzRange: ${tzRangeLabel(tz)}` : "")).digest("hex").slice(0, 20);
 }
 
 /** Effective triage input: editable structured facts take precedence over older prose. */

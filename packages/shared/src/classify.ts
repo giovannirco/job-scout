@@ -1,4 +1,5 @@
 import type { CraftFamily, GeoClass, MatchLabel, Workplace } from "./types.js";
+import { isTimezoneOnlyRestriction, mentionsTimezone, nonTzBlockers, stripTzPhrases } from "./tz-policy.js";
 
 const TITLE_RE =
   /\b(platform|devops|sre|site\s*reliability|reliability\s*engineer|infrastructure|infra|cloud\s*platform|production\s*engineer|observability|telemetry|release\s*engineer|gitops|developer\s*experience|devex|engineering\s*productivity|ai\s*platform|ai\s*infrastructure|ml\s*infra|mlops|platform\s*engineer|internal\s*developer|kubernetes|k8s|compute\s*infra|systems\s*engineer|cloud\s*engineer|devops\s*engineer|staff\s*engineer.*infra|network\s*engineer|security\s*engineer.*infra|platform\s*sre|infra(structure)?\s*sre)\b/i;
@@ -177,6 +178,16 @@ export function geoClass(
 ): GeoClass {
   const blob = [location, workplace, extra].filter(Boolean).join(" | ");
   if (!blob.trim()) return "unknown";
+  // Timezone policy: a TZ / working-hours window alone is never hard_geo. A
+  // named office or city in the location still is.
+  if (mentionsTimezone(blob) && nonTzBlockers(blob).length === 0) {
+    const stripped = [stripTzPhrases(location), stripTzPhrases(workplace), stripTzPhrases(extra)] as const;
+    if (stripped.join(" ").trim() !== blob.replace(/\s*\|\s*/g, " ").trim()) {
+      const g = geoClass(...stripped);
+      if (g === "hard_geo" && isCityOffice(stripped[0])) return g;
+      return g === "hard_geo" || g === "unknown" ? "ambiguous_remote" : g;
+    }
+  }
   // A remote modality or continent abbreviation is not work authorization.
   if (GEO_EXCLUSIVITY_RE.test(blob) && FOREIGN_REGION.test(blob) && !BRAZIL_PLACE.test(blob)) return "hard_geo";
   if (BRAZIL_PLACE.test(location)) return "brazil_friendly";
@@ -281,7 +292,8 @@ export function mergeListingClassify(
 ): { workplace: Workplace; geoClass: GeoClass } {
   let geo = det.geoClass;
   if (det.geoClass !== "hard_geo" && llm.geoClass === "hard_geo" && GEO_TIGHTENABLE.has(det.geoClass)) {
-    if (!isTzOverlapLocation(det.locationRaw || "")) {
+    const why = [llm.geoNote, llm.evidence, det.locationRaw].filter(Boolean).join(" | ");
+    if (!isTzOverlapLocation(det.locationRaw || "") && !isTimezoneOnlyRestriction(why)) {
       geo = "hard_geo";
     }
   }
