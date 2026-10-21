@@ -52,6 +52,7 @@ import {
 import { log as rootLog } from "@job-scout/shared";
 import { env } from "../env.js";
 import { text } from "./result.js";
+import { interviewSummary, positionSummary } from "./summary.js";
 import { workQueue, WorkQueueInput } from "./work-queue.js";
 
 type ToolAuth = { clientId?: string; scopes?: string[]; extra?: Record<string, unknown> };
@@ -72,6 +73,11 @@ export function agentOf(ctx: ToolCtx, callerActor?: string | null): string {
   if (!caller || caller === token) return token;
   return `${caller} via ${token}`;
 }
+
+const VERBOSE = z.boolean().optional().describe("Return the full record instead of the compact summary");
+type Summarizable = Parameters<typeof positionSummary>[0];
+/** Write echo: compact by default, the full position row with verbose. */
+const echo = (p: Summarizable | null | undefined, verbose?: boolean) => (p ? text(verbose ? p : positionSummary(p)) : text({ error: "not found" }, true));
 
 const errText = (e: unknown) => text({ error: e instanceof Error ? e.message : String(e), code: e instanceof LlmGateError ? e.code : undefined }, true);
 
@@ -214,11 +220,10 @@ export function createJobScoutMcpServer() {
 
   server.registerTool(
     "update_position",
-    { title: "Update position", description: "PATCH status, priority, notes, nextAction, resumeSurface, watchEnabled, appliedAt. A status of skip/archived from the career-ops sync (token named career-ops…, or source=career-ops) is recorded as a note and not applied; the other fields still apply. status=materials is refused with a materials_missing error until the position has a resume/cover in job-scout or a career-ops stamp with pdfPath: create materials (run_llm materials) or upsert_career_ops_stamp with pdfPath first.", inputSchema: { idOrSlug: z.string(), status: z.string().optional(), priority: z.string().optional(), notes: z.string().optional(), nextAction: z.string().optional(), resumeSurface: z.string().optional(), watchEnabled: z.boolean().optional(), appliedAt: z.string().optional(), source: z.string().optional() } },
-    async ({ idOrSlug, source, ...patch }, ctx) => {
+    { title: "Update position", description: "PATCH status, priority, notes, nextAction, resumeSurface, watchEnabled, appliedAt. A status of skip/archived from the career-ops sync (token named career-ops…, or source=career-ops) is recorded as a note and not applied; the other fields still apply. status=materials is refused with a materials_missing error until the position has a resume/cover in job-scout or a career-ops stamp with pdfPath: create materials (run_llm materials) or upsert_career_ops_stamp with pdfPath first. Returns a compact position summary (verbose=true for the full row).", inputSchema: { idOrSlug: z.string(), status: z.string().optional(), priority: z.string().optional(), notes: z.string().optional(), nextAction: z.string().optional(), resumeSurface: z.string().optional(), watchEnabled: z.boolean().optional(), appliedAt: z.string().optional(), source: z.string().optional(), verbose: VERBOSE } },
+    async ({ idOrSlug, source, verbose, ...patch }, ctx) => {
       try {
-        const p = await patchFromCaller(idOrSlug, patch, { actor: agentOf(ctx as ToolCtx), source });
-        return p ? text(p) : text({ error: "not found" }, true);
+        return echo(await patchFromCaller(idOrSlug, patch, { actor: agentOf(ctx as ToolCtx), source }), verbose);
       } catch (e) {
         return errText(e);
       }
@@ -227,11 +232,10 @@ export function createJobScoutMcpServer() {
 
   server.registerTool(
     "set_position_status",
-    { title: "Set status", description: "Set pipeline status (triaged|review|materials|applied|screen|interview|offer|rejected|skip|archived). archived requires reason. A skip/archive from the career-ops sync (source=career-ops, or a note starting 'career-ops') is recorded as a note and not applied. materials is refused with a materials_missing error until the position has a resume/cover in job-scout or a career-ops stamp with pdfPath: create materials (run_llm materials) or upsert_career_ops_stamp with pdfPath first.", inputSchema: { idOrSlug: z.string(), status: z.string(), reason: z.string().optional(), note: z.string().optional(), source: z.string().optional(), actor: z.string().optional().describe("Calling agent name for the audit trail, recorded as \"<actor> via <token name>\"") } },
+    { title: "Set status", description: "Set pipeline status (triaged|review|materials|applied|screen|interview|offer|rejected|skip|archived). archived requires reason. A skip/archive from the career-ops sync (source=career-ops, or a note starting 'career-ops') is recorded as a note and not applied. materials is refused with a materials_missing error until the position has a resume/cover in job-scout or a career-ops stamp with pdfPath: create materials (run_llm materials) or upsert_career_ops_stamp with pdfPath first. Returns a compact position summary (verbose=true for the full row).", inputSchema: { idOrSlug: z.string(), status: z.string(), reason: z.string().optional(), note: z.string().optional(), source: z.string().optional(), actor: z.string().optional().describe("Calling agent name for the audit trail, recorded as \"<actor> via <token name>\""), verbose: VERBOSE } },
     async (a, ctx) => {
       try {
-        const p = await setStatusFromCaller(a.idOrSlug, a.status, { actor: agentOf(ctx as ToolCtx, a.actor), reason: a.reason, note: a.note, source: a.source });
-        return p ? text(p) : text({ error: "not found" }, true);
+        return echo(await setStatusFromCaller(a.idOrSlug, a.status, { actor: agentOf(ctx as ToolCtx, a.actor), reason: a.reason, note: a.note, source: a.source }), a.verbose);
       } catch (e) {
         return errText(e);
       }
@@ -240,10 +244,10 @@ export function createJobScoutMcpServer() {
 
   server.registerTool(
     "set_match_override",
-    { title: "Skip / unskip", description: "v1 compat: label=human_skip archives the position; label=match moves it to review. From the career-ops sync (token named career-ops…) human_skip is recorded as a note and not applied.", inputSchema: { idOrSlug: z.string(), label: z.enum(["match", "human_skip"]) } },
+    { title: "Skip / unskip", description: "v1 compat: label=human_skip archives the position; label=match moves it to review. From the career-ops sync (token named career-ops…) human_skip is recorded as a note and not applied.", inputSchema: { idOrSlug: z.string(), label: z.enum(["match", "human_skip"]), verbose: VERBOSE } },
     async (a, ctx) => {
       const actor = agentOf(ctx as ToolCtx);
-      return text(a.label === "human_skip" ? await setStatusFromCaller(a.idOrSlug, "archived", { actor, reason: "human_skip" }) : await patchPosition(a.idOrSlug, { status: "review" }, actor));
+      return echo(a.label === "human_skip" ? await setStatusFromCaller(a.idOrSlug, "archived", { actor, reason: "human_skip" }) : await patchPosition(a.idOrSlug, { status: "review" }, actor), a.verbose);
     },
   );
 
@@ -530,7 +534,7 @@ export function createJobScoutMcpServer() {
 
   server.registerTool(
     "create_position_from_career_ops",
-    { title: "Create from career-ops", description: "Create a position for a tracker row that job-scout does not know. Fetches the URL when reachable; falls back to a manual record.", inputSchema: { url: z.string(), company: z.string(), role: z.string(), score: z.number().optional(), status: z.string().optional(), reportPath: z.string().optional(), trackerId: z.string().optional() } },
+    { title: "Create from career-ops", description: "Create a position for a tracker row that job-scout does not know. Fetches the URL when reachable; falls back to a manual record.", inputSchema: { url: z.string(), company: z.string(), role: z.string(), score: z.number().optional(), status: z.string().optional(), reportPath: z.string().optional(), trackerId: z.string().optional(), verbose: z.boolean().optional().describe("Return the full position detail (JD text, revisions, evaluations) instead of the compact summary") } },
     async (a) => {
       try {
         let position;
@@ -550,7 +554,8 @@ export function createJobScoutMcpServer() {
         if (!position.title?.trim()) patch.title = a.role;
         if (Object.keys(patch).length) await patchPosition(position.id, patch, "career-ops");
         const stamp = await stampCareerOps(position.id, { trackerId: a.trackerId, score: a.score, status: a.status, reportPath: a.reportPath });
-        return text({ position: await getPositionDetail(position.id), stamp });
+        const detail = await getPositionDetail(position.id);
+        return text({ position: a.verbose || !detail ? detail : positionSummary(detail), stamp });
       } catch (e) {
         return errText(e);
       }
@@ -623,7 +628,7 @@ export function createJobScoutMcpServer() {
     {
       title: "Create or update an interview round",
       description:
-        "Store a screen/interview: stage, interviewer, outcome, notes, review, transcript. If transcriptMarkdown is set, queues an AI brief against the JD and company pack unless skipBrief=true. Pass id to patch an existing round.",
+        "Store a screen/interview: stage, interviewer, outcome, notes, review, transcript. If transcriptMarkdown is set, queues an AI brief against the JD and company pack unless skipBrief=true. Pass id to patch an existing round. Returns round metadata and char counts (verbose=true for the full round); get_interview reads the bodies.",
       inputSchema: {
         idOrSlug: z.string(),
         id: z.string().optional(),
@@ -643,6 +648,7 @@ export function createJobScoutMcpServer() {
         transcriptSource: z.string().optional(),
         sourcePath: z.string().optional(),
         skipBrief: z.boolean().optional(),
+        verbose: z.boolean().optional().describe("Return the full round (notes, review, transcript, AI brief) instead of metadata and char counts"),
       },
     },
     async (a) => {
@@ -668,11 +674,9 @@ export function createJobScoutMcpServer() {
         skipBrief: a.skipBrief,
       };
       try {
-        if (a.id) {
-          const row = await patchInterview(p.id, a.id, input);
-          return row ? text(row) : text({ error: "not found" }, true);
-        }
-        return text(await addInterview(p.id, input));
+        const row = a.id ? await patchInterview(p.id, a.id, input) : await addInterview(p.id, input);
+        if (!row) return text({ error: "not found" }, true);
+        return text(a.verbose ? row : interviewSummary(row));
       } catch (e) {
         return errText(e);
       }
