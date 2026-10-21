@@ -442,7 +442,7 @@ export function createJobScoutMcpServer() {
 
   server.registerTool(
     "run_llm",
-    { title: "Run LLM operation", description: "Run triage|evaluate|materials|jd_review|form_answers synchronously on a position (uses Settings > AI model). Returns the result.", inputSchema: { idOrSlug: z.string(), operation: z.enum(["triage", "evaluate", "materials", "jd_review", "form_answers", "listing_classify"]), force: z.boolean().optional() } },
+    { title: "Run LLM operation", description: "Run triage|evaluate|materials|jd_review|form_answers|listing_classify synchronously on a position (uses Settings > AI model). Returns the result.", inputSchema: { idOrSlug: z.string(), operation: z.enum(["triage", "evaluate", "materials", "jd_review", "form_answers", "listing_classify"]), force: z.boolean().optional() } },
     async (a) => {
       const p = await getPositionDetail(a.idOrSlug);
       if (!p) return text({ error: "not found" }, true);
@@ -671,7 +671,7 @@ export function createJobScoutMcpServer() {
     "list_all_interviews",
     {
       title: "List all interview rounds",
-      description: "Desk of every round across positions. Slim (no transcript bodies). lane=upcoming|completed|needs_brief|all. Use get_interview for the corpus.",
+      description: "Desk of every round across positions and recruiter leads; a lead round has positionId null plus leadId, leadRole and leadStatus. Slim (no transcript bodies). lane=upcoming|completed|needs_brief|all. Use get_interview for the corpus.",
       inputSchema: { lane: z.string().optional(), q: z.string().optional(), stage: z.string().optional() },
       annotations: { readOnlyHint: true },
     },
