@@ -55,6 +55,8 @@ export async function retriageTimezoneFails(opts: { apply?: boolean; include?: s
     const active = r.status === "triaged" || r.status === "review";
     if (!forced) {
       if (!mentionsTimezone(reason)) continue;
+      // Residency, work authorization, clearance or onsite still block: a re-triage would archive it again.
+      if (!isTimezoneOnlyRestriction(reason)) continue;
       if (r.listingStatus === "closed") continue;
       if (!triageArchived && !(active && r.triageVerdict === "fail")) continue;
     }

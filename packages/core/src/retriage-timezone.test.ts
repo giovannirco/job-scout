@@ -83,6 +83,8 @@ describe("timezone policy in triage and the re-triage repair", () => {
     const tz = await position("old-tz-archive");
     const res = await position("old-residency-archive");
     const operator = await position("operator-archive");
+    const mixed = await position("old-mixed-archive");
+    await db.update(positions).set({ status: "archived", triageVerdict: "fail", triageScore: 1.8, archiveReason: "triage fail 1.8: Must reside in Canada; US time zones", triageJson: { hardDq: ["Must reside in Canada", "US time zones"] } }).where(eq(positions.id, mixed.id));
     await db.update(positions).set({ status: "archived", triageVerdict: "fail", triageScore: 2.1, archiveReason: "triage fail 2.1: requires overlap with US time zones", triageJson: { hardDq: ["requires overlap with US time zones"] } }).where(eq(positions.id, tz.id));
     await db.update(positions).set({ status: "archived", triageVerdict: "fail", triageScore: 2.0, archiveReason: "triage fail 2.0: residency: Must reside in Canada", triageJson: { hardDq: ["Must reside in Canada"] } }).where(eq(positions.id, res.id));
     await db.update(positions).set({ status: "archived", archiveReason: "not interested, EST hours" }).where(eq(positions.id, operator.id));
@@ -93,6 +95,8 @@ describe("timezone policy in triage and the re-triage repair", () => {
     expect(ids).toContain(tz.id);
     expect(ids).not.toContain(res.id);
     expect(ids).not.toContain(operator.id);
+    // A timezone note beside a residency rule is not a timezone-only fail.
+    expect(ids).not.toContain(mixed.id);
     expect(dry.plan.find((r) => r.id === tz.id)).toMatchObject({ revive: true, timezoneOnly: true });
     expect((await getPosition(tz.id))!.status).toBe("archived");
 
