@@ -25,6 +25,8 @@ export const coreEnv = {
   wahaApiKey: process.env.WAHA_API_KEY || "",
   wahaSession: process.env.WAHA_SESSION || "default",
   wahaWebhookKey: process.env.WAHA_WEBHOOK_KEY || "",
+  /** Operator-provided recruiter-threat blocklist (comma-separated domains). Empty by default. */
+  threatBlocklistDomains: (process.env.THREAT_BLOCKLIST_DOMAINS || "").split(",").map((d) => d.trim().toLowerCase()).filter(Boolean),
   publicBaseUrl: (process.env.PUBLIC_BASE_URL || "").replace(/\/+$/, ""),
   isProd: process.env.NODE_ENV === "production",
 };

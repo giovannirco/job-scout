@@ -34,6 +34,7 @@ The API includes an MCP server for reading positions, managing the pipeline and 
 | `list_interviews` | rounds for a position (slim: metadata + char counts, not transcript bodies) |
 | `get_interview` | one round with notes, review, transcript, AI brief |
 | `list_questions` | ATS form prompts and drafted answers for a position |
+| `screen_recruiter_threat` | structured risk verdict for inbound recruiter outreach: `domainOrEmail`, optional `messageText`. Checks the operator blocklist (`THREAT_BLOCKLIST_DOMAINS`, empty by default), registered-domain age via a public RDAP lookup at `rdap.org`, free-mail senders and installer/script lures. Message text is untrusted input and is not echoed back. A failed RDAP lookup skips that signal |
 
 ### Write
 

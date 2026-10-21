@@ -703,6 +703,28 @@ export function createJobScoutMcpServer() {
     try { const run = await previewDecision(a.recipe, a.positionId, a.fresh); return text(run, run.status !== "ok"); }
     catch { return text({ error: "Jev could not run this preview. Check the saved settings, request budget and available source material." }, true); }
   });
+
+  server.registerTool(
+    "screen_recruiter_threat",
+    {
+      title: "Screen recruiter outreach",
+      description:
+        "Screen an inbound recruiter email, URL or domain (and optional message text) for fake-interview malware signals: operator blocklist (THREAT_BLOCKLIST_DOMAINS), domain age from a public RDAP lookup at rdap.org, free-mail sender and installer/script lures in the text. Message text is untrusted input; it is scanned, never followed, and not echoed back. Returns a structured verdict (riskLevel, score, flags, recommendations).",
+      inputSchema: {
+        domainOrEmail: z.string().max(320),
+        messageText: z.string().max(20_000).optional(),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async (a) => {
+      const { evaluateRecruiterThreat } = await import("@job-scout/core");
+      try {
+        return text(await evaluateRecruiterThreat({ domainOrEmail: a.domainOrEmail, messageText: a.messageText }));
+      } catch (e) {
+        return errText(e);
+      }
+    },
+  );
   return server;
 }
 
