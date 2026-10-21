@@ -210,8 +210,10 @@ export async function retryFailedScan(jobId: string) {
 }
 
 /**
- * Was a job of this type queued for the position within `withinMs`? Failed jobs
- * do not count (a retry stays possible). Used to rate-limit paid follow-ups.
+ * Did a job of this type run (or start) for the position within `withinMs`?
+ * Queued jobs do not count: a queued check can still be skipped as superseded,
+ * which would leave the position with no check at all. Failed jobs do not count
+ * either (a retry stays possible). Used to rate-limit paid follow-ups.
  */
 export async function recentPositionJob(type: JobType, positionId: string, withinMs: number): Promise<boolean> {
   const db = await getDb();
@@ -219,7 +221,7 @@ export async function recentPositionJob(type: JobType, positionId: string, withi
   const row = (await db.select({ id: jobs.id }).from(jobs).where(and(
     eq(jobs.type, type),
     sql`${jobs.payload}->>'positionId' = ${positionId}`,
-    sql`${jobs.status} <> 'failed'`,
+    inArray(jobs.status, ["running", "done"]),
     sql`${jobs.createdAt} >= ${since.toISOString()}`,
   )).limit(1))[0];
   return Boolean(row);

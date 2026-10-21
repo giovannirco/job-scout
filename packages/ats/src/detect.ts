@@ -246,6 +246,11 @@ export function detectAts(url: string): DetectedAts {
     // https://apply.workable.com/{account}/j/{shortcode}/   (a job)
     // https://apply.workable.com/{account}/                  (the account's board)
     // https://{account}.workable.com/j/{shortcode}           (legacy hosted page)
+    // https://jobs.workable.com/view/{shortcode}/…  (Workable's job search; no account in the URL)
+    if (host === "jobs.workable.com") {
+      m = path.match(/\/view\/([A-Za-z0-9]{4,})(?:\/|$)/);
+      return { provider: "workable", jobId: m?.[1], url, confidence: m ? "medium" : "low" };
+    }
     if (host === "workable.com" || host.endsWith(".workable.com")) {
       const parts = path.split("/").filter(Boolean);
       const legacy = host !== "apply.workable.com" && !/^(www|jobs)\./.test(host);

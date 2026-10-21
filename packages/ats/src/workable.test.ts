@@ -27,6 +27,10 @@ describe("Workable", () => {
     expect(detectAts(URL_)).toMatchObject({ provider: "workable", boardToken: "acme-example", jobId: "AB12CD34EF", confidence: "high" });
     expect(detectAts("https://apply.workable.com/acme-example/")).toMatchObject({ provider: "workable", boardToken: "acme-example", jobId: undefined });
     expect(detectAts("https://acme-example.workable.com/j/AB12CD34EF")).toMatchObject({ provider: "workable", boardToken: "acme-example", jobId: "AB12CD34EF" });
+    // Workable's job search names no account: never treat "view" as a board token.
+    const search = detectAts("https://jobs.workable.com/view/AB12CD34EF/senior-sre-acme-example");
+    expect(search).toMatchObject({ provider: "workable", jobId: "AB12CD34EF" });
+    expect(search.boardToken).toBeUndefined();
   });
 
   it("reads the full JD from the public job API instead of the title-only page", async () => {

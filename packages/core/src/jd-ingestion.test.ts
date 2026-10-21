@@ -163,6 +163,9 @@ describe("JD ingestion gaps (isolated PGlite)", () => {
       expect(boardRetitled(pos, "senior platform engineer ")).toBe(false);
       expect(boardRetitled(pos, "Jobs")).toBe(false);
       expect(boardRetitled({ ...pos, listingStatus: "closed" }, "Staff Platform Engineer")).toBe(false);
+      // Only ATS boards are trusted: aggregator feeds rewrite titles ("Company: Title").
+      expect(boardRetitled(pos, "Staff Platform Engineer", "ashby")).toBe(true);
+      expect(boardRetitled(pos, "Acme Example: Senior Platform Engineer", "weworkremotely")).toBe(false);
     });
   });
 
@@ -234,6 +237,12 @@ describe("JD ingestion gaps (isolated PGlite)", () => {
       const revs = await revisionsOf(position.id);
       expect(revs[0]).toMatchObject({ changeKind: "title", material: true });
       expect(revs[1]).toMatchObject({ changeKind: "content", material: true });
+    });
+
+    it("an edit landing before the first check runs still gets a check (queued checks do not count)", async () => {
+      const { position } = await upsertFromJob(role("c4"), { status: "triaged" });
+      await applySnapshot({ positionId: position.id, job: role("c4", { descriptionText: `${JD}\n\nOn-site in Lisbon twice a month.` }) });
+      expect((await jobsFor("jev_check", position.id)).map((j) => j.payload?.revision).sort()).toEqual([1, 2]);
     });
 
     it("the fit check is rate-limited the same way; a location change bypasses the limit", async () => {

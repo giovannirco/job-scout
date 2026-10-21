@@ -222,7 +222,7 @@ export async function scanBoard(boardId: string, opts: { force?: boolean } = {})
       await db.update(discoveryFeed).set({ positionId: existing.id }).where(eq(discoveryFeed.externalIdentity, j.externalIdentity));
       // The board retitled a known posting: watch_check only covers hot/watched rows, so
       // refetch this one now (applySnapshot records the title change and reslugs).
-      if (boardRetitled(existing, j.title)) {
+      if (boardRetitled(existing, j.title, board.provider)) {
         const q = await enqueueJob("watch_check", { positionId: existing.id, reason: "board_retitled" }, { dedupeKey: `watch:${existing.id}`, priority: 85 });
         if (!q.deduped) res.retitled = (res.retitled ?? 0) + 1;
       }
@@ -757,11 +757,16 @@ export async function refreshListingLabels(): Promise<{ craft: number; company: 
 }
 
 /** A gh_jid careers URL has no board token. The company board has the location and the JD. */
+/** ATS boards whose listing title is the posting's own title (aggregator feeds rewrite titles). */
+const TRUSTED_TITLE_BOARDS = new Set(["greenhouse", "ashby", "lever", "bamboohr"]);
+
 /** A trusted board listing names a different real title than the position (and no person pinned it). */
 export function boardRetitled(
   pos: { title: string; listingStatus?: string | null; metadata?: Record<string, unknown> | null },
   boardTitle: string | null | undefined,
+  provider?: string,
 ): boolean {
+  if (provider !== undefined && !TRUSTED_TITLE_BOARDS.has(provider)) return false;
   const next = cleanJobTitle(boardTitle);
   if (!next || isNoiseJobTitle(next) || pos.listingStatus === "closed" || pos.metadata?.titleOverride) return false;
   return next.toLowerCase() !== cleanJobTitle(pos.title).toLowerCase();

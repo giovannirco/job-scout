@@ -651,6 +651,14 @@ export async function stampCareerOps(idOrSlug: string, stamp: Record<string, unk
   return meta.careerOps;
 }
 
+/** The slug when no other position holds it (the unique index would reject the write), else null. */
+async function freeSlug(positionId: string, slug: string | null): Promise<string | null> {
+  if (!slug) return null;
+  const db = await getDb();
+  const holder = (await db.select({ id: positions.id }).from(positions).where(eq(positions.slug, slug)).limit(1))[0];
+  return holder && holder.id !== positionId ? null : slug;
+}
+
 /** The title a person set by hand, which ATS refreshes must not replace. */
 function titleOverrideOf(metadata: Record<string, unknown> | null | undefined): string | null {
   const o = metadata?.titleOverride as { title?: unknown } | undefined;
@@ -894,7 +902,7 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
   const jd = listingClosed ? prevJd : jdSufficiency(atsTitle, bodyText);
   const jdArrived = !listingClosed && nextRev > 1 && !prevJd.sufficient && jd.sufficient;
   const retitled = title !== pos.title && Boolean(pos.title.trim());
-  const nextSlug = retitled ? slugForRetitle({ id: pos.id, slug: pos.slug, title: pos.title, companySlug: pos.company.slug }, title, [prevRev?.title]) : null;
+  const nextSlug = retitled ? await freeSlug(pos.id, slugForRetitle({ id: pos.id, slug: pos.slug, title: pos.title, companySlug: pos.company.slug }, title, [prevRev?.title])) : null;
   const metadata: Record<string, unknown> = {
     ...(nextSlug ? withPrevious(pos.metadata, pos.slug) : pos.metadata || {}),
     ...needsJdPatch(pos.metadata, jd, nextRev),
