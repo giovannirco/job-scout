@@ -280,7 +280,7 @@ export function createJobScoutMcpServer() {
     { title: "Skip / unskip", description: "v1 compat: label=human_skip archives the position; label=match moves it to review. From the career-ops sync (token named career-ops…) human_skip is recorded as a note and not applied.", inputSchema: { idOrSlug: z.string(), label: z.enum(["match", "human_skip"]), verbose: VERBOSE } },
     async (a, ctx) => {
       const actor = agentOf(ctx as ToolCtx);
-      return echo(a.label === "human_skip" ? await setStatusFromCaller(a.idOrSlug, "archived", { actor, reason: "human_skip" }) : await patchPosition(a.idOrSlug, { status: "review" }, actor), a.verbose);
+      return echo(a.label === "human_skip" ? await setStatusFromCaller(a.idOrSlug, "archived", { actor, reason: "human_skip" }) : await setStatusFromCaller(a.idOrSlug, "review", { actor }), a.verbose);
     },
   );
 
@@ -641,7 +641,8 @@ export function createJobScoutMcpServer() {
         if (mapped && mapped !== position.status) patch.status = mapped;
         // Workday/landing pages often yield no title from the fetch: the tracker role is the truth then.
         if (!position.title?.trim()) patch.title = a.role;
-        if (Object.keys(patch).length) await patchPosition(position.id, patch, "career-ops");
+        // Same precedence as set_position_status: a stale tracker row never moves the role backwards.
+        if (Object.keys(patch).length) await patchFromCaller(position.id, patch, { actor: "career-ops", source: "career-ops", trackerStatus: a.status, note: `career-ops tracker${a.trackerId ? ` #${a.trackerId}` : ""} is ${a.status ?? "unknown"}` });
         const stamp = await stampCareerOps(position.id, { trackerId: a.trackerId, score: a.score, status: a.status, reportPath: a.reportPath });
         const detail = await getPositionDetail(position.id);
         return text({ position: a.verbose || !detail ? detail : positionSummary(detail), stamp, via,

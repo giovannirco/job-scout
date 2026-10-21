@@ -187,3 +187,29 @@ export function isAutomatedActor(actor: string | null | undefined): boolean {
   const a = String(actor || "system").trim();
   return AUTOMATED_ACTOR.test(actorParts(a).token) || isCareerOpsActor(a);
 }
+
+/** Pipeline order for career-ops sync writes; terminal statuses sit outside it. */
+const STAGE_RANK: Partial<Record<string, number>> = { triaged: 0, review: 1, materials: 2, applied: 3, screen: 4, interview: 5, offer: 6 };
+const PRE_APPLY = (s: string) => (STAGE_RANK[s] ?? 99) < 3;
+
+export type CareerOpsStatusVerdict = { apply: true } | { apply: false; why: "later" | "terminal" | "closed" };
+
+/**
+ * May a status write that comes from the career-ops tracker sync move a
+ * position from `current` to `next`? The tracker is often stale, so it may only
+ * move a role forward: never out of rejected, never back to an earlier stage,
+ * and a pre-apply label (Evaluated, To apply…) never reopens an archived,
+ * skipped or closed role. Forward moves (review → applied, applied → rejected,
+ * archived → applied when the tracker records an application) still apply.
+ */
+export function careerOpsStatusVerdict(current: string, next: string, opts: { listingClosed?: boolean } = {}): CareerOpsStatusVerdict {
+  if (current === next) return { apply: true };
+  if (current === "rejected") return { apply: false, why: "terminal" };
+  if (current === "archived" || current === "skip") return PRE_APPLY(next) ? { apply: false, why: "terminal" } : { apply: true };
+  if (opts.listingClosed && PRE_APPLY(next) && PRE_APPLY(current) === false) return { apply: false, why: "closed" };
+  if (next === "rejected") return { apply: true };
+  const a = STAGE_RANK[current];
+  const b = STAGE_RANK[next];
+  if (a !== undefined && b !== undefined && b < a) return { apply: false, why: "later" };
+  return { apply: true };
+}

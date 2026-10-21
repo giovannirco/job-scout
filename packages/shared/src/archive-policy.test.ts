@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hardDisqualifierKind, isAutomatedActor, isCareerOpsActor, postedYearlyUsdMax, triageArchiveDecision } from "./archive-policy.js";
+import { careerOpsStatusVerdict, hardDisqualifierKind, isAutomatedActor, isCareerOpsActor, postedYearlyUsdMax, triageArchiveDecision } from "./archive-policy.js";
 
 describe("hardDisqualifierKind", () => {
   it.each([
@@ -119,5 +119,21 @@ describe("actor attribution format", () => {
     expect(isAutomatedActor("career-ops via shared-agent")).toBe(true);
     expect(isAutomatedActor("someone via scan:greenhouse")).toBe(true);
     expect(isAutomatedActor("desk-agent via shared-agent")).toBe(false);
+  });
+});
+
+describe("careerOpsStatusVerdict", () => {
+  it("blocks backwards and reopening moves", () => {
+    expect(careerOpsStatusVerdict("rejected", "interview")).toEqual({ apply: false, why: "terminal" });
+    expect(careerOpsStatusVerdict("archived", "review")).toEqual({ apply: false, why: "terminal" });
+    expect(careerOpsStatusVerdict("skip", "materials")).toEqual({ apply: false, why: "terminal" });
+    expect(careerOpsStatusVerdict("interview", "applied")).toEqual({ apply: false, why: "later" });
+    expect(careerOpsStatusVerdict("offer", "interview")).toEqual({ apply: false, why: "later" });
+    expect(careerOpsStatusVerdict("applied", "review", { listingClosed: true })).toEqual({ apply: false, why: "closed" });
+  });
+  it("allows forward moves", () => {
+    for (const [a, b] of [["review", "applied"], ["applied", "rejected"], ["offer", "rejected"], ["triaged", "review"], ["archived", "applied"], ["screen", "interview"], ["review", "review"]] as const) {
+      expect(careerOpsStatusVerdict(a, b)).toEqual({ apply: true });
+    }
   });
 });
