@@ -105,6 +105,11 @@ export function positionSlugFor(companySlug: string, title: string, positionId: 
   return `${slugify(`${companySlug}-${title}`).slice(0, 70)}-${positionId.slice(-4)}`;
 }
 
+/** A not-a-JD title (soft-404, JS wall, vendor boilerplate, placeholder) or a board shell ("Jobs"): never slug material. */
+export function isNonJdTitle(title: string | null | undefined): boolean {
+  return Boolean(titleSignature(title)) || isShellJobTitle(title);
+}
+
 /** Was this position slug derived from a not-a-JD title (vendor boilerplate, "Job Not Found", a loading placeholder)? */
 export function slugFromBadTitle(slug: string, companySlug: string): boolean {
   let body = slug.replace(/-[A-Za-z0-9_-]{4}$/, "");
@@ -133,8 +138,9 @@ export function slugForRetitle(
   newTitle: string,
   knownTitles: Array<string | null | undefined> = [],
 ): string | null {
+  if (isNonJdTitle(newTitle)) return null;
   const next = positionSlugFor(pos.companySlug, newTitle, pos.id);
-  if (!newTitle.trim() || next === pos.slug) return null;
+  if (next === pos.slug) return null;
   const titles = [pos.title, ...knownTitles].filter((t): t is string => Boolean(t && t.trim()));
   const derived = titles.some((t) => positionSlugFor(pos.companySlug, t, pos.id) === pos.slug);
   const fromShell = pos.slug.endsWith(`-${pos.id.slice(-4)}`) && titles.some((t) => isShellJobTitle(t));
@@ -143,7 +149,8 @@ export function slugForRetitle(
 
 /**
  * Positions whose slug was built from an earlier title (a bad first scrape, a
- * retitle on the board) and never followed the corrected title. Dry-run unless
+ * retitle on the board) and never followed the corrected title. Rows whose
+ * current title is still not a real JD title are left alone. Dry-run unless
  * `apply`; old slugs stay resolvable through metadata.previousSlugs.
  */
 export async function repairStaleTitleSlugs(opts: { apply?: boolean } = {}) {
@@ -158,6 +165,8 @@ export async function repairStaleTitleSlugs(opts: { apply?: boolean } = {}) {
   const taken = new Set(rows.map((r) => r.slug));
   const plan: SlugRepairPlan[] = [];
   for (const p of rows) {
+    // The stored title can itself still be a soft-404 or shell; a slug built from it is no better.
+    if (isNonJdTitle(p.title)) continue;
     if (positionSlugFor(p.companySlug, p.title, p.id) === p.slug) continue;
     const earlier = titlesBy.get(p.id) || [];
     // Only a slug built from an earlier title, never a hand-picked one.

@@ -12,7 +12,7 @@ import { applySnapshot, getPosition, listPositions, patchPosition, refreshPositi
 import { BoardIndexError, boardRetitled, followUpIntake, intakeUrl } from "./scan.js";
 import { runTriage } from "./triage.js";
 import { runEvaluate } from "./evaluate.js";
-import { repairStaleTitleSlugs } from "./slug-repair.js";
+import { repairStaleTitleSlugs, slugForRetitle } from "./slug-repair.js";
 
 const dir = mkdtempSync(join(tmpdir(), "job-scout-jd-ingestion-"));
 
@@ -155,6 +155,25 @@ describe("JD ingestion gaps (isolated PGlite)", () => {
       const after = (await getPosition(position.id))!;
       expect(after.slug).toContain("database-reliability-engineer");
       expect((await getPosition(position.slug))?.id).toBe(position.id);
+    });
+
+    it("repairStaleTitleSlugs skips a row whose stored title is still a not-a-JD title", async () => {
+      const { position } = await upsertFromJob(role("r6", { title: "Senior Platform Engineer" }), { status: "triaged" });
+      const db = await getDb();
+      await db.update(positions).set({ title: "Job Not Found" }).where(eq(positions.id, position.id));
+      expect((await revisionsOf(position.id)).some((r) => r.title === "Senior Platform Engineer")).toBe(true);
+      const plan = await repairStaleTitleSlugs();
+      expect(plan.positions.find((p) => p.id === position.id)).toBeUndefined();
+      await repairStaleTitleSlugs({ apply: true });
+      expect((await getPosition(position.id))!.slug).toBe(position.slug);
+    });
+
+    it("slugForRetitle never derives a slug from a not-a-JD or shell title", () => {
+      const pos = { id: "pos_000000000abcd", slug: "acme-example-engineering-team-abcd", title: "Engineering Team", companySlug: "acme-example" };
+      expect(slugForRetitle(pos, "Job Not Found")).toBeNull();
+      expect(slugForRetitle(pos, "Jobs")).toBeNull();
+      expect(slugForRetitle(pos, "   ")).toBeNull();
+      expect(slugForRetitle(pos, "Staff Platform Engineer")).toBe("acme-example-staff-platform-engineer-abcd");
     });
 
     it("boardRetitled: a real, different board title triggers a refetch; noise and closed rows do not", () => {
