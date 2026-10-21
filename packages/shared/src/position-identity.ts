@@ -50,6 +50,7 @@ export function isJobPostingUrl(value?: string | null): boolean {
     const u = new URL(value || "");
     if (u.searchParams.has("gh_jid")) return true;
     if (/\/jobs\/\d+(?:\/|$)/.test(u.pathname)) return true;
+    if (/^[^.]+\.recruitee\.com$/i.test(u.hostname) && /^\/o\/[^/]+\/?$/.test(u.pathname)) return true;
     if (/^jobs\.ashbyhq\.com$/i.test(u.hostname) && /\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/?$/i.test(u.pathname)) return true;
     return false;
   } catch {

@@ -293,6 +293,20 @@ export function detectAts(url: string): DetectedAts {
       };
     }
 
+    // ── Recruitee ───────────────────────────────────────────────────────────
+    // https://{company}.recruitee.com/o/{offer-slug}
+    if (host.endsWith(".recruitee.com") && !/^(www|app|api|careers)\./.test(host)) {
+      const company = host.split(".")[0];
+      m = path.match(/\/o\/([^/?#]+)/i);
+      return {
+        provider: "recruitee",
+        boardToken: company,
+        jobId: m?.[1],
+        url,
+        confidence: m ? "high" : "medium",
+      };
+    }
+
     // ── InHire ──────────────────────────────────────────────────────────────
     // https://{tenant}.inhire.app/vagas/{uuid}[/{slug}]
     if (host.endsWith(".inhire.app") && !/^(api|api-dev|files|www|app)\./.test(host)) {

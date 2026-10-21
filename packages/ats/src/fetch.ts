@@ -492,6 +492,59 @@ export async function fetchInhireJob(tenant: string, jobId: string, url?: string
   };
 }
 
+/**
+ * Recruitee public offers API: GET https://{company}.recruitee.com/api/offers/{slug}.
+ * The /o/{slug} page is a JS app whose static HTML is vendor marketing copy, so the
+ * page is never scraped.
+ */
+export async function fetchRecruiteeJob(company: string, slug: string, url?: string): Promise<AtsJob> {
+  const pageUrl = url || `https://${company}.recruitee.com/o/${slug}`;
+  const base = { provider: "recruitee" as const, boardToken: company, jobId: slug, externalIdentity: `recruitee:${company}:${slug}`, url: pageUrl };
+  const { status, body, ok } = await fetchText(`https://${company}.recruitee.com/api/offers/${encodeURIComponent(slug)}`, { accept: "application/json" });
+  if (status === 404) return { ...base, title: "", listingStatus: "closed", rawPayload: { source: "recruitee_api", httpStatus: 404 } };
+  if (!ok) throw new Error(`recruitee fetch failed: ${status}`);
+  type Offer = {
+    id?: number; slug?: string; title?: string; description?: string; requirements?: string; status?: string;
+    location?: string; city?: string; country?: string; remote?: boolean; company_name?: string;
+    employment_type_code?: string; published_at?: string; updated_at?: string; careers_apply_url?: string;
+    salary?: { min?: string | number | null; max?: string | number | null; currency?: string | null; period?: string | null } | null;
+  };
+  let offer: Offer | undefined;
+  try {
+    offer = (JSON.parse(body) as { offer?: Offer }).offer;
+  } catch {
+    offer = undefined;
+  }
+  if (!offer) return { ...base, title: "", listingStatus: "unknown", rawPayload: { source: "recruitee_api", fetchFailed: "bad_payload" } };
+  if (offer.slug && offer.slug !== slug) {
+    // Never accept a different offer than the one asked for.
+    return { ...base, title: "", listingStatus: "unknown", rawPayload: { source: "recruitee_api", fetchFailed: "slug_mismatch", got: offer.slug } };
+  }
+  const loc = [offer.city?.trim(), offer.country?.trim()].filter(Boolean).join(", ") || offer.location;
+  const sal = offer.salary && (offer.salary.min || offer.salary.max)
+    ? `${offer.salary.currency || ""} ${offer.salary.min ?? ""}-${offer.salary.max ?? ""} ${offer.salary.period || ""}`.trim()
+    : undefined;
+  const html = [offer.description, offer.requirements].filter(Boolean).join("\n");
+  return {
+    ...base,
+    title: (offer.title || "").trim(),
+    company: offer.company_name,
+    applyUrl: offer.careers_apply_url,
+    // Recruitee puts the company HQ country on remote offers; it is not a residency rule.
+    locationRaw: offer.remote ? "Remote" : loc || undefined,
+    descriptionText: stripHtml(decodeHtmlEntities(html)) || undefined,
+    descriptionHtml: html || undefined,
+    salaryRaw: sal,
+    employmentType: offer.employment_type_code,
+    workplaceType: offer.remote ? "remote" : undefined,
+    isRemote: offer.remote ?? undefined,
+    postedAt: offer.published_at,
+    updatedAt: offer.updated_at,
+    listingStatus: offer.status && offer.status !== "published" ? "closed" : "open",
+    rawPayload: { source: "recruitee_api", status: offer.status, offerId: offer.id },
+  };
+}
+
 /** The board's own job URLs name this org (a renamed / aliased board is not evidence of closure). */
 function ashbyBoardMatches(org: string, jobs: Array<{ jobUrl?: string }>): boolean {
   const urls = jobs.map((j) => j.jobUrl).filter((u): u is string => typeof u === "string" && Boolean(u));
@@ -954,6 +1007,11 @@ export async function fetchJobFromUrl(url: string, opts: { render?: HtmlRenderer
   // InHire pages are a JS app: only the public API has the posting. Never render.
   if (detected.provider === "inhire" && detected.boardToken && detected.jobId) {
     return fetchInhireJob(detected.boardToken, detected.jobId, url);
+  }
+
+  // Recruitee offer pages render client-side; the public offers API has the posting.
+  if (detected.provider === "recruitee" && detected.boardToken && detected.jobId) {
+    return fetchRecruiteeJob(detected.boardToken, detected.jobId, url);
   }
 
   // Workday / SmartRecruiters / Workable / LinkedIn / etc. → HTML + JSON-LD,
