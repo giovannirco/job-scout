@@ -373,7 +373,7 @@ export function extractUrls(text: string): string[] {
 
 /** Build external identity for CRM dedupe. */
 export function externalIdentityFromDetect(d: DetectedAts): string | undefined {
-  if (!d.provider || d.provider === "unknown") return undefined;
+  if (d.provider === "unknown") return undefined;
   if (d.boardToken && d.jobId) return `${d.provider}:${d.boardToken}:${d.jobId}`;
   if (d.jobId) return `${d.provider}:${d.jobId}`;
   return undefined;

@@ -17,7 +17,7 @@ export type MaterialsInput = {
   identityMarkdown: string;
   masterResumeMarkdown: string;
   masterCoverMarkdown?: string | null;
-  resumeSurfaces: Record<string, string>;
+  resumeSurfaces?: Record<string, string> | null;
   preferredSurface?: string | null;
   evaluationMarkdown?: string | null;
   atsKeywords?: string[];

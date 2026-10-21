@@ -288,7 +288,7 @@ export function classifyMateriality(
   if (paths.has("listing_status")) {
     const d = meaningful.find((x) => x.path === "listing_status");
     if (d?.after === "closed") return { material: true, change_kind: "closed" };
-    if (d?.before === "closed" && d?.after === "open")
+    if (d?.before === "closed" && d.after === "open")
       return { material: true, change_kind: "reopened" };
     return { material: true, change_kind: "status" };
   }

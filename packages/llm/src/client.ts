@@ -314,7 +314,8 @@ export function createLlmClient(opts: LlmClientOptions) {
       }
       let content = "";
       let model = modelName;
-      let finishReason: string | null = null;
+      // Assigned inside handle(); the cast stops TS narrowing it to null at the check below.
+      let finishReason = null as string | null;
       let tokensIn: number | null = null;
       let tokensOut: number | null = null;
       const calls = new Map<number, { id: string; name: string; args: string }>();

@@ -15,11 +15,12 @@ const LEVELS: Record<LogLevel, number> = { debug: 10, info: 20, warn: 30, error:
 
 // apps/web imports this package's barrel, so this module is evaluated in the browser
 // too, where `process` does not exist. Read env defensively rather than at the top level.
-const env: Record<string, string | undefined> = typeof process !== "undefined" && process.env ? process.env : {};
+const env: Record<string, string | undefined> = (typeof process !== "undefined" && (process as Partial<NodeJS.Process>).env) || {};
 
 const envFormat = env.LOG_FORMAT || (env.NODE_ENV === "production" ? "json" : "pretty");
-const envLevel = (env.LOG_LEVEL || "info").toLowerCase() as LogLevel;
-const FLOOR = LEVELS[envLevel] ?? LEVELS.info;
+const envLevel = (env.LOG_LEVEL || "info").toLowerCase();
+// LOG_LEVEL is free text; an unknown value falls back to info.
+const FLOOR = (LEVELS as Partial<Record<string, number>>)[envLevel] ?? LEVELS.info;
 
 let baseContext: LogFields = {};
 
@@ -63,7 +64,9 @@ const RESET = "\x1b[0m";
 function write(level: LogLevel, msg: string, fields: LogFields) {
   if (LEVELS[level] < FLOOR) return;
   const record: LogFields & { ts: string; level: LogLevel; msg: string } = { ts: new Date().toISOString(), level, ...baseContext, msg, ...normalize(fields) };
-  if (typeof process === "undefined" || !process.stdout || !process.stderr) {
+  // Browser shims may define `process` without Node's streams.
+  const node = typeof process === "undefined" ? undefined : (process as Partial<NodeJS.Process>);
+  if (!node?.stdout || !node.stderr) {
     console[level](msg, record);
     return;
   }
