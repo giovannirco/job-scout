@@ -11,6 +11,7 @@ import { createApproval, resolveApproval } from "./autopilot.js";
 import { saveMaterial } from "./materials.js";
 import { coreEnv } from "./env.js";
 import { planLastGoodRepair, repairToLastGoodRevision } from "./jd-repair.js";
+import { positionSlugFor, reslugSuggestion, slugFromBadTitle } from "./slug-repair.js";
 import { careerOpsStampState, listMaterialsWithoutFiles, MaterialsMissingError, repairMaterialsWithoutFiles } from "./pipeline-integrity.js";
 
 const dir = mkdtempSync(join(tmpdir(), "job-scout-jd-guards-"));
@@ -204,6 +205,42 @@ describe("JD snapshot guards and last-good repair (isolated PGlite)", () => {
     expect(evs.find((e) => e.id === "ev_old_d4")?.json).not.toHaveProperty("superseded");
     const queued = (await db.select().from(jobs)).filter((j) => (j.payload as { positionId?: string }).positionId === position.id).map((j) => [j.type, (j.payload as { force?: boolean }).force ?? null]);
     expect(queued).toEqual(expect.arrayContaining([["jd_review", null], ["triage", true]]));
+  });
+
+  it("last-good repair reslugs a slug derived from a not-a-JD title and live-checks the title read-only", async () => {
+    const { position } = await upsertFromJob(inhire("a19"), { status: "review" });
+    const db = await getDb();
+    const badSlug = `${position.company.slug}-job-not-found-${position.id.slice(-4)}`;
+    await db.update(positions).set({ slug: badSlug }).where(eq(positions.id, position.id));
+    const live = vi.fn(async () => new Response(JSON.stringify({ tenantName: "Acme Pay", displayName: "Cloud Platform Engineer III", description: `<p>${JD}</p>`, status: "published" }), { status: 200 }));
+    vi.stubGlobal("fetch", live);
+    const preset = { positionId: position.id, reslug: true, liveCheck: true, enqueue: [] };
+    const want = positionSlugFor(position.company.slug, "Cloud Platform Engineer III", position.id);
+
+    const dry = await repairToLastGoodRevision(preset);
+    expect(dry).toMatchObject({ dryRun: true, reslug: { from: badSlug, to: want }, live: { liveTitle: "Cloud Platform Engineer III", matches: true } });
+    expect(dry.steps.map((st) => st.step)).toEqual(["restore_revision", "reslug", "listing_status", "supersede_evaluations", "enqueue"]);
+    expect((await getPosition(position.id))!.slug).toBe(badSlug);
+    expect(live).toHaveBeenCalledTimes(1);
+
+    await repairToLastGoodRevision(preset, { apply: true });
+    const after = (await getPosition(position.id))!;
+    expect(after.slug).toBe(want);
+    expect(after.metadata?.previousSlugs).toEqual([badSlug]);
+    expect((await getPosition(badSlug))?.id).toBe(position.id);
+    const events = await db.select().from(timelineEvents).where(and(eq(timelineEvents.positionId, position.id), eq(timelineEvents.kind, "repair")));
+    expect(events.map((e) => e.title)).toContain(`Slug repaired: ${badSlug} → ${want}`);
+    // Idempotent: a good slug is left alone.
+    expect((await repairToLastGoodRevision(preset)).reslug).toBeNull();
+  });
+
+  it("reslug suggestions only fire for slugs built from a not-a-JD title", () => {
+    const pos = (slug: string) => ({ id: "pos_synthetic_ab12", slug, company: { slug: "acme-pay" } });
+    expect(slugFromBadTitle("acme-pay-job-not-found-ab12", "acme-pay")).toBe(true);
+    expect(slugFromBadTitle("acme-pay-cloud-platform-engineer-ab12", "acme-pay")).toBe(false);
+    expect(reslugSuggestion(pos("acme-pay-job-not-found-ab12"), "Cloud Platform Engineer")).toEqual({ from: "acme-pay-job-not-found-ab12", to: "acme-pay-cloud-platform-engineer-ab12" });
+    expect(reslugSuggestion(pos("acme-pay-job-not-found-ab12"), "Job Not Found")).toBeNull();
+    expect(reslugSuggestion(pos("acme-pay-sre-ab12"), "Cloud Platform Engineer")).toBeNull();
   });
 
   it("planner skips guard-failing and cross-company revisions and respects the window", () => {

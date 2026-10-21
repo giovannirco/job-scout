@@ -1,11 +1,12 @@
 import { eq } from "drizzle-orm";
 import { companies, getDb, positions, slugify } from "@job-scout/db";
-import { canonicalCompanySlug, isPrototypeSlug } from "@job-scout/shared";
+import { canonicalCompanySlug, isPrototypeSlug, titleSignature } from "@job-scout/shared";
 import { addEvent } from "./timeline.js";
 
 export type SlugRepairPlan = { id: string; name: string; from: string; to: string };
 
-function withPrevious(metadata: Record<string, unknown> | null, slug: string): Record<string, unknown> {
+/** Metadata with `slug` appended to previousSlugs (which getPosition/getCompany still resolve). */
+export function withPrevious(metadata: Record<string, unknown> | null | undefined, slug: string): Record<string, unknown> {
   const m = { ...(metadata || {}) };
   const prev = Array.isArray(m.previousSlugs) ? m.previousSlugs.filter((s): s is string => typeof s === "string") : [];
   return { ...m, previousSlugs: [...new Set([...prev, slug])] };
@@ -57,4 +58,26 @@ export async function repairPrototypeSlugs(opts: { apply?: boolean } = {}) {
     await addEvent({ positionId: p.id, kind: "repair", title: `Slug repaired: ${p.from} → ${p.to}`, actor: "repair:prototype-slugs", metadata: { from: p.from, to: p.to } });
   }
   return { dryRun: false as const, companies: companyPlan, positions: positionPlan };
+}
+
+/** Position slug convention: slugify(`${companySlug}-${title}`) capped at 70, then "-" + the last 4 of the id. */
+export function positionSlugFor(companySlug: string, title: string, positionId: string): string {
+  return `${slugify(`${companySlug}-${title}`).slice(0, 70)}-${positionId.slice(-4)}`;
+}
+
+/** Was this position slug derived from a not-a-JD title (vendor boilerplate, "Job Not Found", a loading placeholder)? */
+export function slugFromBadTitle(slug: string, companySlug: string): boolean {
+  let body = slug.replace(/-[A-Za-z0-9_-]{4}$/, "");
+  const co = slugify(companySlug);
+  if (co && body.startsWith(`${co}-`)) body = body.slice(co.length + 1);
+  const words = body.replace(/-/g, " ").trim();
+  return Boolean(words) && Boolean(titleSignature(words));
+}
+
+/** Reslug when the current slug came from a bad title and a real title is known; null when nothing to do. */
+export function reslugSuggestion(pos: { id: string; slug: string; company: { slug: string } }, realTitle: string): { from: string; to: string } | null {
+  if (!realTitle.trim() || titleSignature(realTitle)) return null;
+  if (!slugFromBadTitle(pos.slug, pos.company.slug)) return null;
+  const to = positionSlugFor(pos.company.slug, realTitle, pos.id);
+  return to === pos.slug ? null : { from: pos.slug, to };
 }

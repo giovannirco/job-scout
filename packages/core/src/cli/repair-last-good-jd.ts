@@ -2,12 +2,14 @@
  * Restore a clobbered JD from its last good revision. Dry-run by default; writes only with --apply.
  *
  *   pnpm db:repair-last-good-jd --presets /private/path/presets.json <name> [--apply]
- *   pnpm db:repair-last-good-jd --position <id> [--before <iso>] [--supersede-from <iso>] [--supersede-until <iso>] [--supersede ev_a,ev_b] [--apply]
+ *   pnpm db:repair-last-good-jd --position <id> [--before <iso>] [--supersede-from <iso>] [--supersede-until <iso>] [--supersede ev_a,ev_b] [--reslug] [--live] [--apply]
  *   pnpm db:repair-last-good-jd --presets <file> <name> --snapshot <get_position.json>   # plan only, no database
  *
  * Presets name real positions, so they live outside the repository: a JSON object
- * { "<name>": { positionId, before?, supersedeFrom?, supersedeUntil?, supersedeEvaluations?, enqueue? } }.
- * --snapshot plans from a saved get_position (MCP/API) response and never opens a database.
+ * { "<name>": { positionId, before?, supersedeFrom?, supersedeUntil?, supersedeEvaluations?, enqueue?, reslug?, liveCheck? } }.
+ * --reslug renames a slug derived from a not-a-JD title (the old slug stays resolvable via metadata.previousSlugs).
+ * --live fetches the live posting read-only and compares its title with the restored one.
+ * --snapshot plans from a saved get_position (MCP/API) response and never opens a database (no live check).
  */
 import { readFileSync } from "node:fs";
 import type { LastGoodRepairPreset, RepairSnapshot } from "../jd-repair.js";
@@ -29,7 +31,13 @@ if (presetsPath && name) {
     supersedeFrom: flag("--supersede-from"),
     supersedeUntil: flag("--supersede-until"),
     supersedeEvaluations: (flag("--supersede") || "").split(",").filter(Boolean),
+    reslug: argv.includes("--reslug"),
+    liveCheck: argv.includes("--live"),
   };
+}
+if (preset && presetsPath) {
+  if (argv.includes("--reslug")) preset = { ...preset, reslug: true };
+  if (argv.includes("--live")) preset = { ...preset, liveCheck: true };
 }
 if (!preset) {
   console.error("usage: repair-last-good-jd (--presets <file> <name> | --position <id> …) [--snapshot <file>] [--apply]");
