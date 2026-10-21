@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { LaneBadge, ScoreMeter, StatusBadge } from "@/components/badges";
 import { useChatScope } from "@/frame/store";
 import { apiMeta, del, patch, post, qs, useApi, useApiMeta, type Board, type DeltaRow, type DiscoveryRow, type SystemInfo, type Watch } from "@/lib/api";
+import { handle } from "@/lib/async";
 import { ago, countLabel, dateTime, titleCase } from "@/lib/format";
 import { discoveryQueuedMessage, promoteMessage } from "@/lib/discovery-toast";
 import { gateReasonLabel } from "@/lib/gate-reason";
@@ -23,7 +24,8 @@ export function RadarPage() {
   const navigate = useNavigate({ from: onSources ? "/sources" : "/discovery" });
   const go = useNavigate();
   const tab: Tab = onSources ? (search.tab === "watches" ? "watches" : "boards") : search.tab || "discovery";
-  const set = (p: Partial<RadarSearch>) => navigate({ search: (prev) => ({ ...prev, page: undefined, ...p }) });
+  // navigate() only resolves once the URL commits; route load errors render in the router's error boundary.
+  const set = (p: Partial<RadarSearch>) => void navigate({ search: (prev) => ({ ...prev, page: undefined, ...p }) });
   const hours = search.hours || 72;
 
   const raw = useApi<{ lanes: { lane: string; c: number; positions?: number }[]; boards: { total: number; enabled: number; scanned24h: number; errored: number } }>(["radar", "summary", hours], `/api/v1/radar/discovery/summary?hours=${hours}`, {
@@ -39,12 +41,12 @@ export function RadarPage() {
         subtitle={onSources ? "Boards and watches the worker scans." : "Scan firehose — listings observed this window, not owned positions. Owned roles live in Pipeline."}
         actions={
           <Btn
-            onClick={async () => {
+            onClick={handle(async () => {
               const r = await post<{ enqueued: number }>("/api/v1/radar/boards/scan-all");
               const text = discoveryQueuedMessage(r);
               if (r.enqueued > 0) toast.success(text);
               else toast.message(text);
-            }}
+            })}
           >
             <Play className="h-3.5 w-3.5" /> Scan due boards
           </Btn>
@@ -240,7 +242,7 @@ function Discovery({ search, set, summary }: { search: RadarSearch; set: (p: Par
                       </a>
                     ) : null}
                     {!r.positionSlug || r.positionStatus === "archived" ? (
-                      <Btn size="xs" variant="ghost" onClick={() => promote(r)} title={r.positionStatus === "archived" ? "Revive archived position" : noKey ? "Create a position. Scoring waits until a model key is set." : "Create a position and run triage"}>
+                      <Btn size="xs" variant="ghost" onClick={handle(() => promote(r))} title={r.positionStatus === "archived" ? "Revive archived position" : noKey ? "Create a position. Scoring waits until a model key is set." : "Create a position and run triage"}>
                         <ArrowUpRight className="h-3 w-3" /> {r.positionStatus === "archived" ? "Revive" : "Promote"}
                       </Btn>
                     ) : null}
@@ -400,7 +402,7 @@ function Boards({ search, set }: { search: RadarSearch; set: (p: Partial<RadarSe
             <option value="lever">lever</option>
           </Select>
           <Input label="Board token" value={form.token} onChange={(e) => setForm({ ...form, token: e.target.value })} placeholder="e.g. grafanalabs" />
-          <Btn variant="primary" size="md" onClick={add} disabled={!form.company || !form.token}>
+          <Btn variant="primary" size="md" onClick={handle(add)} disabled={!form.company || !form.token}>
             Add
           </Btn>
         </Card>
@@ -453,10 +455,10 @@ function Boards({ search, set }: { search: RadarSearch; set: (p: Partial<RadarSe
                 </Td>
                 <Td right>
                   <span className="inline-flex gap-1">
-                    <IconBtn label="Scan now" onClick={() => scan(b)}>
+                    <IconBtn label="Scan now" onClick={handle(() => scan(b))}>
                       <Play className="h-3.5 w-3.5" />
                     </IconBtn>
-                    <Btn size="xs" variant="ghost" onClick={() => toggle(b)}>
+                    <Btn size="xs" variant="ghost" onClick={handle(() => toggle(b))}>
                       {b.enabled ? "Disable" : "Enable"}
                     </Btn>
                   </span>
@@ -497,7 +499,7 @@ function Watches({ search, set }: { search: RadarSearch; set: (p: Partial<RadarS
       <Card className="p-3 grid sm:grid-cols-[1fr_200px_auto] gap-2 items-end">
         <Input label="URL to watch" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Any careers page or job URL" />
         <Input label="Label" value={label} onChange={(e) => setLabel(e.target.value)} />
-        <Btn variant="primary" size="md" onClick={add} disabled={!url}>
+        <Btn variant="primary" size="md" onClick={handle(add)} disabled={!url}>
           Watch
         </Btn>
       </Card>
@@ -543,7 +545,7 @@ function Watches({ search, set }: { search: RadarSearch; set: (p: Partial<RadarS
                   {w.lastChangedAt ? dateTime(w.lastChangedAt) : "—"}
                 </Td>
                 <Td right>
-                  <IconBtn label="Remove watch" onClick={() => remove(w)}>
+                  <IconBtn label="Remove watch" onClick={handle(() => remove(w))}>
                     <Trash2 className="h-3.5 w-3.5" />
                   </IconBtn>
                 </Td>

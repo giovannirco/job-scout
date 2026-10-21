@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent }
 import { toast } from "sonner";
 import { Markdown } from "@/components/markdown";
 import { api, client, del, post, useApi, type ChatMessage, type ChatThread, type ChatThreadRow, type SystemInfo } from "@/lib/api";
+import { handle } from "@/lib/async";
 import { ago } from "@/lib/format";
 import { Btn, IconBtn, Kbd, cn } from "@/ui/kit";
 import { useUi, type ChatScopeCtx } from "./store";
@@ -190,12 +191,12 @@ export function ChatPanel() {
           {threadId ? (
             <IconBtn
               label="Delete thread"
-              onClick={async () => {
+              onClick={handle(async () => {
                 if (!confirm("Delete this thread?")) return;
                 await del(`/api/v1/chat/threads/${threadId}`);
                 setThreadId(null);
                 void qc.invalidateQueries({ queryKey: ["chat", "threads", scopeKey] });
-              }}
+              }, "Could not delete thread")}
             >
               <Trash2 className="h-3.5 w-3.5" />
             </IconBtn>

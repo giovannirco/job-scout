@@ -4,6 +4,7 @@ import { Activity, Check, Inbox, MessageSquareText, X } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
 import { toast } from "sonner";
 import { post, type ActivityRow, type Approval } from "@/lib/api";
+import { handle } from "@/lib/async";
 import { ago } from "@/lib/format";
 import { Btn, Dot, Empty, IconBtn, Seg, cn, type Tone } from "@/ui/kit";
 import { StatusBadge } from "@/components/badges";
@@ -214,11 +215,11 @@ function ApprovalCard({ a, full }: { a: Approval; full?: boolean }) {
         </div>
       ) : null}
       <div className="flex items-center gap-1.5 pt-1">
-        <Btn size="xs" variant="primary" onClick={() => resolve("approve")}>
+        <Btn size="xs" variant="primary" onClick={handle(() => resolve("approve"))}>
           <Check className="h-3 w-3" />
           {a.kind === "status_suggestion" ? `Move to ${p.to ?? "status"}` : a.kind === "archive_suggestion" ? "Archive" : "Accept draft"}
         </Btn>
-        <Btn size="xs" variant="ghost" onClick={() => resolve("dismiss")}>
+        <Btn size="xs" variant="ghost" onClick={handle(() => resolve("dismiss"))}>
           Dismiss
         </Btn>
       </div>

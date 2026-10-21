@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { jobRecovery, clipBookmarklet, isStarterScoutBrief, pausedGeoBlocks, titleExcludesFromNorthStar } from "@job-scout/shared";
 import { useChatScope, useTheme, type ThemePref } from "@/frame/store";
 import { api, del, patch, post, qs, useApi, type ApiToken, type AutopilotConfig, type AutopilotState, type Job, type LlmStatus, type ModelsCatalog, type NotificationsConfig, type NotifyChannel, type Profile, type Settings, type SystemInfo } from "@/lib/api";
+import { handle } from "@/lib/async";
 import { ago, compact, dateTime } from "@/lib/format";
 import { discoveryQueuedMessage } from "@/lib/discovery-toast";
 import { JevSettings } from "@/components/Jev";
@@ -38,7 +39,7 @@ export function SettingsPage() {
           <button
             key={t.value}
             type="button"
-            onClick={() => navigate({ search: { tab: t.value === "profile" ? undefined : t.value } })}
+            onClick={() => void navigate({ search: { tab: t.value === "profile" ? undefined : t.value } })}
             className={cn("block w-full text-left rounded-md px-2.5 py-1.5 text-[13px] whitespace-nowrap transition-colors", tab === t.value ? "bg-surface-3 text-fg" : "text-muted hover:text-fg hover:bg-surface-2")}
           >
             {t.label}
@@ -249,7 +250,7 @@ function ProfileTab() {
           />
         </div>
       </Panel>
-      <SaveBar dirty={dirty} onSave={save} label="Save profile" />
+      <SaveBar dirty={dirty} onSave={handle(save)} label="Save profile" />
     </div>
   );
 }
@@ -339,7 +340,7 @@ function GateTab() {
         </Link>
         . Whether new positions get triaged automatically is an Autopilot setting.
       </p>
-      <SaveBar dirty={dirty} onSave={save} label="Save gate" />
+      <SaveBar dirty={dirty} onSave={handle(save)} label="Save gate" />
     </div>
   );
 }
@@ -437,7 +438,7 @@ function AiTab() {
         <Btn
           variant="ghost"
           size="xs"
-          onClick={async () => {
+          onClick={handle(async () => {
             try {
               const r = await post<{ items: unknown[] }>("/api/v1/settings/llm/retry", { hours: 24, scope: "failed_and_missing" });
               toast.success(`Retry queued: ${r.items.length} jobs`);
@@ -446,12 +447,12 @@ function AiTab() {
             } catch (e) {
               toast.error(e instanceof Error ? e.message : "Retry failed");
             }
-          }}
+          })}
           className="ml-auto"
         >
           <RefreshCw className="h-3 w-3" /> Retry failed
         </Btn>
-        <Btn variant="ghost" size="xs" onClick={refreshCatalog}>
+        <Btn variant="ghost" size="xs" onClick={handle(refreshCatalog)}>
           <RefreshCw className="h-3 w-3" /> Refresh catalog
         </Btn>
       </Card>
@@ -548,7 +549,7 @@ function AiTab() {
                   {u?.avgLatencyMs ? `${(u.avgLatencyMs / 1000).toFixed(1)}s` : "—"}
                 </Td>
                 <Td right>
-                  <Btn size="xs" variant="ghost" onClick={() => test(op.id)} disabled={testing === op.id || !d.model} title="Smoke call with this model">
+                  <Btn size="xs" variant="ghost" onClick={handle(() => test(op.id))} disabled={testing === op.id || !d.model} title="Smoke call with this model">
                     <Play className="h-3 w-3" /> {testing === op.id ? "…" : "Test"}
                   </Btn>
                 </Td>
@@ -557,7 +558,7 @@ function AiTab() {
           })}
         </tbody>
       </Table>
-      <SaveBar dirty={dirty} onSave={save} label="Save models" />
+      <SaveBar dirty={dirty} onSave={handle(save)} label="Save models" />
 
       <Panel
         title="Recent calls"
@@ -678,7 +679,7 @@ function AutopilotTab() {
             <button
               key={p.id}
               type="button"
-              onClick={() => applyPreset(p.id)}
+              onClick={handle(() => applyPreset(p.id))}
               className={cn("text-left rounded-lg border p-4 transition-colors relative", active ? "border-accent bg-accent/[0.06]" : "border-border bg-surface hover:border-border-strong")}
             >
               {active ? <span className="absolute top-3 right-3 h-2 w-2 rounded-full bg-accent" /> : null}
@@ -796,7 +797,7 @@ function AutopilotTab() {
           </Panel>
         </div>
       </div>
-      <SaveBar dirty={dirty} onSave={save} label="Save as custom" />
+      <SaveBar dirty={dirty} onSave={handle(save)} label="Save as custom" />
     </div>
   );
 }
@@ -956,13 +957,13 @@ function SystemTab() {
         meta={`${by("running")} running · ${by("queued")} queued · ${by("failed")} retained failures`}
         actions={
           <>
-            <Btn size="xs" variant="ghost" onClick={() => post<{ enqueued: number }>("/api/v1/radar/boards/scan-all").then((r) => { const text = discoveryQueuedMessage(r); if (r.enqueued > 0) toast.success(text); else toast.message(text); })}>
+            <Btn size="xs" variant="ghost" onClick={handle(() => post<{ enqueued: number }>("/api/v1/radar/boards/scan-all").then((r) => { const text = discoveryQueuedMessage(r); if (r.enqueued > 0) toast.success(text); else toast.message(text); }))}>
               Discovery
             </Btn>
-            <Btn size="xs" variant="ghost" onClick={enqueueWatches}>
+            <Btn size="xs" variant="ghost" onClick={handle(enqueueWatches)}>
               Watches
             </Btn>
-            <Btn size="xs" variant="ghost" onClick={runRetention}>
+            <Btn size="xs" variant="ghost" onClick={handle(runRetention)}>
               Retention now
             </Btn>
           </>
@@ -1042,7 +1043,7 @@ function SystemTab() {
             <Input label="Discovery (days)" type="number" value={ret.discoveryDays} onChange={(e) => setRet({ ...ret, discoveryDays: Number(e.target.value) })} />
             <Input label="Deltas (days)" type="number" value={ret.deltasDays} onChange={(e) => setRet({ ...ret, deltasDays: Number(e.target.value) })} />
             <Input label="LLM runs (days)" type="number" value={ret.llmRunsDays} onChange={(e) => setRet({ ...ret, llmRunsDays: Number(e.target.value) })} />
-            <Btn variant="primary" size="md" onClick={saveRet}>
+            <Btn variant="primary" size="md" onClick={handle(saveRet)}>
               Save
             </Btn>
           </div>
@@ -1053,7 +1054,7 @@ function SystemTab() {
         <div className="space-y-3">
           <div className="flex gap-2 items-end">
             <Input label="New token name" value={tokName} onChange={(e) => setTokName(e.target.value)} placeholder="career-ops-mac" />
-            <Btn variant="primary" size="md" onClick={createToken} disabled={!tokName}>
+            <Btn variant="primary" size="md" onClick={handle(createToken)} disabled={!tokName}>
               Create
             </Btn>
           </div>
@@ -1082,7 +1083,7 @@ function SystemTab() {
                   {t.revokedAt ? (
                     <span className="text-bad text-[11px]">revoked</span>
                   ) : (
-                    <IconBtn label="Revoke token" onClick={() => revoke(t.id)}>
+                    <IconBtn label="Revoke token" onClick={handle(() => revoke(t.id))}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </IconBtn>
                   )}

@@ -7,6 +7,7 @@ import { ListingBadge, ScoreMeter, StatusBadge } from "@/components/badges";
 import { Markdown } from "@/components/markdown";
 import { openDock, useChatScope } from "@/frame/store";
 import { post, useApi, type CompanyDetail, type SystemInfo } from "@/lib/api";
+import { handle } from "@/lib/async";
 import { ago, companySite, dateTime, departmentLabel, money } from "@/lib/format";
 import { Btn, Card, Chip, Dot, Empty, ErrorNote, IconBtn, Loading, Monogram, Page, Panel, Table, Td, Th, Tr, cn } from "@/ui/kit";
 
@@ -81,7 +82,7 @@ export function CompanyPage() {
             <div className="font-display text-[22px] font-semibold tabular leading-none">{open.length}</div>
             <div className="eyebrow mt-0.5">open · {hot} hot</div>
           </div>
-          <Btn variant={c.research ? "default" : "primary"} disabled={noKey} title={noKey ? "Add a model key in Settings" : undefined} onClick={research}>
+          <Btn variant={c.research ? "default" : "primary"} disabled={noKey} title={noKey ? "Add a model key in Settings" : undefined} onClick={handle(research)}>
             <Sparkles className="h-3.5 w-3.5" /> {c.research ? "Refresh research" : "Research"}
           </Btn>
           <IconBtn label="Chat about this company" disabled={noKey} title={noKey ? "Add a model key in Settings" : "Chat about this company"} onClick={() => openDock("chat")}>
@@ -112,7 +113,7 @@ export function CompanyPage() {
                 </thead>
                 <tbody>
                   {open.map((p) => (
-                    <PositionRow key={p.id} p={p} onOpen={() => navigate({ to: "/positions/$id", params: { id: p.slug } })} />
+                    <PositionRow key={p.id} p={p} onOpen={() => void navigate({ to: "/positions/$id", params: { id: p.slug } })} />
                   ))}
                 </tbody>
               </Table>
@@ -123,7 +124,7 @@ export function CompanyPage() {
                 <Table className="border-0 rounded-none">
                   <tbody>
                     {c.positions.filter((p) => p.status === "archived").map((p) => (
-                      <PositionRow key={p.id} p={p} muted onOpen={() => navigate({ to: "/positions/$id", params: { id: p.slug } })} />
+                      <PositionRow key={p.id} p={p} muted onOpen={() => void navigate({ to: "/positions/$id", params: { id: p.slug } })} />
                     ))}
                   </tbody>
                 </Table>
@@ -141,7 +142,7 @@ export function CompanyPage() {
                       {b.provider}/{b.token}
                     </span>
                     <span className="text-faint font-mono text-[11px] tabular ml-auto">scanned {ago(b.lastScannedAt)}</span>
-                    <IconBtn label="Scan now" onClick={() => scan(b.id)}>
+                    <IconBtn label="Scan now" onClick={handle(() => scan(b.id))}>
                       <Play className="h-3 w-3" />
                     </IconBtn>
                   </div>

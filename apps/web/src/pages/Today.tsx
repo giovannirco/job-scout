@@ -9,6 +9,7 @@ import { ScoreMeter, STATUS_LABEL, STATUS_PATH, STATUS_TONE, StatusBadge } from 
 import { InboxPanel } from "@/frame/Dock";
 import { openDock, useChatScope } from "@/frame/store";
 import { patch, post, useAction, useApi, type AutopilotState, type PipelineStatus, type SystemInfo, type TodayData, type TodaySlim } from "@/lib/api";
+import { handle } from "@/lib/async";
 import { ago, compact, dateTime } from "@/lib/format";
 import { Btn, Empty, ErrorNote, Loading, Monogram, Page, PageHeader, Panel, TONE_DOT, TONE_TEXT, cn } from "@/ui/kit";
 import { todayTitle, unscoredStage } from "./today-title";
@@ -67,12 +68,12 @@ export function TodayPage() {
               </Link>
             ) : null}
             <Btn
-              onClick={async () => {
+              onClick={handle(async () => {
                 const r = await post<{ enqueued: number }>("/api/v1/radar/boards/scan-all");
                 const text = discoveryQueuedMessage(r);
                 if (r.enqueued > 0) toast.success(text);
                 else toast.message(text);
-              }}
+              })}
             >
               <RadarIcon className="h-3.5 w-3.5" /> Run discovery
             </Btn>
@@ -210,7 +211,7 @@ export function TodayPage() {
                   <Btn
                     size="xs"
                     variant="ghost"
-                    onClick={async () => {
+                    onClick={handle(async () => {
                       try {
                         const r = await post<{ enqueued: number; items: unknown[] }>("/api/v1/settings/llm/retry", {
                           hours: 24,
@@ -222,7 +223,7 @@ export function TodayPage() {
                       } catch (e) {
                         toast.error(e instanceof Error ? e.message : "Retry failed");
                       }
-                    }}
+                    })}
                   >
                     <RotateCcw className="h-3 w-3" /> Retry failed
                   </Btn>
@@ -324,7 +325,7 @@ function Funnel({
               key={s}
               type="button"
               title={`${label} · ${n}`}
-              onClick={() => navigate({ to: "/pipeline", search: { status: s } })}
+              onClick={() => void navigate({ to: "/pipeline", search: { status: s } })}
               style={{ width: `${pct}%` }}
               className={cn("relative flex items-center gap-1.5 px-2 border-r border-bg last:border-r-0 hover:brightness-110 transition-[filter] min-w-0 text-left", s === "triaged" ? "bg-surface-3" : "bg-surface-2")}
             >
@@ -348,7 +349,7 @@ function Funnel({
       <div className="flex items-center gap-3 font-mono text-[10.5px] text-muted tabular flex-wrap">
         <span className="text-faint">30d</span>
         {FUNNEL_30D.map((s) => (
-          <button key={s} type="button" className="hover:text-fg" onClick={() => navigate({ to: "/pipeline", search: { status: s } })}>
+          <button key={s} type="button" className="hover:text-fg" onClick={() => void navigate({ to: "/pipeline", search: { status: s } })}>
             {last30d?.[s] || 0} {s === "triaged" && unscored ? "not scored" : STATUS_LABEL[s].toLowerCase()}
           </button>
         ))}
@@ -402,7 +403,7 @@ function DecisionList({ rows }: { rows: TodaySlim[] }) {
       {rows.map((r) => (
         <div key={r.id} className="px-3 py-2.5 flex items-start gap-3 group">
           <Monogram name={r.company.name} size={30} className="mt-0.5" />
-          <button type="button" className="min-w-0 flex-1 text-left" onClick={() => navigate({ to: "/positions/$id", params: { id: r.slug } })}>
+          <button type="button" className="min-w-0 flex-1 text-left" onClick={() => void navigate({ to: "/positions/$id", params: { id: r.slug } })}>
             <div className="flex items-center gap-2 min-w-0">
               <span className="truncate text-[13px] font-medium">{r.title}</span>
               <span className="text-muted text-[12px] truncate shrink-0 max-w-[40%]">{r.company.name}</span>
@@ -413,10 +414,10 @@ function DecisionList({ rows }: { rows: TodaySlim[] }) {
             <ScoreMeter score={r.triageScore} verdict={r.triageVerdict} />
             {r.triageStale ? <span className="text-[10px] text-warn">Needs refresh</span> : null}
             <div className="flex items-center gap-1">
-              <Btn size="xs" variant="primary" title="Move to review" onClick={() => decide.mutateAsync({ id: r.id, status: "review" }).then(() => toast.success("Moved to review"))}>
+              <Btn size="xs" variant="primary" title="Move to review" onClick={handle(() => decide.mutateAsync({ id: r.id, status: "review" }).then(() => toast.success("Moved to review")))}>
                 <Check className="h-3 w-3" /> Review
               </Btn>
-              <Btn size="xs" variant="ghost" title="Skip" onClick={() => decide.mutateAsync({ id: r.id, status: "skip" }).then(() => toast("Skipped"))}>
+              <Btn size="xs" variant="ghost" title="Skip" onClick={handle(() => decide.mutateAsync({ id: r.id, status: "skip" }).then(() => toast("Skipped")))}>
                 <X className="h-3 w-3" />
               </Btn>
             </div>

@@ -43,7 +43,7 @@ export function CompaniesPage() {
             </form>
             <Seg<"positions" | "all">
               value={search.all ? "all" : "positions"}
-              onChange={(v) => navigate({ search: { q: search.q, all: v === "all" ? true : undefined } })}
+              onChange={(v) => void navigate({ search: { q: search.q, all: v === "all" ? true : undefined } })}
               options={[
                 { value: "positions", label: "Open roles" },
                 { value: "all", label: "All" },
@@ -69,7 +69,7 @@ export function CompaniesPage() {
       ) : view === "grid" ? (
         <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(230px,1fr))]">
           {rows.map((c) => (
-            <Card key={c.id} className="p-3 flex flex-col gap-2.5" onClick={() => navigate({ to: "/companies/$id", params: { id: c.slug } })}>
+            <Card key={c.id} className="p-3 flex flex-col gap-2.5" onClick={() => void navigate({ to: "/companies/$id", params: { id: c.slug } })}>
               <div className="flex items-center gap-2.5 min-w-0">
                 <Monogram name={c.name} size={32} />
                 <div className="min-w-0">
@@ -91,27 +91,27 @@ export function CompaniesPage() {
           <thead>
             <tr>
               <Th>
-                <SortHead label="Company" field="name" sort={search.sort} onSort={(n) => navigate({ search: (prev) => ({ ...prev, sort: n, page: undefined }) })} />
+                <SortHead label="Company" field="name" sort={search.sort} onSort={(n) => void navigate({ search: (prev) => ({ ...prev, sort: n, page: undefined }) })} />
               </Th>
               <Th>Site</Th>
               <Th>Tags</Th>
               <Th right>
-                <SortHead label="Hot" field="hot" sort={search.sort} onSort={(n) => navigate({ search: (prev) => ({ ...prev, sort: n, page: undefined }) })} />
+                <SortHead label="Hot" field="hot" sort={search.sort} onSort={(n) => void navigate({ search: (prev) => ({ ...prev, sort: n, page: undefined }) })} />
               </Th>
               <Th right>
-                <SortHead label="Pass" field="pass" sort={search.sort} onSort={(n) => navigate({ search: (prev) => ({ ...prev, sort: n, page: undefined }) })} />
+                <SortHead label="Pass" field="pass" sort={search.sort} onSort={(n) => void navigate({ search: (prev) => ({ ...prev, sort: n, page: undefined }) })} />
               </Th>
               <Th right>
-                <SortHead label="Open" field="open" sort={search.sort} onSort={(n) => navigate({ search: (prev) => ({ ...prev, sort: n, page: undefined }) })} />
+                <SortHead label="Open" field="open" sort={search.sort} onSort={(n) => void navigate({ search: (prev) => ({ ...prev, sort: n, page: undefined }) })} />
               </Th>
               <Th right>
-                <SortHead label="Updated" field="updated" sort={search.sort} onSort={(n) => navigate({ search: (prev) => ({ ...prev, sort: n, page: undefined }) })} />
+                <SortHead label="Updated" field="updated" sort={search.sort} onSort={(n) => void navigate({ search: (prev) => ({ ...prev, sort: n, page: undefined }) })} />
               </Th>
             </tr>
           </thead>
           <tbody>
             {rows.map((c) => (
-              <Tr key={c.id} onClick={() => navigate({ to: "/companies/$id", params: { id: c.slug } })}>
+              <Tr key={c.id} onClick={() => void navigate({ to: "/companies/$id", params: { id: c.slug } })}>
                 <Td className="font-medium">
                   <span className="inline-flex items-center gap-2">
                     <Monogram name={c.name} size={22} />
@@ -139,7 +139,7 @@ export function CompaniesPage() {
           </tbody>
         </Table>
       )}
-      {total > PAGE_SIZE ? <Pager page={page} pageSize={PAGE_SIZE} total={total} onPage={(p) => navigate({ search: (prev) => ({ ...prev, page: p > 1 ? p : undefined }) })} /> : null}
+      {total > PAGE_SIZE ? <Pager page={page} pageSize={PAGE_SIZE} total={total} onPage={(p) => void navigate({ search: (prev) => ({ ...prev, page: p > 1 ? p : undefined }) })} /> : null}
     </Page>
   );
 }

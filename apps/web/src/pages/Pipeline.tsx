@@ -48,7 +48,8 @@ export function PipelinePage() {
   const [q, setQ] = useState(s.q || "");
   useEffect(() => setQ(s.q || ""), [s.q]);
 
-  const set = (patch: Partial<PipelineSearch>) => navigate({ search: (prev) => ({ ...prev, page: undefined, ...patch }) });
+  // navigate() only resolves once the URL commits; route load errors render in the router's error boundary.
+  const set = (patch: Partial<PipelineSearch>) => void navigate({ search: (prev) => ({ ...prev, page: undefined, ...patch }) });
 
   const list = useApiMeta<PositionRow[]>(
     ["positions", "list", s],
@@ -178,7 +179,7 @@ export function PipelinePage() {
       ) : (
         <PositionsTable rows={rows} home={profile.data?.location} sort={s.sort} />
       )}
-      {total > PAGE_SIZE && s.view !== "board" ? <Pager page={page} pageSize={PAGE_SIZE} total={total} onPage={(p) => navigate({ search: (prev) => ({ ...prev, page: p > 1 ? p : undefined }) })} /> : null}
+      {total > PAGE_SIZE && s.view !== "board" ? <Pager page={page} pageSize={PAGE_SIZE} total={total} onPage={(p) => void navigate({ search: (prev) => ({ ...prev, page: p > 1 ? p : undefined }) })} /> : null}
     </Page>
   );
 }
@@ -256,7 +257,7 @@ function PositionsTable({ rows, home, sort }: { rows: PositionRow[]; home?: stri
         {rows.map((r, i) => {
           const loc = familyLocationLabel(r.locations, r.locationRaw);
           return (
-          <Tr key={r.id} selected={i === cursor} onClick={() => navigate({ to: "/positions/$id", params: { id: r.slug } })}>
+          <Tr key={r.id} selected={i === cursor} onClick={() => void navigate({ to: "/positions/$id", params: { id: r.slug } })}>
             <Td className="pr-0">
               <Monogram name={r.company.name} size={26} />
             </Td>

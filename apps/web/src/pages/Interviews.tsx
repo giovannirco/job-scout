@@ -17,7 +17,8 @@ export function InterviewsPage() {
   const qc = useQueryClient();
   const lane = (search.lane as Lane) || "all";
   const selected = search.id || "";
-  const set = (patch: Partial<InterviewsSearch>) => navigate({ search: (prev) => ({ ...prev, ...patch }) });
+  // navigate() only resolves once the URL commits; route load errors render in the router's error boundary.
+  const set = (patch: Partial<InterviewsSearch>) => void navigate({ search: (prev) => ({ ...prev, ...patch }) });
 
   const list = useApi<Interview[]>(["interviews-desk", lane, search.q, search.stage], `/api/v1/interviews${qs({ lane, q: search.q, stage: search.stage })}`, { refetchInterval: 30_000 });
   const rows = list.data || [];

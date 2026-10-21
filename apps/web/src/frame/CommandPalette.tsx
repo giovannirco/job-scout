@@ -5,13 +5,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ScoreMeter, StatusBadge } from "@/components/badges";
 import { api, post, useApi, type CompanyRow, type PositionRow, type SystemInfo } from "@/lib/api";
+import { handle } from "@/lib/async";
 import { discoveryQueuedMessage } from "@/lib/discovery-toast";
 import { Kbd, Monogram, cn } from "@/ui/kit";
 import { setUi, toggleDock } from "./store";
 
 type Item =
   | { kind: "nav"; id: string; label: string; hint?: string; to: string; search?: Record<string, unknown> }
-  | { kind: "action"; id: string; label: string; hint?: string; run: () => void | Promise<void> }
+  | { kind: "action"; id: string; label: string; hint?: string; run: () => void }
   | { kind: "position"; id: string; row: PositionRow }
   | { kind: "company"; id: string; row: CompanyRow };
 
@@ -56,13 +57,13 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         id: "discovery",
         label: "Run discovery now",
         hint: "scan boards that are due",
-        run: async () => {
+        run: handle(async () => {
           const r = await post<{ enqueued: number }>("/api/v1/radar/boards/scan-all");
           const text = discoveryQueuedMessage(r);
           if (r.enqueued > 0) toast.success(text);
           else toast.message(text);
           void qc.invalidateQueries({ queryKey: ["today"] });
-        },
+        }, "Could not run discovery"),
       },
       { kind: "nav", id: "today", label: "Today", to: "/today" },
       { kind: "nav", id: "pipeline", label: "Pipeline", to: "/pipeline" },
@@ -94,12 +95,12 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
 
   useEffect(() => setIdx(0), [items.length, trimmed]);
 
-  const run = async (it: Item) => {
+  const run = (it: Item) => {
     onClose();
     if (it.kind === "nav") void navigate({ to: it.to, search: it.search as never });
-    else if (it.kind === "action") await it.run();
+    else if (it.kind === "action") it.run();
     else if (it.kind === "position") void navigate({ to: "/positions/$id", params: { id: it.row.slug } });
-    else if (it.kind === "company") void navigate({ to: "/companies/$id", params: { id: it.row.slug } });
+    else void navigate({ to: "/companies/$id", params: { id: it.row.slug } });
   };
 
   if (!open) return null;
@@ -119,7 +120,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
             onKeyDown={(e) => {
               if (e.key === "ArrowDown") (e.preventDefault(), setIdx((i) => Math.min(items.length - 1, i + 1)));
               else if (e.key === "ArrowUp") (e.preventDefault(), setIdx((i) => Math.max(0, i - 1)));
-              else if (e.key === "Enter" && items[idx]) void run(items[idx]!);
+              else if (e.key === "Enter" && items[idx]) run(items[idx]!);
               else if (e.key === "Escape") onClose();
             }}
           />
@@ -134,7 +135,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                 key={it.id}
                 type="button"
                 onMouseEnter={() => setIdx(i)}
-                onClick={() => void run(it)}
+                onClick={() => run(it)}
                 className={cn("w-full flex items-center gap-2.5 px-3 h-10 text-left text-[12.5px]", active ? "bg-surface-2" : "")}
               >
                 {it.kind === "position" ? (

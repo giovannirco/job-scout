@@ -24,6 +24,7 @@ import {
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { api, apiMeta, client, useApi, type PositionRow, type SystemInfo, type TodayData } from "@/lib/api";
+import { handle } from "@/lib/async";
 import { compact } from "@/lib/format";
 import { Btn, IconBtn, Input, Kbd, Modal, cn } from "@/ui/kit";
 import { CommandPalette } from "./CommandPalette";
@@ -48,7 +49,8 @@ export function RootLayout() {
     );
   }
   if (auth.isError || (auth.data && !auth.data.authenticated && !client.getToken())) {
-    return <Login onDone={() => auth.refetch()} />;
+    // refetch() resolves even on failure; errors land in auth.isError and re-render this gate.
+    return <Login onDone={() => void auth.refetch()} />;
   }
   return <Frame />;
 }
@@ -380,7 +382,7 @@ function AddUrlModal({ open, onClose, onCreated }: { open: boolean; onClose: () 
 
   return (
     <Modal open={open} onClose={onClose} title="Add position">
-      <form onSubmit={submit} className="p-4 space-y-3">
+      <form onSubmit={handle(submit)} className="p-4 space-y-3">
         <p className="text-[12.5px] text-muted">
           {noKey
             ? "Paste any job URL. Greenhouse, Ashby and Lever are read directly. The listing is fetched and gated. Scoring waits until a model key is set."
@@ -424,7 +426,7 @@ function Login({ onDone }: { onDone: () => void }) {
 
   return (
     <div className="h-full grid place-items-center p-6 grid-paper">
-      <form onSubmit={submit} className="w-full max-w-[340px] rounded-xl border border-border bg-surface p-6 space-y-4 shadow-pop">
+      <form onSubmit={handle(submit)} className="w-full max-w-[340px] rounded-xl border border-border bg-surface p-6 space-y-4 shadow-pop">
         <div className="flex items-center gap-3">
           <Brand className="h-9 w-9" />
           <div>

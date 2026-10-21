@@ -12,7 +12,8 @@ export function InboxPage() {
   const search = useSearch({ from: "/inbox" });
   const navigate = useNavigate({ from: "/inbox" });
   const filter = (search.status as Filter) || "pending";
-  const setFilter = (status: Filter) => navigate({ search: (prev) => ({ ...prev, status: status === "pending" ? undefined : status }) });
+  // navigate() only resolves once the URL commits; route load errors render in the router's error boundary.
+  const setFilter = (status: Filter) => void navigate({ search: (prev) => ({ ...prev, status: status === "pending" ? undefined : status }) });
   const q = useApi<Approval[]>(["approvals", filter, search.sort], `/api/v1/approvals?status=${filter}&limit=100${search.sort ? `&sort=${search.sort}` : ""}`, { refetchInterval: 30_000 });
   const auto = useApi<AutopilotState>(["autopilot"], "/api/v1/settings/autopilot");
   const items = q.data || [];
@@ -42,9 +43,9 @@ export function InboxPage() {
             ]}
           />
           <div className="flex items-center gap-2 text-[11.5px] text-muted">
-            <SortHead label="Created" field="created" sort={search.sort} onSort={(n) => navigate({ search: (prev) => ({ ...prev, sort: n }) })} />
-            <SortHead label="Title" field="title" sort={search.sort} onSort={(n) => navigate({ search: (prev) => ({ ...prev, sort: n }) })} />
-            <SortHead label="Status" field="status" sort={search.sort} onSort={(n) => navigate({ search: (prev) => ({ ...prev, sort: n }) })} />
+            <SortHead label="Created" field="created" sort={search.sort} onSort={(n) => void navigate({ search: (prev) => ({ ...prev, sort: n }) })} />
+            <SortHead label="Title" field="title" sort={search.sort} onSort={(n) => void navigate({ search: (prev) => ({ ...prev, sort: n }) })} />
+            <SortHead label="Status" field="status" sort={search.sort} onSort={(n) => void navigate({ search: (prev) => ({ ...prev, sort: n }) })} />
           </div>
         </div>
       </PageHeader>

@@ -87,7 +87,8 @@ export function AiLogsPage() {
   const detail = useApi<LlmRunDetail>(["llm-run", selected], `/api/v1/settings/llm/runs/${selected}`, { enabled: Boolean(selected) });
 
   const items = runs.data?.items || [];
-  const setSearch = (patch: Record<string, unknown>) => navigate({ search: (prev) => ({ ...prev, ...("run" in patch || "page" in patch ? {} : { page: undefined }), ...patch }) });
+  // navigate() only resolves once the URL commits; route load errors render in the router's error boundary.
+  const setSearch = (patch: Record<string, unknown>) => void navigate({ search: (prev) => ({ ...prev, ...("run" in patch || "page" in patch ? {} : { page: undefined }), ...patch }) });
 
   return (
     <Page wide>

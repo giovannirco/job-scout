@@ -11,6 +11,7 @@ import { StatusMenu, useStatusChange } from "@/components/status-menu";
 import { openDock, useChatScope } from "@/frame/store";
 import { INTERVIEW_OUTCOMES, INTERVIEW_STAGES, INTERVIEW_STATUSES, changeKindLabel, humanDiffSummary, isCompanyNameLocation, listedAtHome } from "@job-scout/shared";
 import { api, del, patch, post, qs, useApi, type Evaluation, type Interview, type Material, type Person, type PipelineStatus, type PositionDetail, type Profile, type Revision, type SystemInfo, type TimelineEvent, type TriageJson } from "@/lib/api";
+import { handle } from "@/lib/async";
 import { ago, boardTruncatedJd, createdFromLabel, dateShort, dateTime, employmentLabel, host, jdChangedAt, money, multiAnswerValues, questionStatusLabel, readableJd, sourceLabel, titleCase, toggleMultiAnswer } from "@/lib/format";
 import { Btn, Card, Chip, Dot, Empty, ErrorNote, Field, IconBtn, Input, Loading, Monogram, Page, Panel, Select, SortHead, Tabs, Textarea, TONE_DOT, TONE_TEXT, cn } from "@/ui/kit";
 
@@ -28,7 +29,8 @@ export function PositionPage() {
   const search = useSearch({ from: "/positions/$id" });
   const navigate = useNavigate({ from: "/positions/$id" });
   const tab = (search.tab as Tab) || "brief";
-  const setTab = (t: Tab) => navigate({ search: { tab: t === "brief" ? undefined : t }, replace: true });
+  // navigate() only resolves once the URL commits; route load errors render in the router's error boundary.
+  const setTab = (t: Tab) => void navigate({ search: { tab: t === "brief" ? undefined : t }, replace: true });
 
   const [pendingUntil, setPendingUntil] = useState<number>(0);
   const polling = pendingUntil > Date.now();
@@ -151,23 +153,23 @@ export function PositionPage() {
                   <Dot tone="accent" pulse /> working
                 </span>
               ) : null}
-              <Btn variant={hasEval ? "default" : "primary"} disabled={noKey} onClick={() => runAction("evaluate")} title={noKey ? "Add a model key in Settings" : "Full A–H evaluation with the configured model"}>
+              <Btn variant={hasEval ? "default" : "primary"} disabled={noKey} onClick={handle(() => runAction("evaluate"))} title={noKey ? "Add a model key in Settings" : "Full A–H evaluation with the configured model"}>
                 <Sparkles className="h-3.5 w-3.5" /> {hasEval ? "Re-evaluate" : "Evaluate"}
               </Btn>
-              <Btn disabled={noKey} onClick={() => runAction("materials")} title={noKey ? "Add a model key in Settings" : "Tailored resume + cover for this position"}>
+              <Btn disabled={noKey} onClick={handle(() => runAction("materials"))} title={noKey ? "Add a model key in Settings" : "Tailored resume + cover for this position"}>
                 <FileText className="h-3.5 w-3.5" /> Materials
               </Btn>
               <IconBtn label="Chat about this position" disabled={noKey} title={noKey ? "Add a model key in Settings" : "Chat about this position"} onClick={() => openDock("chat")}>
                 <MessageSquareText className="h-4 w-4" />
               </IconBtn>
-              <IconBtn label="Fetch the JD again" onClick={refreshJd}>
+              <IconBtn label="Fetch the JD again" onClick={handle(refreshJd)}>
                 <RefreshCw className="h-3.5 w-3.5" />
               </IconBtn>
-              <IconBtn label={p.watchEnabled ? "Stop watching" : "Watch for JD changes"} onClick={toggleWatch} active={p.watchEnabled}>
+              <IconBtn label={p.watchEnabled ? "Stop watching" : "Watch for JD changes"} onClick={handle(toggleWatch)} active={p.watchEnabled}>
                 {p.watchEnabled ? <Eye className="h-3.5 w-3.5 text-accent" /> : <EyeOff className="h-3.5 w-3.5" />}
               </IconBtn>
               {p.status !== "archived" ? (
-                <IconBtn label="Archive" onClick={archive}>
+                <IconBtn label="Archive" onClick={handle(archive)}>
                   <Archive className="h-3.5 w-3.5" />
                 </IconBtn>
               ) : null}
@@ -196,12 +198,12 @@ export function PositionPage() {
         ]}
       />
 
-      {tab === "brief" ? <BriefTab p={p} noKey={noKey} home={profile.data?.location} onTriage={() => runAction("triage", { force: true })} /> : null}
-      {tab === "evaluation" ? <EvaluationTab p={p} hasEval={hasEval} hasJdReview={hasJdReview} noKey={noKey} onRun={runAction} /> : null}
+      {tab === "brief" ? <BriefTab p={p} noKey={noKey} home={profile.data?.location} onTriage={handle(() => runAction("triage", { force: true }))} /> : null}
+      {tab === "evaluation" ? <EvaluationTab p={p} hasEval={hasEval} hasJdReview={hasJdReview} noKey={noKey} onRun={handle(runAction)} /> : null}
       {tab === "jd" ? <JdTab p={p} /> : null}
-      {tab === "materials" ? <MaterialsTab p={p} noKey={noKey} onRun={runAction} /> : null}
-      {tab === "forms" ? <FormsTab p={p} noKey={noKey} onDraft={() => runAction("form_answers")} /> : null}
-      {tab === "company" ? <CompanyTab p={p} hasResearch={hasResearch} noKey={noKey} onRun={runAction} /> : null}
+      {tab === "materials" ? <MaterialsTab p={p} noKey={noKey} onRun={handle(runAction)} /> : null}
+      {tab === "forms" ? <FormsTab p={p} noKey={noKey} onDraft={handle(() => runAction("form_answers"))} /> : null}
+      {tab === "company" ? <CompanyTab p={p} hasResearch={hasResearch} noKey={noKey} onRun={handle(runAction)} /> : null}
       {tab === "history" ? <HistoryTab p={p} /> : null}
       {["brief", "evaluation", "materials"].includes(tab) ? <JevPosition positionId={p.id} /> : null}
     </Page>
@@ -380,7 +382,7 @@ function BriefTab({ p, noKey, home, onTriage }: { p: PositionDetail; noKey: bool
             <Textarea label="Next action" value={next} onChange={(e) => setNext(e.target.value)} className="min-h-[40px]" placeholder="e.g. ping recruiter Friday" />
             <Textarea label="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything that does not fit a field" />
             <div className="flex justify-end">
-              <Btn variant="primary" onClick={save} disabled={notes === (p.notes || "") && next === (p.nextAction || "")}>
+              <Btn variant="primary" onClick={handle(save)} disabled={notes === (p.notes || "") && next === (p.nextAction || "")}>
                 Save
               </Btn>
             </div>
@@ -722,7 +724,7 @@ function HistoryTab({ p }: { p: PositionDetail }) {
     <div className="space-y-3 max-w-3xl">
       <Card className="p-3 flex gap-2 items-end">
         <Textarea label="Add a note" value={note} onChange={(e) => setNote(e.target.value)} className="min-h-[40px] flex-1" />
-        <Btn variant="primary" onClick={addNote} disabled={!note.trim()}>
+        <Btn variant="primary" onClick={handle(addNote)} disabled={!note.trim()}>
           Add
         </Btn>
       </Card>
@@ -875,8 +877,8 @@ function FormsTab({ p, noKey, onDraft }: { p: PositionDetail; noKey: boolean; on
               : "No form harvested yet. Refresh the JD or wait for a renderer."}
         </div>
         <div className="flex items-center gap-2">
-          <SortHead label="Question" field="question" sort={search.sort} onSort={(n) => navigate({ search: (prev) => ({ ...prev, sort: n, tab: "forms" }) })} />
-          <SortHead label="Status" field="status" sort={search.sort} onSort={(n) => navigate({ search: (prev) => ({ ...prev, sort: n, tab: "forms" }) })} />
+          <SortHead label="Question" field="question" sort={search.sort} onSort={(n) => void navigate({ search: (prev) => ({ ...prev, sort: n, tab: "forms" }) })} />
+          <SortHead label="Status" field="status" sort={search.sort} onSort={(n) => void navigate({ search: (prev) => ({ ...prev, sort: n, tab: "forms" }) })} />
           <Btn variant="primary" onClick={onDraft} disabled={!rows.length || noKey} title={noKey ? "Add a model key in Settings" : undefined}>
             <Sparkles className="h-3.5 w-3.5" /> Draft answers
           </Btn>
@@ -900,20 +902,20 @@ function FormsTab({ p, noKey, onDraft }: { p: PositionDetail; noKey: boolean; on
           <div className="flex gap-2">
             <Btn
               size="xs"
-              onClick={async () => {
+              onClick={handle(async () => {
                 await patch(`/api/v1/positions/${id}/questions/${row.id}`, { status: "answered" });
                 void qc.invalidateQueries({ queryKey: ["position", id, "questions"] });
-              }}
+              })}
             >
               Mark answered
             </Btn>
             <Btn
               size="xs"
               variant="ghost"
-              onClick={async () => {
+              onClick={handle(async () => {
                 await patch(`/api/v1/positions/${id}/questions/${row.id}`, { status: "skipped" });
                 void qc.invalidateQueries({ queryKey: ["position", id, "questions"] });
-              }}
+              })}
             >
               Skip
             </Btn>
@@ -979,7 +981,7 @@ function ContactsPanel({ positionId }: { positionId: string }) {
                 ) : null}
                 {p.notes ? <div className="text-[11px] text-faint mt-0.5">{p.notes}</div> : null}
               </div>
-              <IconBtn label="Delete contact" onClick={() => remove(p.id)}>
+              <IconBtn label="Delete contact" onClick={handle(() => remove(p.id))}>
                 <Trash2 className="h-3.5 w-3.5" />
               </IconBtn>
             </div>
@@ -1122,7 +1124,7 @@ function InterviewsPanel({ positionId, noKey }: { positionId: string; noKey: boo
                       </option>
                     ))}
                   </select>
-                  <IconBtn label="Delete interview" onClick={() => remove(i.id)}>
+                  <IconBtn label="Delete interview" onClick={handle(() => remove(i.id))}>
                     <Trash2 className="h-3.5 w-3.5" />
                   </IconBtn>
                 </div>
