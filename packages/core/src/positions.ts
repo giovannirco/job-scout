@@ -45,7 +45,7 @@ import { careerStamp, groupingRows, groupRows, groupSummary, repostFor, terminal
 import { getProfile, profileFingerprint } from "./profile.js";
 import { decodeCursor, encodeCursor, filterFingerprint } from "./list-cursor.js";
 import { applyClassificationOverride, classificationOverride } from "./classification-override.js";
-import { positionSlug, withPreviousSlug } from "./slug-repair.js";
+import { positionSlugFor, withPrevious } from "./slug-repair.js";
 import { log as rootLog } from "@job-scout/shared";
 const log = rootLog.child({ scope: "positions" });
 
@@ -473,13 +473,13 @@ async function listingEdits(pos: PositionRow, patch: Record<string, unknown>, ac
     if (title !== pos.title) {
       set.title = title;
       set.craftFamily = craftFamily(title);
-      let slug = positionSlug(pos.company.slug, title, pos.id);
+      let slug = positionSlugFor(pos.company.slug, title, pos.id);
       const db = await getDb();
       const taken = (await db.select({ id: positions.id }).from(positions).where(and(eq(positions.slug, slug), sql`${positions.id} <> ${pos.id}`)).limit(1))[0];
       if (taken) slug = `${slug}-${pos.id.slice(-8, -4).toLowerCase()}`;
       if (slug !== pos.slug) {
         set.slug = slug;
-        Object.assign(metadata, withPreviousSlug(metadata, pos.slug));
+        Object.assign(metadata, withPrevious(metadata, pos.slug));
       }
       events.push({ field: "title", from: pos.title, to: title });
     }
@@ -498,7 +498,7 @@ async function listingEdits(pos: PositionRow, patch: Record<string, unknown>, ac
       const externalIdentity = canonicalExternalIdentity(externalIdentityFromDetect(detected)) || null;
       const db = await getDb();
       const others = await db.select({ id: positions.id, slug: positions.slug, url: positions.primaryUrl, externalIdentity: positions.externalIdentity }).from(positions).where(sql`${positions.id} <> ${pos.id}`);
-      const clash = others.find((o) => o.url === url || normalizePostingUrl(o.url) === normalizePostingUrl(url)
+      const clash = others.find((o) => o.url === url || sameNormalizedUrl(o.url, url)
         || (externalIdentity && canonicalExternalIdentity(o.externalIdentity) === externalIdentity));
       if (clash) throw new Error(`url_conflict: ${url} already belongs to position ${clash.slug}`);
       set.primaryUrl = url;
