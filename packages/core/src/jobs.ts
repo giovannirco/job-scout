@@ -112,12 +112,23 @@ export async function completeJob(jobId: string, result: Record<string, unknown>
     .where(eq(jobs.id, jobId));
 }
 
-export async function failJob(jobId: string, error: string, opts: { retryInMs?: number; payload?: Record<string, unknown> } = {}) {
+export async function failJob(
+  jobId: string,
+  error: string,
+  /** refundAttempt: the job never really ran (parked while its dependency is down), so the claim does not count. */
+  opts: { retryInMs?: number; payload?: Record<string, unknown>; refundAttempt?: boolean } = {},
+) {
   const db = await getDb();
   if (opts.retryInMs) {
     await db
       .update(jobs)
-      .set({ status: "queued", error: error.slice(0, 4000), runAfter: new Date(Date.now() + opts.retryInMs), ...(opts.payload ? { payload: opts.payload } : {}) })
+      .set({
+        status: "queued",
+        error: error.slice(0, 4000),
+        runAfter: new Date(Date.now() + opts.retryInMs),
+        ...(opts.payload ? { payload: opts.payload } : {}),
+        ...(opts.refundAttempt ? { attempts: sql`greatest(${jobs.attempts} - 1, 0)` } : {}),
+      })
       .where(eq(jobs.id, jobId));
     return;
   }

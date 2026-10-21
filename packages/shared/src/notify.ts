@@ -10,6 +10,7 @@ export const NOTIFY_EVENTS = [
   "jd_change_hot",
   "listing_closed_hot",
   "company_research",
+  "llm_health",
 ] as const;
 export type NotifyEvent = (typeof NOTIFY_EVENTS)[number];
 
@@ -65,6 +66,7 @@ export const DEFAULT_NOTIFICATIONS: NotificationsConfig = {
     jd_change_hot: true,
     listing_closed_hot: true,
     company_research: true,
+    llm_health: true,
   },
   quietHours: { enabled: true, timezone: "UTC", start: "23:00", end: "08:00" },
   chat: { model: "grok-4.6", allowFrom: [...DEFAULT_NOTIFY_ALLOW_FROM], cursorTs: 0, cursorId: "" },
@@ -200,6 +202,7 @@ export function formatNotifyBody(input: NotifyBodyInput): string {
     jd_change_hot: "JD CHANGE",
     listing_closed_hot: "LISTING CLOSED",
     company_research: "RESEARCH",
+    llm_health: "LLM",
   };
   const lines = [`${label[input.event]}  ${input.company} — ${input.title}`];
   if (input.score != null) lines.push(`score ${input.score.toFixed(1)}`);

@@ -71,6 +71,7 @@ const EVENT_LABELS: { key: keyof NotificationsConfig["events"]; label: string; r
   { key: "jd_change_hot", label: "JD change on hot roles", room: "process" },
   { key: "listing_closed_hot", label: "Listing closed on hot roles", room: "process" },
   { key: "company_research", label: "Company research pack", room: "research" },
+  { key: "llm_health", label: "LLM outage / recovery", room: "desk" },
 ];
 const CHANNELS: NotifyChannel[] = ["desk", "new", "process", "research", "chat"];
 

@@ -4,7 +4,7 @@ import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { nanoid } from "nanoid";
 import { getDb } from "@job-scout/db";
-import { httpDuration, httpRequests, metricRoute } from "@job-scout/core";
+import { getLlmHealth, httpDuration, httpRequests, metricRoute, publicLlmHealth } from "@job-scout/core";
 import { log as rootLog } from "@job-scout/shared";
 import { sql } from "drizzle-orm";
 import { authMiddleware, authStatus, loginHandler } from "./auth.js";
@@ -24,6 +24,17 @@ import { clipPreview, handleClip } from "./routes/clip.js";
 
 const log = rootLog.child({ scope: "http" });
 const QUIET_PATHS = new Set(["/api/v1/health", "/api/v1/ready", "/metrics", "/favicon.ico"]);
+
+/** LLM section of /health, bounded so a slow database never fails the liveness probe. */
+async function healthLlm() {
+  try {
+    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 1_500).unref?.());
+    const report = await Promise.race([getLlmHealth(), timeout]);
+    return report ? publicLlmHealth(report) : { state: "unknown" as const };
+  } catch {
+    return { state: "unknown" as const };
+  }
+}
 
 export function createApp() {
   const app = new Hono();
@@ -87,7 +98,11 @@ export function createApp() {
   app.get("/clip", handleClip);
   app.post("/clip", handleClip);
 
-  app.get("/api/v1/health", (c) => ok(c, { status: "ok", version: env.version }));
+  // Liveness stays HTTP 200: an LLM outage is "degraded", not a reason to restart the API.
+  app.get("/api/v1/health", async (c) => {
+    const llm = await healthLlm();
+    return ok(c, { status: llm?.state === "failing" ? "degraded" : "ok", version: env.version, llm });
+  });
   app.get("/api/v1/ready", async (c) => {
     try {
       const db = await getDb();

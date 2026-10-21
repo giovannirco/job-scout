@@ -136,7 +136,7 @@ A configured `API_TOKEN_SEED` is an admin credential; there is no built-in seed.
 | method | path | notes |
 |--|--|--|
 | POST | `/webhooks/waha` | a WAHA server inbound. Public path; requires `X-Api-Key` = `WAHA_WEBHOOK_KEY`. Handles `event=message` only (`message.any` is ignored). Runs the desk agent for **job-scout chat** only; never apply |
-| GET | `/health` · `/ready` | probes; `health` carries `version` |
+| GET | `/health` · `/ready` | probes; `health` carries `version` and an `llm` health section (`status` is `degraded` while LLM calls are failing; still HTTP 200) |
 | POST | `/auth/login` · GET `/auth/status` | session |
 | GET | `/clip?url=` | session-auth re-fetch intake (ATS URLs); redirects to `/positions/:slug` |
 | POST | `/clip` | form or JSON `{url,title,text}` snapshot; cross-site submissions require a same-origin confirmation; no re-fetch when `text` is present; redirects to `/positions/:slug` |

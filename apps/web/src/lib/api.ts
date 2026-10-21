@@ -507,6 +507,7 @@ export type NotificationsConfig = {
     jd_change_hot: boolean;
     listing_closed_hot: boolean;
     company_research: boolean;
+    llm_health: boolean;
   };
   quietHours: { enabled: boolean; timezone: string; start: string; end: string };
   chat: { model: string; allowFrom: string[]; cursorTs: number; cursorId: string };

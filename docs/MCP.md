@@ -30,7 +30,7 @@ Positions are drained first; evaluations start on the page that returns the last
 
 | tool | |
 |--|--|
-| `server_info` | identity, version, endpoints, LLM status |
+| `server_info` | identity, version, endpoints, LLM usage, `llmHealth` (failing operations and kind: `auth` `quota` `upgrade_required` `outage`) |
 | `market_summary` | counts by status/verdict, discovery lanes for the last N hours, LLM usage |
 | `list_positions` | lean rows; `status` (comma list, `hot`, `active`, `all`), `verdict`, `q`, `company`, `minScore`, `sort`, `fields`, cursor pagination. See [Paging](#paging) |
 | `get_position` | full detail: company, current JD text, revisions, evaluations, materials |
@@ -65,7 +65,7 @@ Positions are drained first; evaluations start on the page that returns the last
 | `run_llm` | run `triage` / `evaluate` / `materials` / `jd_review` / `form_answers` / `listing_classify` synchronously with the model from Settings › AI |
 | `run_discovery_radar` | enqueue board scans for due boards (`all=true` forces every enabled board) |
 | `promote_discovery` | create a position from a discovery row and triage it |
-| `retry_failed_llm` | re-enqueue latest failed LLM ops (`hours`, `scope=failed|failed_and_missing`). Does not re-run successful evaluate/materials |
+| `retry_failed_llm` | re-enqueue latest failed LLM ops (`hours`, `scope=failed|failed_and_missing`) and release jobs parked during an LLM outage (`released`). Does not re-run successful evaluate/materials |
 
 **Write echoes.** `update_position`, `set_position_status`, `set_match_override` and `create_position_from_career_ops` return a compact position summary: `id`, `slug`, `title`, `company` (`slug`, `name`), `status`, `archiveReason`, `priority`, `primaryUrl`, `workplace`, `geoClass`, `geoNotes`, `listingStatus`, `nextAction`, `notes` (cut at 2,000 chars), `resumeSurface`, `watchEnabled`, `appliedAt`, `lastChangedAt`, `updatedAt`, the career-ops `trackerId`/`status`/`score` when stamped, `classificationOverride` when set, and `statusApplied`/`statusNote` when the career-ops guard declined a status. `triageJson`, `metadata`, JD text and revisions are not echoed. Pass `verbose: true` for the full row (`create_position_from_career_ops`: the full `get_position` detail). `upsert_interview` returns the round's metadata with `notesChars`, `notesMarkdownChars`, `reviewChars`, `transcriptChars`, `aiBriefChars` and `briefJobId`; `verbose: true` returns the bodies, and `get_interview` reads them later.
 

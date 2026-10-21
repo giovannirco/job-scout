@@ -31,6 +31,10 @@ The dashboard lives in the repo at `deploy/helm/job-scout/dashboards/job-scout.j
 | `job_scout_llm_tokens_total` | `operation model direction` | Prompt (`in`) and completion (`out`) tokens |
 | `job_scout_llm_latency_seconds` | `operation model` | Wall time per call |
 | `job_scout_llm_gate_total` | `operation code` | Refused before the model: `disabled` `no_model` `cap_reached` `budget_reached` `not_configured` |
+| `job_scout_llm_health_status` | `operation` | From recent `llm_runs`: 0 ok/idle, 1 degraded (failure ratio >= 0.5 over 30 min, at least 4 runs), 2 failing (3+ failures in a row) |
+| `job_scout_llm_consecutive_failures` | `operation` | Failed runs in a row, newest first |
+| `job_scout_llm_failure_ratio` | `operation` | Share of failed runs in the 30 min window |
+| `job_scout_llm_provider_down` | `kind` | 1 while a failing operation's kind is provider-wide (`auth` `quota` `upgrade_required` `outage`); LLM jobs are parked |
 | `job_scout_jobs_processed_total` | `type outcome` | Worker jobs: `ok` `failed` `retry` `parked` |
 | `job_scout_job_duration_seconds` | `type` | Job wall time |
 | `job_scout_jobs_in_flight` | | Running in this worker |
@@ -76,6 +80,12 @@ The dashboard lives in the repo at `deploy/helm/job-scout/dashboards/job-scout.j
 | `job_scout_evaluations_total`, `job_scout_materials_total`, `job_scout_interviews_upcoming` | | |
 | `job_scout_db_pool_connections` | `state` | pg pool `total` `idle` `waiting` |
 | `job_scout_metrics_db_refresh_seconds`, `job_scout_metrics_db_refresh_errors` | | Cost / health of the gauge refresh itself |
+
+### LLM outages
+
+`GET /api/v1/health` carries an `llm` section (state, `providerDown`, `kind`, failing operations; never error text) and reports `status: "degraded"` while an operation is failing. HTTP stays 200 so probes do not restart the API. The MCP `server_info` tool returns the full report as `llmHealth`.
+
+While the provider is down the worker parks LLM jobs (`outcome=parked`, payload `llmParked`) without spending attempts and lets one probe per operation through every 5 minutes. The worker's `llm-health` tick (every minute) sends one `llm_health` notification when calls start failing and one on recovery (30 minute flapping guard), and releases parked jobs on recovery. `retry_failed_llm` (MCP) or `POST /settings/llm/retry` also releases parked jobs and pulls backed-off ones forward. Alert on `max(job_scout_llm_provider_down) == 1` for a few minutes.
 
 ### Adding a metric
 

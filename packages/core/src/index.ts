@@ -43,3 +43,4 @@ export * from "./slug-repair.js";
 export * from "./list-cursor.js";
 export * from "./threat-intel.js";
 export * from "./classification-override.js";
+export * from "./llm-health.js";

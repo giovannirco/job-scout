@@ -85,6 +85,33 @@ export const llmGate = new client.Counter({
   registers: [registry],
 });
 
+// LLM health, derived from recent llm_runs (see llm-health.ts). Set on scrape by the API and on
+// every health tick by the worker, so either component reports it.
+export const llmHealthStatus = new client.Gauge({
+  name: `${P}llm_health_status`,
+  help: "LLM health by operation from recent runs: 0 ok/idle, 1 degraded, 2 failing.",
+  labelNames: ["operation"],
+  registers: [registry],
+});
+export const llmConsecutiveFailures = new client.Gauge({
+  name: `${P}llm_consecutive_failures`,
+  help: "Failed LLM runs in a row (newest first) by operation.",
+  labelNames: ["operation"],
+  registers: [registry],
+});
+export const llmFailureRatio = new client.Gauge({
+  name: `${P}llm_failure_ratio`,
+  help: "Share of failed LLM runs in the health window by operation.",
+  labelNames: ["operation"],
+  registers: [registry],
+});
+export const llmProviderDown = new client.Gauge({
+  name: `${P}llm_provider_down`,
+  help: "1 while a provider-wide failure (auth, quota, upgrade_required, outage) is parking LLM work.",
+  labelNames: ["kind"],
+  registers: [registry],
+});
+
 export const jobsProcessed = new client.Counter({
   name: `${P}jobs_processed_total`,
   help: "Worker jobs finished by type and outcome (ok, failed, retry, parked).",
@@ -355,6 +382,9 @@ async function refreshDbGauges() {
     dbGauges.evaluations.set(num(misc[0]?.evals));
     dbGauges.materials.set(num(misc[0]?.mats));
     dbGauges.interviewsUpcoming.set(num(misc[0]?.interviews));
+
+    const { getLlmHealth } = await import("./llm-health.js");
+    await getLlmHealth();
 
     dbGauges.scrapeErrors.set(0);
   } catch (e) {

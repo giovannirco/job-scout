@@ -32,6 +32,7 @@ import {
   careerOpsStampState,
   upsertFromJob,
   usageSummary,
+  getLlmHealth,
   retryFailedLlm,
   LlmGateError,
   CursorError,
@@ -137,8 +138,8 @@ export function createJobScoutMcpServer() {
 
   server.registerTool(
     "server_info",
-    { title: "Server info", description: "job-scout identity, version, endpoints, LLM status.", inputSchema: z.object({}), annotations: { readOnlyHint: true } },
-    async () => text({ name: "job-scout", version: env.version, publicBaseUrl: env.publicBaseUrl, mcp: `${env.publicBaseUrl}/mcp`, api: `${env.publicBaseUrl}/api/v1`, llm: await usageSummary(24) }),
+    { title: "Server info", description: "job-scout identity, version, endpoints, LLM usage and LLM health (failing operations, failure kind: auth, quota, upgrade_required, outage).", inputSchema: z.object({}), annotations: { readOnlyHint: true } },
+    async () => text({ name: "job-scout", version: env.version, publicBaseUrl: env.publicBaseUrl, mcp: `${env.publicBaseUrl}/mcp`, api: `${env.publicBaseUrl}/api/v1`, llm: await usageSummary(24), llmHealth: await getLlmHealth() }),
   );
 
   server.registerTool(
@@ -490,7 +491,7 @@ export function createJobScoutMcpServer() {
     {
       title: "Retry failed LLM jobs",
       description:
-        "Re-enqueue the latest failed LLM ops in a time window. scope=failed_and_missing also triages open positions with no successful triage. Does not re-run successful evaluate/materials.",
+        "Re-enqueue the latest failed LLM ops in a time window and release jobs parked during an LLM outage. scope=failed_and_missing also triages open positions with no successful triage. Does not re-run successful evaluate/materials.",
       inputSchema: {
         hours: z.number().int().min(1).max(168).optional(),
         scope: z.enum(["failed", "failed_and_missing"]).optional(),

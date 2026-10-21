@@ -24,3 +24,4 @@ export * from "./job-recovery.js";
 export * from "./decisions.js";
 export * from "./page-signature.js";
 export * from "./snapshot-guard.js";
+export * from "./llm-health.js";

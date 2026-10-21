@@ -1,6 +1,10 @@
 import {
+  checkLlmHealthAlerts,
   checkPosition,
   checkWatch,
+  getLlmHealth,
+  invalidateLlmHealth,
+  llmCircuit,
   claimNextJob,
   completeJob,
   enqueueDueBoardScans,
@@ -31,7 +35,7 @@ import {
   type JobRow,
 } from "@job-scout/core";
 import type { JobType } from "@job-scout/db";
-import { jobRecovery, log as rootLog } from "@job-scout/shared";
+import { classifyLlmFailure, jobRecovery, LLM_PARK_MS, LLM_PROBE_INTERVAL_MS, providerWideKind, log as rootLog } from "@job-scout/shared";
 
 const log = rootLog.child({ scope: "worker" });
 
@@ -85,6 +89,8 @@ export type WorkerOptions = {
   retentionEveryMs?: number;
   /** Only pick these job types (e.g. a dedicated LLM worker) */
   types?: JobType[];
+  /** LLM health check / outage alert cadence */
+  llmHealthEveryMs?: number;
 };
 
 export function startWorker(opts: WorkerOptions = {}) {
@@ -114,9 +120,34 @@ export function startWorker(opts: WorkerOptions = {}) {
     }
   };
 
+  const providerDownNow = async () => {
+    invalidateLlmHealth();
+    return (await getLlmHealth({ fresh: true }).catch(() => null))?.providerDown === true;
+  };
+
+  /** Hold an LLM job while the provider is down: requeue later without spending an attempt. */
+  const park = async (job: JobRow, msg: string, kind: string | null, retryInMs: number) => {
+    const prev = (job.payload as { llmParked?: { count?: number } } | null)?.llmParked;
+    await failJob(job.id, msg, {
+      retryInMs,
+      refundAttempt: true,
+      payload: { ...job.payload, llmParked: { kind, at: new Date().toISOString(), count: (prev?.count ?? 0) + 1 } },
+    });
+  };
+
   const run = async (job: JobRow) => {
     const t0 = Date.now();
     const jlog = log.child({ jobId: job.id, type: job.type, attempt: job.attempts, positionId: (job.payload as Record<string, unknown> | null)?.positionId ?? undefined });
+    const llmJob = LLM_TYPES.includes(job.type);
+    if (llmJob) {
+      const circuit = await llmCircuit(job.type).catch(() => ({ open: false, kind: null, reason: null }));
+      if (circuit.open) {
+        await park(job, circuit.reason ?? "LLM provider down", circuit.kind, LLM_PROBE_INTERVAL_MS);
+        jobsProcessed.labels({ type: job.type, outcome: "parked" }).inc();
+        jlog.warn("job.parked", { reason: "llm_provider_down", kind: circuit.kind });
+        return;
+      }
+    }
     try {
       const result = await processJob(job);
       if (job.type === "triage" && result.reason === "position_changed" && result.retryable === true) {
@@ -139,6 +170,10 @@ export function startWorker(opts: WorkerOptions = {}) {
       const gate = e instanceof LlmGateError;
       const ms = Date.now() - t0;
       let outcome: "failed" | "retry" | "parked" = "failed";
+      // Provider-shaped LLM failures (a model-call error, not a bug in the job).
+      const llmFailure = llmJob && !gate && e instanceof Error
+        && (e.name === "LlmError" || /llm timeout|fetch failed|ECONNREFUSED|ECONNRESET|ENOTFOUND|EAI_AGAIN|socket hang up/i.test(msg));
+      const kind = llmFailure ? classifyLlmFailure({ error: msg, status: (e as { status?: number | null }).status ?? null }) : null;
       // LLM gate errors (cap/disabled) are not failures of the job: park it for later.
       if (gate && ((e as LlmGateError).code === "cap_reached" || (e as LlmGateError).code === "budget_reached")) {
         outcome = "parked";
@@ -155,7 +190,12 @@ export function startWorker(opts: WorkerOptions = {}) {
         jobsProcessed.labels({ type: job.type, outcome: "ok" }).inc();
         jlog.info("job.skipped", { ms, reason: "junk_title" });
         return;
-      } else if (!gate && job.attempts < 3 && (jobRecovery(job.type, msg).retryable || (LLM_TYPES.includes(job.type) && /timeout|429|5\d\d|ECONN|fetch failed/i.test(msg)))) {
+      } else if (llmFailure && (await providerDownNow())) {
+        // Health over recent runs says the provider is down for everyone: this job is fine,
+        // so the outage must not spend its attempts. It comes back on recovery or after LLM_PARK_MS.
+        outcome = "parked";
+        await park(job, msg, kind, LLM_PARK_MS);
+      } else if (!gate && job.attempts < 3 && (jobRecovery(job.type, msg).retryable || (llmJob && /timeout|429|5\d\d|ECONN|fetch failed/i.test(msg)) || providerWideKind(kind))) {
         outcome = "retry";
         await failJob(job.id, msg, { retryInMs: 2 * 60_000 * job.attempts });
       } else {
@@ -163,7 +203,7 @@ export function startWorker(opts: WorkerOptions = {}) {
       }
       jobDuration.labels({ type: job.type }).observe(ms / 1000);
       jobsProcessed.labels({ type: job.type, outcome }).inc();
-      jlog[outcome === "failed" ? "error" : "warn"]("job.failed", { ms, outcome, gate: gate ? (e as LlmGateError).code : undefined, err: e });
+      jlog[outcome === "failed" ? "error" : "warn"]("job.failed", { ms, outcome, gate: gate ? (e as LlmGateError).code : undefined, llmKind: kind ?? undefined, err: e });
     }
   };
 
@@ -194,6 +234,10 @@ export function startWorker(opts: WorkerOptions = {}) {
   setTimeout(inbox, 12_000);
   timers.push(setInterval(notifyFlush, 4_000));
   timers.push(setInterval(inbox, 5_000));
+  // LLM outage alerts (once failing, once recovered) and release of parked LLM jobs on recovery.
+  const llmHealth = safe("llm-health", () => checkLlmHealthAlerts());
+  setTimeout(llmHealth, 15_000);
+  timers.push(setInterval(llmHealth, opts.llmHealthEveryMs ?? 60_000));
   const nagStale = safe("stale-applied-nags", () => enqueueStaleAppliedNags());
   setTimeout(nagStale, 90_000);
   timers.push(setInterval(nagStale, 6 * 3_600_000));

@@ -386,6 +386,8 @@ export type RetryFailedItem = {
 export type RetryFailedResult = {
   enqueued: number;
   skipped: number;
+  /** Queued jobs (parked during an outage or backing off) pulled forward to run now. */
+  released: number;
   items: RetryFailedItem[];
 };
 
@@ -406,7 +408,9 @@ export async function retryFailedLlm(
   const ops = (opts.operations?.length ? opts.operations : [...RETRYABLE_LLM_OPS]).filter((o): o is RetryableLlmOp =>
     allowed.has(o),
   );
-  if (!ops.length) return { enqueued: 0, skipped: 0, items: [] };
+  if (!ops.length) return { enqueued: 0, skipped: 0, released: 0, items: [] };
+  const { releaseParkedLlmJobs, runQueuedJobNow } = await import("./llm-health.js");
+  let released = await releaseParkedLlmJobs(ops);
 
   const db = await getDb();
   const since = new Date(Date.now() - hours * 3_600_000);
@@ -486,9 +490,11 @@ export async function retryFailedLlm(
         ? { companyId: c.companyId, positionId: c.positionId }
         : { positionId: c.positionId, force: true };
     const q = await enqueueJob(c.operation, payload, { dedupeKey: `${c.operation}:${c.positionId}`, priority: 20 });
+    // Already queued but waiting (backoff or outage park): run it now instead of later.
+    if (q.deduped && (await runQueuedJobNow(q.id))) released += 1;
     items.push({ positionId: c.positionId, operation: c.operation, jobId: q.id, deduped: q.deduped });
   }
-  return { enqueued: items.filter((i) => !i.deduped).length, skipped, items };
+  return { enqueued: items.filter((i) => !i.deduped).length, skipped, released, items };
 }
 
 /** One-token smoke call for the Settings "Test" button. */

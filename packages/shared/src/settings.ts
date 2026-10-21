@@ -186,6 +186,7 @@ export const NotificationsConfigSchema = z.object({
     jd_change_hot: z.boolean().default(true),
     listing_closed_hot: z.boolean().default(true),
     company_research: z.boolean().default(true),
+    llm_health: z.boolean().default(true),
   }),
   quietHours: z.object({
     enabled: z.boolean().default(true),
