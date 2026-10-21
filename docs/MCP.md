@@ -84,7 +84,7 @@ Positions are drained first; evaluations start on the page that returns the last
 |--|--|
 | `upsert_career_ops_stamp` | store tracker id / score / status / report path on `positions.metadata.careerOps` |
 | `list_career_ops_stamps` | every position carrying a stamp |
-| `reconcile_career_ops` | bulk reconciliation: tracker id stamp first, then posting URL, then (no URL) exact unique company + title. Dry run by default. On a real run, URL-less rows that match nothing become manual positions (`created`; dry run: `wouldCreate`), and a URL that appears later for a stamped URL-less position is set on it (`urlSet`) |
+| `reconcile_career_ops` | bulk reconciliation: tracker id stamp first, then posting URL, then (no URL) exact unique company + title. Dry run by default. On a real run, URL-less rows that match nothing become manual positions (`created`; dry run: `wouldCreate`) unless the tracker dropped them (Discarded/SKIP/Withdrawn → `skippedDropped`), and a URL that appears later for a stamped URL-less position is set on it (`urlSet`) |
 | `create_position_from_career_ops` | create or link the position for one tracker row. `url` is optional: a row without one becomes a manual position keyed by company + role and stamped with `trackerId`; re-runs link it (`via: trackerId` or `company_title`), and a URL supplied later is set on that same position (`urlSet: true`; `urlConflict` when another position holds it). With a URL it fetches when reachable, else a manual record titled from the tracker role |
 | `write_resume_eval` | store an evaluation produced elsewhere as an `evaluate` record and stamp it |
 

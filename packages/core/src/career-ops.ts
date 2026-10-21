@@ -69,7 +69,8 @@ export async function setCareerOpsUrl(positionId: string, url: string): Promise<
 /**
  * Tracker link first (a position already stamped with the row's trackerId), then URL identity.
  * Title fallback is exact, unambiguous, and never overrides a conflicting URL. Rows without a
- * URL that match nothing become manual positions on a real run (dry run: `wouldCreate`); a URL
+ * URL that match nothing become manual positions on a real run (dry run: `wouldCreate`), except
+ * rows the tracker dropped (`skippedDropped`); a URL
  * that appears later for a stamped URL-less position is set on it (`urlSet`).
  */
 export async function reconcileCareerOps(input: z.input<typeof ReconcileInput>) {
@@ -81,6 +82,8 @@ export async function reconcileCareerOps(input: z.input<typeof ReconcileInput>) 
   const reports: Array<{ trackerId: string; path: string; status: string }> = [];
   const created: Array<{ trackerId: string; positionId: string }> = [];
   const wouldCreate: string[] = [];
+  // A row the tracker dropped (Discarded, SKIP…, Withdrawn) never becomes an active position.
+  const skippedDropped: string[] = [];
   const urlSet: Array<{ trackerId: string; positionId: string; url: string }> = [];
   const proposals = new Map<string, { row: z.output<typeof TrackerRow>; ids: string[]; via: string }>();
   for (const row of rows) {
@@ -98,7 +101,7 @@ export async function reconcileCareerOps(input: z.input<typeof ReconcileInput>) 
     }
     if (!candidates.length) {
       unmatched.push(row.trackerId);
-      if (!url) wouldCreate.push(row.trackerId);
+      if (!url) (careerOpsDropStatus(row.status) ? skippedDropped : wouldCreate).push(row.trackerId);
       continue;
     }
     proposals.set(row.trackerId, { row, ids: candidates.map(p => p.id), via });
@@ -148,5 +151,5 @@ export async function reconcileCareerOps(input: z.input<typeof ReconcileInput>) 
   }
   const createdIds = new Set(created.map(c => c.trackerId));
   return { dryRun, matches, unmatched: unmatched.filter(t => !createdIds.has(t)), conflicts, reports, created,
-    ...(dryRun ? { wouldCreate } : {}), urlSet };
+    ...(dryRun ? { wouldCreate } : {}), skippedDropped, urlSet };
 }
