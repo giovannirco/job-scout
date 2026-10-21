@@ -153,7 +153,7 @@ export async function runListingClassify(positionId: string) {
             geoNote: res.data.geoNote ?? null,
           },
         },
-        updatedAt: new Date(),
+        ...(merged.geoClass !== pos.geoClass || merged.workplace !== pos.workplace || rc !== pos.remoteClass ? { updatedAt: new Date() } : {}),
       })
       .where(eq(positions.id, pos.id));
     if (merged.geoClass !== pos.geoClass || merged.workplace !== pos.workplace) {
@@ -187,6 +187,9 @@ export async function backfillListingFacts(opts: { force?: boolean } = {}) {
       id: positions.id,
       salaryMin: positions.salaryMin,
       salaryCurrency: positions.salaryCurrency,
+      workplace: positions.workplace,
+      geoClass: positions.geoClass,
+      remoteClass: positions.remoteClass,
       status: positions.status,
       listingStatus: positions.listingStatus,
       metadata: positions.metadata,
@@ -223,6 +226,7 @@ export async function backfillListingFacts(opts: { force?: boolean } = {}) {
     });
     const salary = parseSalary(extractSalaryRaw(rev?.descriptionText || ""));
     const fillSalary = Boolean(salary.min && (row.salaryMin == null || (row.salaryMin === salary.min && row.salaryCurrency !== salary.currency)));
+    const changed = fillSalary || facts.workplace !== row.workplace || facts.geoClass !== row.geoClass || facts.remoteClass !== row.remoteClass;
     await db
       .update(positions)
       .set({
@@ -230,7 +234,7 @@ export async function backfillListingFacts(opts: { force?: boolean } = {}) {
         geoClass: facts.geoClass,
         remoteClass: facts.remoteClass,
         ...(fillSalary ? { salaryMin: salary.min, salaryMax: salary.max, salaryCurrency: salary.currency, salaryPeriod: salary.period, salaryRaw: salary.raw } : {}),
-        updatedAt: new Date(),
+        ...(changed ? { updatedAt: new Date() } : {}),
       })
       .where(and(eq(positions.id, row.id), sql`${positions.status} <> 'archived'`));
     await db.update(discoveryFeed).set({ geoClass: facts.geoClass }).where(eq(discoveryFeed.positionId, row.id));

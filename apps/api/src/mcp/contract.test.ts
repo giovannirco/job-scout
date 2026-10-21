@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import bcrypt from "bcryptjs";
 import { eq, inArray, sql } from "drizzle-orm";
-import { apiTokens, closeDb, getDb, positions } from "@job-scout/db";
-import { bootstrap, upsertFromJob } from "@job-scout/core";
+import { apiTokens, closeDb, evaluations, getDb, id as newId, positions } from "@job-scout/db";
+import { applySnapshot, bootstrap, getPosition, harvestFromJob, stampCareerOps, upsertFromJob } from "@job-scout/core";
 import { env } from "../env.js";
 import { handleMcpHttp } from "./handler.js";
 import { fitPage } from "./page.js";
@@ -175,10 +175,90 @@ describe("MCP contract", () => {
 
     it("a large page stays under the result cap", async () => {
       const db = await getDb();
-      await db.update(positions).set({ notes: "n".repeat(5_000) }).where(inArray(positions.id, ids));
+      await db.update(positions).set({ triageJson: { oneLiner: "n".repeat(12_000) } }).where(inArray(positions.id, ids));
       const r = await call("list_positions", { q: "Paging Probe", pageSize: 200, fields: "full" });
       expect(r.isError).toBe(false);
       expect(r.bytes).toBeLessThan(100_000);
+      expect(r.data.truncated).toBe(true);
+      const rest = await call("list_positions", { q: "Paging Probe", pageSize: 200, fields: "full", cursor: r.data.nextCursor });
+      expect(r.data.items.length + rest.data.items.length).toBe(12);
+    });
+  });
+
+  describe("list_changes", () => {
+    const pause = (ms = 15) => new Promise((r) => setTimeout(r, ms));
+    const job = (board: string, n: number) => ({
+      provider: "greenhouse" as const, boardToken: board, jobId: String(n), company: `Changes Co ${board}`, title: "Changes Probe Engineer",
+      url: `https://boards.greenhouse.io/${board}/jobs/${n}`, locationRaw: "Remote", descriptionText: "Operate Kubernetes for an example product. " + "z".repeat(400), listingStatus: "open" as const,
+    });
+
+    it("leaves updatedAt alone for unchanged checks, form harvests and career-ops stamps", async () => {
+      const { position: p } = await upsertFromJob(job("changes-noop", 1), { status: "review" });
+      const before = (await getPosition(p.id))!.updatedAt.getTime();
+      await pause();
+      const r = await applySnapshot({ positionId: p.id, job: job("changes-noop", 1), source: "watch" });
+      expect(r.changed).toBe(false);
+      await harvestFromJob(p.id, { ...job("changes-noop", 1), questionPrompts: [] });
+      await stampCareerOps(p.id, { trackerId: "T-1", status: "Evaluated" });
+      const after = (await getPosition(p.id))!;
+      expect(after.updatedAt.getTime()).toBe(before);
+      expect(after.lastCheckedAt!.getTime()).toBeGreaterThan(before);
+      await call("update_position", { idOrSlug: p.id, nextAction: "email the example recruiter" });
+      expect((await getPosition(p.id))!.updatedAt.getTime()).toBeGreaterThan(before);
+    });
+
+    it("lists only rows changed after since, pages positions then evaluations, and keeps now fixed", async () => {
+      const ids: string[] = [];
+      for (let i = 0; i < 5; i++) ids.push((await upsertFromJob(job(`changes-page-${i}`, 10 + i), { status: "review" })).position.id);
+      const quiet = (await upsertFromJob(job("changes-quiet", 99), { status: "review" })).position.id;
+      await pause();
+      const since = new Date().toISOString();
+      await pause();
+      for (const pid of ids) await call("update_position", { idOrSlug: pid, notes: "touched by a person" });
+      // An unchanged watch check on another row after `since` is not a change.
+      await applySnapshot({ positionId: quiet, job: job("changes-quiet", 99), source: "watch" });
+      const db = await getDb();
+      for (const pid of ids.slice(0, 3)) await db.insert(evaluations).values({ id: newId("ev"), positionId: pid, kind: "evaluate", model: "example-model", markdown: "ok", json: {} });
+
+      const pages: any[] = [];
+      let cursor: string | undefined;
+      do {
+        const r = await call("list_changes", { since, limit: 2, ...(cursor ? { cursor } : {}) });
+        expect(r.isError).toBe(false);
+        pages.push(r.data);
+        cursor = r.data.nextCursor ?? undefined;
+      } while (cursor && pages.length < 10);
+      const seen = pages.flatMap((p) => p.positions.map((x: { id: string }) => x.id));
+      expect(seen.sort()).toEqual([...ids].sort());
+      expect(seen).not.toContain(quiet);
+      expect(pages.flatMap((p) => p.evaluations)).toHaveLength(3);
+      // positions are drained before evaluations start
+      const firstEvalPage = pages.findIndex((p) => p.evaluations.length);
+      expect(pages.slice(firstEvalPage + 1).every((p) => p.positions.length === 0)).toBe(true);
+      expect(new Set(pages.map((p) => p.now)).size).toBe(1);
+      const row = pages[0].positions[0];
+      expect(row).toHaveProperty("lastChangedAt");
+      for (const k of ["triageJson", "departments", "locationRaw", "metadata"]) expect(row).not.toHaveProperty(k);
+
+      const again = await call("list_changes", { since: pages[0].now });
+      expect(again.data.positions.map((x: { id: string }) => x.id)).not.toContain(quiet);
+    });
+
+    it("cuts a large page to the result cap and refuses a cursor for another since", async () => {
+      const since = new Date(0).toISOString();
+      const db = await getDb();
+      await db.update(positions).set({ triageJson: { oneLiner: "m".repeat(4_000) } });
+      const r = await call("list_changes", { since, limit: 500, fields: "full" });
+      expect(r.isError).toBe(false);
+      expect(r.bytes).toBeLessThan(100_000);
+      expect(r.data.truncated).toBe(true);
+      expect(typeof r.data.nextCursor).toBe("string");
+      const next = await call("list_changes", { since, limit: 500, fields: "full", cursor: r.data.nextCursor });
+      expect(next.isError).toBe(false);
+      const ids = new Set(r.data.positions.map((x: { id: string }) => x.id));
+      expect(next.data.positions.some((x: { id: string }) => ids.has(x.id))).toBe(false);
+      const wrong = await call("list_changes", { since: new Date(1).toISOString(), cursor: r.data.nextCursor });
+      expect(wrong).toMatchObject({ isError: true, data: { code: "invalid_cursor" } });
     });
   });
 });

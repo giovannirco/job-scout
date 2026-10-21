@@ -120,7 +120,8 @@ export async function harvestFromJob(positionId: string, job: AtsJob): Promise<{
   if (job.formHarvestError) forms.harvestError = job.formHarvestError;
   else if (successful) delete forms.harvestError;
   forms.harvestedAt = new Date().toISOString();
-  await db.update(positions).set({ metadata: { ...prev, forms }, updatedAt: new Date() }).where(eq(positions.id, positionId));
+  // Bookkeeping only: questions keep their own updatedAt, so the position's (what list_changes reads) stays put.
+  await db.update(positions).set({ metadata: { ...prev, forms } }).where(eq(positions.id, positionId));
   return { upserted };
 }
 

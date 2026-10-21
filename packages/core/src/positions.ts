@@ -532,9 +532,10 @@ export async function stampCareerOps(idOrSlug: string, stamp: Record<string, unk
   const now = new Date().toISOString();
   // Record job-scout's own stage at stamp time so a later status change shows as drift.
   const next = { ...stamp, syncedAt: now, jsStatus: pos.status, jsStatusAt: now };
+  // The stamp is the sync's own echo: it leaves updatedAt alone so list_changes does not hand it back.
   const [updated] = await db
     .update(positions)
-    .set({ metadata: sql`jsonb_set(coalesce(${positions.metadata}, '{}'::jsonb), '{careerOps}', coalesce(${positions.metadata}->'careerOps', '{}'::jsonb) || ${JSON.stringify(next)}::jsonb)`, updatedAt: new Date() })
+    .set({ metadata: sql`jsonb_set(coalesce(${positions.metadata}, '{}'::jsonb), '{careerOps}', coalesce(${positions.metadata}->'careerOps', '{}'::jsonb) || ${JSON.stringify(next)}::jsonb)` })
     .where(eq(positions.id, pos.id)).returning();
   const meta = (updated?.metadata || {}) as Record<string, unknown>;
   return meta.careerOps;
@@ -577,12 +578,12 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
   const blocked = snapshotBlockReason(pos, opts.job, { prevBody, source: opts.source || "scan", force: Boolean(opts.force) });
   if (blocked) {
     // Keep the last good revision: no jd_revision, no jd_change, no re-scoring. Record why.
+    // Nothing the operator sees changed, so updatedAt (what list_changes reads) stays put.
     const now = new Date();
     await db
       .update(positions)
       .set({
         lastCheckedAt: now,
-        updatedAt: now,
         metadata: {
           ...(pos.metadata || {}),
           lastAtsFetch: { at: now.toISOString(), provider: opts.job.provider, listingStatus: opts.job.listingStatus, rejected: blocked, ...(softNotFoundSince ? { softNotFoundSince } : {}) },
@@ -618,12 +619,15 @@ export async function applySnapshot(opts: { positionId: string; job: AtsJob; sou
     await archivePosition(pos.id, "listing_closed", "system");
   }
 
+  // An unchanged check records lastCheckedAt only; updatedAt (what list_changes reads) moves
+  // only when a field the operator sees actually changes.
   const touch = async (extra: Record<string, unknown> = {}) => {
+    const visible = Object.entries(extra).some(([k, v]) => k !== "contentHash" && (pos as Record<string, unknown>)[k] !== v);
     await db
       .update(positions)
       .set({
         lastCheckedAt: now,
-        updatedAt: now,
+        ...(visible ? { updatedAt: now } : {}),
         metadata: {
           ...(pos.metadata || {}),
           lastAtsFetch: { at: now.toISOString(), provider: opts.job.provider, listingStatus: opts.job.listingStatus },
@@ -1210,6 +1214,8 @@ async function afterAtsFetch(positionId: string, job: AtsJob, facts?: ReturnType
   const db = await getDb();
   const prev = (pos.metadata || {}) as Record<string, unknown>;
   const ats = { ...((prev.ats as Record<string, unknown>) || {}), workplaceType: job.workplaceType ?? null, isRemote: job.isRemote ?? null };
+  const changed = f.workplace !== pos.workplace || f.geoClass !== pos.geoClass || f.remoteClass !== pos.remoteClass
+    || Boolean(job.employmentType && job.employmentType !== pos.employmentType);
   await db
     .update(positions)
     .set({
@@ -1218,7 +1224,7 @@ async function afterAtsFetch(positionId: string, job: AtsJob, facts?: ReturnType
       remoteClass: f.remoteClass,
       ...(job.employmentType ? { employmentType: job.employmentType } : {}),
       metadata: { ...prev, ats },
-      updatedAt: new Date(),
+      ...(changed ? { updatedAt: new Date() } : {}),
     })
     .where(eq(positions.id, positionId));
   const { harvestFromJob } = await import("./questions.js");
@@ -1368,24 +1374,66 @@ export async function refreshPosition(idOrSlug: string, source = "refresh", opts
   return applySnapshot({ positionId: pos.id, job, source, force: opts.force });
 }
 
-/** Rows changed since a timestamp — for the career-ops sync skill. */
-export async function listChangesSince(since: Date, limit = 200) {
+/**
+ * Rows changed since a timestamp — for the career-ops sync skill. Keyed on
+ * positions.updated_at, which moves on operator-visible changes (status, notes,
+ * JD revisions, triage, listing facts) and not on unchanged watch checks, form
+ * harvests or career-ops stamps. Pages positions first, then evaluations, by
+ * keyset at full timestamp precision. `now` is the watermark from the first
+ * page, repeated on every page: use it as the next `since` once nextCursor is null.
+ */
+export async function listChangesSince(since: Date, opts: number | { limit?: number; cursor?: string } = {}) {
+  const o = typeof opts === "number" ? { limit: opts } : opts;
+  const limit = Math.min(500, Math.max(1, Math.floor(o.limit ?? 200)));
+  const s = "changes";
+  const f = filterFingerprint({ since: since.toISOString() });
+  const cursor = o.cursor ? decodeCursor(o.cursor, { s, f }) : null;
+  const now = cursor?.w ?? new Date().toISOString();
   const db = await getDb();
-  const rows = await db
-    .select({
-      ...LIST_ROW,
-      archiveReason: positions.archiveReason,
-    })
+
+  let posRows: Awaited<ReturnType<typeof changedPositions>> = [];
+  let positionsMore = false;
+  if (!cursor?.e) {
+    const rows = await changedPositions(since, cursor?.k, limit + 1);
+    positionsMore = rows.length > limit;
+    posRows = rows.slice(0, limit);
+  }
+  let evRows: { id: string; positionId: string | null; kind: string; model: string | null; createdAt: Date; cursorTs: string }[] = [];
+  let evaluationsMore = false;
+  if (!positionsMore) {
+    const after = cursor?.e ? sql`(${evaluations.createdAt}, ${evaluations.id}) > (${cursor.e[0]}::timestamptz, ${cursor.e[1]})` : undefined;
+    const rows = await db
+      .select({ id: evaluations.id, positionId: evaluations.positionId, kind: evaluations.kind, model: evaluations.model, createdAt: evaluations.createdAt, cursorTs: sql<string>`${evaluations.createdAt}::text` })
+      .from(evaluations)
+      .where(and(gt(evaluations.createdAt, since), after))
+      .orderBy(asc(evaluations.createdAt), asc(evaluations.id))
+      .limit(limit + 1);
+    evaluationsMore = rows.length > limit;
+    evRows = rows.slice(0, limit);
+  }
+  // A positions cursor past the last changed position resumes with the first evaluation.
+  const positionCursors = posRows.map((r) => encodeCursor({ s, f, w: now, k: [r.cursorTs, r.id] }));
+  const evaluationCursors = evRows.map((r) => encodeCursor({ s, f, w: now, e: [r.cursorTs, r.id] }));
+  const nextCursor = positionsMore ? positionCursors.at(-1) ?? null : evaluationsMore ? evaluationCursors.at(-1) ?? null : null;
+  return {
+    positions: posRows.map(({ cursorTs: _cursorTs, ...row }) => row),
+    evaluations: evRows.map(({ cursorTs: _cursorTs, ...row }) => row),
+    now,
+    nextCursor,
+    /** more changed positions remain, so this page carries no evaluations */
+    positionsMore,
+    positionCursors,
+    evaluationCursors,
+  };
+}
+
+async function changedPositions(since: Date, after: [string, string] | undefined, limit: number) {
+  const db = await getDb();
+  return db
+    .select({ ...LIST_ROW, cursorTs: sql<string>`${positions.updatedAt}::text` })
     .from(positions)
     .innerJoin(companies, eq(positions.companyId, companies.id))
-    .where(gt(positions.updatedAt, since))
-    .orderBy(asc(positions.updatedAt))
-    .limit(Math.min(500, limit));
-  const evals = await db
-    .select({ id: evaluations.id, positionId: evaluations.positionId, kind: evaluations.kind, model: evaluations.model, createdAt: evaluations.createdAt })
-    .from(evaluations)
-    .where(gt(evaluations.createdAt, since))
-    .orderBy(asc(evaluations.createdAt))
-    .limit(500);
-  return { positions: rows, evaluations: evals, now: new Date().toISOString() };
+    .where(and(gt(positions.updatedAt, since), after ? sql`(${positions.updatedAt}, ${positions.id}) > (${after[0]}::timestamptz, ${after[1]})` : undefined))
+    .orderBy(asc(positions.updatedAt), asc(positions.id))
+    .limit(limit);
 }

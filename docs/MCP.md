@@ -18,6 +18,12 @@ Rows are lean by default. `list_positions` rows carry `id`, `slug`, `title`, `co
 
 Each page is cut to about 80 KB of rows so it stays under the result limit. A cut page has `truncated: true`, fewer rows than `pageSize`, and a `nextCursor` that resumes after its last row. `total` counts the whole result, not the page.
 
+## Changes
+
+`list_changes` returns positions whose `updatedAt` is after `since`, oldest first, then evaluations created after `since`. `updatedAt` moves when something the operator sees changes: status, notes and other edits, a JD revision, triage, a listing-fact change. It does not move for an unchanged watch or refresh check (that records `lastCheckedAt`), a form-question harvest, or a career-ops stamp, so those rows are not handed back. `lastChangedAt` on each row marks the last material JD change.
+
+Positions are drained first; evaluations start on the page that returns the last changed position, and later pages carry `positions: []`. Follow `nextCursor` with the same `since`. `now` is fixed by the first page and repeated on every page: once `nextCursor` is `null`, store that `now` as the next `since`. Rows are lean, like `list_positions`; `fields: "full"` returns the fuller list row. Pages are cut to the byte budget described under [Paging](#paging).
+
 ## Tools
 
 ### Read
@@ -36,7 +42,7 @@ Each page is cut to about 80 KB of rows so it stays under the result limit. A cu
 | `list_companies` / `get_company` | companies with counts / detail with positions and latest research |
 | `get_profile` / `get_identity` | operator profile / identity + master resume + scout brief markdown |
 | `list_activity` | timeline events, optionally for one position |
-| `list_changes` | positions and evaluations updated after an ISO timestamp — the sync primitive |
+| `list_changes` | lean positions, then evaluations, changed after an ISO `since` — the sync primitive. `limit` rows per page (default 200), `cursor`, `fields`. See [Changes](#changes) |
 | `list_processes` | live loops (applied/screen/interview/offer) with round timeline |
 | `list_all_interviews` | every round across positions (`lane`, `q`, `stage`); slim |
 | `list_interviews` | rounds for a position (slim: metadata + char counts, not transcript bodies) |

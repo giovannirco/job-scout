@@ -54,7 +54,7 @@ import { log as rootLog } from "@job-scout/shared";
 import { env } from "../env.js";
 import { text } from "./result.js";
 import { interviewSummary, positionSummary } from "./summary.js";
-import { fitPage, leanRow } from "./page.js";
+import { fitPage, leanRow, PAGE_BUDGET_BYTES } from "./page.js";
 import { workQueue, WorkQueueInput } from "./work-queue.js";
 
 type ToolAuth = { clientId?: string; scopes?: string[]; extra?: Record<string, unknown> };
@@ -503,11 +503,36 @@ export function createJobScoutMcpServer() {
 
   server.registerTool(
     "list_changes",
-    { title: "List changes since", description: "Positions and evaluations updated after an ISO timestamp — the primitive the career-ops sync uses.", inputSchema: { since: z.string(), limit: z.number().int().min(1).max(500).optional() }, annotations: { readOnlyHint: true } },
+    {
+      title: "List changes since",
+      description:
+        "Positions, then evaluations, changed after an ISO timestamp — the primitive the career-ops sync uses. A position counts as changed when something the operator sees moved (status, notes and other edits, JD revisions, triage, listing facts); unchanged watch checks, form harvests and career-ops stamps do not count. Rows are lean (fields=full for salary, location, departments, repost and ATS fields); lastChangedAt marks the last material JD change. Pages: pass nextCursor back as cursor with the same since until it is null, then use the returned now (fixed by the first page) as the next since. limit is rows per page (default 200); a page is also cut to stay under the result size limit (truncated=true).",
+      inputSchema: {
+        since: z.string(),
+        limit: z.number().int().min(1).max(500).optional(),
+        cursor: z.string().optional().describe("nextCursor from the previous page, unchanged"),
+        fields: z.enum(["lean", "full"]).optional().describe("lean (default) or full row projection"),
+      },
+      annotations: { readOnlyHint: true },
+    },
     async (a) => {
       const d = new Date(a.since);
       if (Number.isNaN(d.getTime())) return text({ error: "since must be ISO" }, true);
-      return text(await listChangesSince(d, a.limit ?? 200));
+      let r;
+      try {
+        r = await listChangesSince(d, { limit: a.limit ?? 200, cursor: a.cursor });
+      } catch (e) {
+        return errText(e);
+      }
+      const rows: object[] = a.fields === "full" ? r.positions : r.positions.map(leanRow);
+      const pos = fitPage(rows, r.positionCursors, r.nextCursor);
+      // Evaluations follow only once a page has handed back every changed position.
+      if (pos.truncated || r.positionsMore) {
+        return text({ positions: pos.items, evaluations: [], now: r.now, nextCursor: pos.nextCursor, ...(pos.truncated ? { truncated: true } : {}) });
+      }
+      const used = Buffer.byteLength(JSON.stringify(pos.items));
+      const evs = r.evaluations.length ? fitPage(r.evaluations, r.evaluationCursors, r.nextCursor, Math.max(1, PAGE_BUDGET_BYTES - used)) : { items: [], nextCursor: r.nextCursor, truncated: false };
+      return text({ positions: pos.items, evaluations: evs.items, now: r.now, nextCursor: evs.nextCursor, ...(evs.truncated ? { truncated: true } : {}) });
     },
   );
 
