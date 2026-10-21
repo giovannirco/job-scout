@@ -46,3 +46,4 @@ export * from "./threat-intel.js";
 export * from "./classification-override.js";
 export * from "./llm-health.js";
 export * from "./retriage-timezone.js";
+export * from "./career-ops-reversals.js";

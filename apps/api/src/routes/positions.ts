@@ -14,6 +14,7 @@ import {
   listMaterials,
   listPositions,
   patchPosition,
+  patchFromCaller,
   refreshPosition,
   saveMaterial,
   stampCareerOps,
@@ -81,7 +82,9 @@ positionsRoutes.get("/:id", async (c) => {
 positionsRoutes.patch("/:id", async (c) => {
   const actor = c.get("user")?.name || "operator";
   try {
-    const p = await patchPosition(c.req.param("id"), await body(c), actor);
+    const b = await body<Record<string, unknown>>(c);
+    // A career-ops-sourced PATCH (source/note) gets the same status precedence as the MCP tools.
+    const p = await patchFromCaller(c.req.param("id"), b, { actor, source: typeof b.source === "string" ? b.source : undefined, note: typeof b.note === "string" ? b.note : undefined });
     return p ? ok(c, p) : fail(c, "NOT_FOUND", "position not found");
   } catch (e) {
     return fail(c, "VALIDATION_ERROR", e instanceof Error ? e.message : String(e));

@@ -8,7 +8,7 @@ import { buildTriageMessages, buildEvaluateMessages } from "@job-scout/llm";
 import { bootstrap } from "./bootstrap.js";
 import { coreEnv } from "./env.js";
 import { getLlmClient } from "./llm.js";
-import { getPosition, patchPosition, stampCareerOps, upsertFromJob } from "./positions.js";
+import { archivePosition, getPosition, patchPosition, stampCareerOps, upsertFromJob } from "./positions.js";
 import { updateProfile } from "./profile.js";
 import { updateSettings } from "./settings.js";
 import { runTriage } from "./triage.js";
@@ -103,5 +103,48 @@ describe("career-ops never skips or archives on its own", () => {
     const rows = await listCareerOpsSkips(new Date(Date.now() - 30 * 86_400_000));
     expect(rows.find((r) => r.id === p.id)).toMatchObject({ trackerStatus: "Discarded", from: "materials", skippedBy: "sync-agent" });
     expect((await getPosition(p.id))!.status).toBe("skip");
+  });
+});
+
+describe("career-ops reversal repair plan", () => {
+  const dir2 = mkdtempSync(join(tmpdir(), "job-scout-career-ops-reversals-"));
+  beforeAll(async () => { delete process.env.DATABASE_URL; process.env.PGLITE_DATA_DIR = dir2; await bootstrap({ seedBoards: false }); });
+  afterAll(async () => { await closeDb(); rmSync(dir2, { recursive: true, force: true }); });
+  it("finds backwards sync writes, proposes the prior status, and skips ones already moved", async () => {
+    const { planCareerOpsReversals } = await import("./career-ops-reversals.js");
+    const t = (h: number) => new Date(Date.UTC(2026, 0, 10, h)).toISOString();
+    const ev = (positionId: string, h: number, title: string, actor: string) => ({ id: `${positionId}-${h}`, positionId, kind: "status", title, actor, createdAt: t(h) });
+    const plans = planCareerOpsReversals({
+      since: new Date(Date.UTC(2026, 0, 9)),
+      actors: ["local-agent"],
+      positions: [
+        { id: "p_closed", status: "review", listingStatus: "closed" },
+        { id: "p_rejected", status: "rejected", listingStatus: "open" },
+        { id: "p_forward", status: "applied", listingStatus: "open" },
+        { id: "p_person", status: "review", listingStatus: "open" },
+      ],
+      events: [
+        ev("p_closed", 1, "archived: listing_closed", "system"), ev("p_closed", 2, "archived → review", "local-agent"),
+        ev("p_rejected", 1, "screen → rejected", "local-agent"), ev("p_rejected", 2, "rejected → interview", "career-ops"), ev("p_rejected", 3, "interview → rejected", "operator"),
+        ev("p_forward", 2, "review → applied", "local-agent"),
+        ev("p_person", 2, "archived → review", "operator"),
+      ],
+    });
+    expect(plans).toEqual([
+      expect.objectContaining({ positionId: "p_closed", move: "archived → review", revertTo: "archived", archiveReason: "listing_closed", action: "revert" }),
+      expect.objectContaining({ positionId: "p_rejected", move: "rejected → interview", revertTo: null, action: "already_moved" }),
+    ]);
+  });
+
+  it("--apply restores the prior status; dry-run changes nothing", async () => {
+    const { repairCareerOpsReversals } = await import("./career-ops-reversals.js");
+    const p = await position("reopened-by-sync");
+    await archivePosition(p.id, "listing_closed", "system");
+    await patchPosition(p.id, { status: "review" }, "local-agent");
+    const dry = await repairCareerOpsReversals({ actors: ["local-agent"] });
+    expect(dry.plans.find((x) => x.positionId === p.id)).toMatchObject({ revertTo: "archived", action: "revert" });
+    expect((await getPosition(p.id))!.status).toBe("review");
+    await repairCareerOpsReversals({ actors: ["local-agent"], apply: true });
+    expect(await getPosition(p.id)).toMatchObject({ status: "archived", archiveReason: "listing_closed" });
   });
 });
