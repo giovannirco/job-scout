@@ -2,7 +2,7 @@
 image:
   # Your private registry path, e.g. registry.example.com/job-scout
   repository: job-scout
-  tag: "2.14.1"
+  tag: "2.14.2"
   pullPolicy: IfNotPresent
 
 nameOverride: job-scout

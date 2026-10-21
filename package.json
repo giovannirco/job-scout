@@ -1,7 +1,7 @@
 {
   "name": "job-scout",
   "private": true,
-  "version": "2.14.1",
+  "version": "2.14.2",
   "type": "module",
   "packageManager": "pnpm@9.15.0",
   "scripts": {
