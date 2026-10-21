@@ -41,7 +41,7 @@ The dashboard lives in the repo at `deploy/helm/job-scout/dashboards/job-scout.j
 | `job_scout_scheduler_runs_total` | `task status` | In-process ticks (`requeue-stale` always; others only with `WORKER_SCHEDULER=1`) |
 | `job_scout_board_scans_total` | `provider status` | Board scans |
 | `job_scout_scan_listings_total` | `provider outcome` | `seen` `gate_pass` `gate_fail` `created` `updated` `closed` |
-| `job_scout_ingest_quality_total` | `reason` | Ingest rejected or repaired (`placeholder_url`, `unresolved_company`, `junk_title`, `triage_zero_score`) |
+| `job_scout_ingest_quality_total` | `reason` | Ingest rejected or repaired (`placeholder_url`, `unresolved_company`, `aggregator_unresolved`, `aggregator_duplicate`, `junk_title`, `triage_zero_score`) |
 | `job_scout_jd_changes_total` | `change_kind material` | JD revisions written |
 | `job_scout_watch_checks_total` | `outcome` | `unchanged` `changed` `closed` `first_seen` |
 | `job_scout_autopilot_actions_total` | `hook action` | `enqueue_evaluate`, `enqueue_company_research`, `enqueue_materials`, `enqueue_jd_review`, `approval`, `noop` |

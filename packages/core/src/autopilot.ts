@@ -64,11 +64,28 @@ async function hasFreshResearch(companyId: string, staleDays: number): Promise<b
   return r.length > 0;
 }
 
+/**
+ * Aggregator rows the autopilot must not push toward an application: the employer is
+ * unknown (it could be a role already applied to elsewhere) or the row is an alias.
+ */
+export function aggregatorHold(metadata: Record<string, unknown> | null | undefined): "aggregator_unresolved" | "aggregator_duplicate" | null {
+  if (metadata?.duplicateOfId) return "aggregator_duplicate";
+  const agg = metadata?.aggregator as { unresolved?: unknown } | undefined;
+  return agg?.unresolved === true ? "aggregator_unresolved" : null;
+}
+
+async function heldPosition(positionId: string) {
+  const pos = await getPosition(positionId);
+  return aggregatorHold(pos?.metadata as Record<string, unknown> | null | undefined);
+}
+
 /** After LLM triage: maybe evaluate, maybe research the company. */
 export function afterTriage(ctx: { positionId: string; companyId: string; score: number; verdict: "pass" | "marginal" | "fail"; status: PositionStatus }) {
   return safe("afterTriage", ctx, async (c, cfg) => {
     const out: Record<string, unknown> = {};
     if (c.verdict !== "pass" || !["triaged", "review"].includes(c.status)) return out;
+    const held = await heldPosition(c.positionId);
+    if (held) return { autopilotSkipped: held };
     const wantEval = cfg.evaluate.mode === "all_pass" || (cfg.evaluate.mode === "threshold" && c.score >= cfg.evaluate.minTriageScore);
     if (wantEval) {
       const q = await enqueueJob("evaluate", { positionId: c.positionId, auto: true }, { dedupeKey: `evaluate:${c.positionId}`, priority: 70 });
@@ -100,6 +117,8 @@ export function afterEvaluate(ctx: {
   return safe("afterEvaluate", ctx, async (c, cfg) => {
     const out: Record<string, unknown> = {};
     if (!["triaged", "review", "materials"].includes(c.status)) return out;
+    const held = await heldPosition(c.positionId);
+    if (held) return { autopilotSkipped: held };
     if (c.expectedUpdatedAt) {
       const current = await getPosition(c.positionId);
       if (!current || current.updatedAt.toISOString() !== c.expectedUpdatedAt || current.status !== c.status || current.listingStatus === "closed" || current.metadata?.quarantined) {

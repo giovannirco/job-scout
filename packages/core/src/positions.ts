@@ -36,6 +36,7 @@ import {
   companiesMatch, jdRefreshFrozen, sameNormalizedUrl,
   searchWords, likeContains, homeMarket, listedAtHome,
   employerFromPosting, unresolvedCompany, UNRESOLVED_COMPANY, requisitionId,
+  aggregatorHost, extractAggregatorEmployer, decisionTitle,
 } from "@job-scout/shared";
 import { resolveCompanyForName } from "./companies.js";
 import { addEvent } from "./timeline.js";
@@ -1144,8 +1145,25 @@ export async function upsertFromJob(
     throw new Error("placeholder or invalid posting URL");
   }
   job = { ...job, locationRaw: cleanLocation(job.locationRaw) };
-  const companyName = [opts.companyName, job.company, job.boardToken].find(n => !unresolvedCompany(n))
+  const aggregator = aggregatorHost(job.url);
+  let companyName = [opts.companyName, job.company, job.boardToken].find(n => !unresolvedCompany(n))
     || employerFromPosting(job.url, job.title) || UNRESOLVED_COMPANY;
+  let employerVia: string | null = null;
+  if (aggregator && companyName === UNRESOLVED_COMPANY) {
+    // The aggregator hides or replaces the employer: look for it on the page itself.
+    const raw = (job.rawPayload || {}) as { htmlExcerpt?: unknown; titleCandidates?: unknown; jsonLd?: { company?: unknown } | null };
+    const found = extractAggregatorEmployer({
+      html: typeof raw.htmlExcerpt === "string" ? raw.htmlExcerpt : null,
+      title: job.title,
+      titleCandidates: Array.isArray(raw.titleCandidates) ? raw.titleCandidates.filter((t): t is string => typeof t === "string") : null,
+      text: job.descriptionText,
+      jsonLdCompany: typeof raw.jsonLd?.company === "string" ? raw.jsonLd.company : null,
+    });
+    if (found) {
+      companyName = found.company;
+      employerVia = found.via;
+    }
+  }
   if (companyName === UNRESOLVED_COMPANY) {
     ingestQuality.labels({ reason: "unresolved_company" }).inc();
     log.warn("ingest.unresolved_company", { url: job.url });
@@ -1189,6 +1207,21 @@ export async function upsertFromJob(
     throw new Error("unparseable job title");
   }
 
+  // An aggregator repost of a role already filed at the same employer is an alias of that
+  // filing, not a new decision. An aggregator row with no employer is held from autopilot.
+  const aliasOf = aggregator && companyName !== UNRESOLVED_COMPANY ? await aggregatorOriginal(company.id, job.title) : null;
+  const aggregatorMeta = aggregator
+    ? {
+        host: aggregator,
+        unresolved: companyName === UNRESOLVED_COMPANY,
+        employer: companyName === UNRESOLVED_COMPANY ? null : company.name,
+        via: employerVia ?? (companyName === UNRESOLVED_COMPANY ? null : "listing"),
+        ...(aliasOf ? { duplicateOfId: aliasOf.id } : {}),
+      }
+    : null;
+  if (aggregatorMeta?.unresolved) ingestQuality.labels({ reason: "aggregator_unresolved" }).inc();
+  if (aliasOf) ingestQuality.labels({ reason: "aggregator_duplicate" }).inc();
+
   const hash = contentHash({ title: job.title, descriptionText: job.descriptionText, salaryRaw: job.salaryRaw, locationRaw: job.locationRaw });
   // Posting identity comes from the ATS id or canonical URL, never JD text.
   // Identical descriptions are grouped for display without discarding their links.
@@ -1212,8 +1245,10 @@ export async function upsertFromJob(
     companyId: company.id,
     slug: posSlug,
     title: job.title,
-    status: job.listingStatus === "closed" && ["triaged", "review"].includes(opts.status || "triaged") ? "archived" : opts.status || "triaged",
-    archiveReason: job.listingStatus === "closed" && ["triaged", "review"].includes(opts.status || "triaged") ? "listing_closed" : null,
+    status: aliasOf || (job.listingStatus === "closed" && ["triaged", "review"].includes(opts.status || "triaged")) ? "archived" : opts.status || "triaged",
+    archiveReason: aliasOf
+      ? `aggregator_duplicate: ${aggregator} repost of ${aliasOf.slug}`.slice(0, 300)
+      : job.listingStatus === "closed" && ["triaged", "review"].includes(opts.status || "triaged") ? "listing_closed" : null,
     closedAt: job.listingStatus === "closed" ? now : null,
     primaryUrl: job.url,
     atsProvider: job.provider,
@@ -1239,6 +1274,8 @@ export async function upsertFromJob(
     metadata: {
       dataRepairVersion: 1,
       requisitionId: job.requisitionId || requisitionId(job.descriptionText),
+      ...(aggregatorMeta ? { aggregator: aggregatorMeta } : {}),
+      ...(aliasOf ? { duplicateOfId: aliasOf.id } : {}),
       ...(repost ? { repostOfId: repost.id, repost: { id: repost.id, appliedAt: repost.appliedAt?.toISOString() || null, status: repost.status, careerOps: careerStamp(repost), reason: "Possible repost: same employer, title and location as a closed posting" } } : {}),
       ats: {
         provider: job.provider,
@@ -1277,11 +1314,34 @@ export async function upsertFromJob(
   });
   await addEvent({ positionId: posId, kind: "created", title: `Created from ${opts.source || "scan"}` });
   if (repost) await addEvent({ positionId: posId, kind: "repost", title: `Possible repost of ${repost.title}`, metadata: { repostOfId: repost.id, appliedAt: repost.appliedAt } });
+  if (aliasOf) {
+    await addEvent({ positionId: posId, kind: "duplicate", title: `Aggregator repost of ${aliasOf.title}`, body: `${aggregator} lists the same role at ${company.name}.`, metadata: { duplicateOfId: aliasOf.id, aggregator } });
+    await addEvent({ positionId: aliasOf.id, kind: "duplicate", title: `Also listed on ${aggregator}`, body: job.url, metadata: { aliasId: posId, url: job.url, aggregator } });
+    // An alias needs no decision of its own: the original carries it.
+    return { position: (await getPosition(posId))!, created: true, revived: false };
+  }
   const createdPos = (await getPosition(posId))!;
   await afterAtsFetch(posId, job, facts);
   const { enqueuePositionDecision } = await import("./decision-events.js");
   await enqueuePositionDecision(posId, 1);
   return { position: createdPos, created: true, revived: false };
+}
+
+/** The filing an aggregator repost duplicates: same employer, same role title, not itself an alias. */
+async function aggregatorOriginal(companyId: string, title: string) {
+  const db = await getDb();
+  const want = decisionTitle(title);
+  if (!want) return null;
+  const rows = await db
+    .select({ id: positions.id, slug: positions.slug, title: positions.title, status: positions.status, listingStatus: positions.listingStatus, firstSeenAt: positions.firstSeenAt, metadata: positions.metadata })
+    .from(positions)
+    .where(eq(positions.companyId, companyId));
+  const hot = (s: string) => ["materials", "applied", "screen", "interview", "offer"].includes(s);
+  return rows
+    .filter(r => decisionTitle(r.title) === want && !(r.metadata as Record<string, unknown> | null)?.duplicateOfId)
+    .sort((a, b) => Number(hot(b.status)) - Number(hot(a.status))
+      || Number(b.listingStatus !== "closed") - Number(a.listingStatus !== "closed")
+      || (a.firstSeenAt?.getTime() || 0) - (b.firstSeenAt?.getTime() || 0))[0] ?? null;
 }
 
 async function afterAtsFetch(positionId: string, job: AtsJob, facts?: ReturnType<typeof classifyListing>) {

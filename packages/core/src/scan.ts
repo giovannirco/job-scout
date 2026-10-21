@@ -678,9 +678,12 @@ export async function followUpIntake(
     triageScore: number | null;
     triageVerdict: string | null;
     status: string;
+    metadata?: Record<string, unknown> | null;
   },
   opts: { created: boolean; revived: boolean },
 ): Promise<{ triageJobId: string | null }> {
+  // An aggregator alias of an existing filing is decided by that filing.
+  if (position.metadata?.duplicateOfId) return { triageJobId: null };
   const settings = await getSettings();
   if (!settings.autopilot.triageNew) return { triageJobId: null };
   if (!position.triagedAt && !llmConfigured()) return { triageJobId: null };
