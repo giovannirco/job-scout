@@ -33,6 +33,7 @@ import {
   runInterviewBrief,
   pollWhatsAppInbox,
   scanBoard,
+  sweepStaleTriage,
   type JobRow,
 } from "@job-scout/core";
 import type { JobType } from "@job-scout/db";
@@ -266,7 +267,8 @@ export function startWorker(opts: WorkerOptions = {}) {
 
   if (opts.scheduler !== false) {
     const discovery = safe("discovery", () => enqueueDueBoardScans());
-    const watch = safe("watch", () => enqueueDueWatchChecks());
+    // Same pairing as the `watch` CronJob (once.ts): the capped stale-triage sweep rides the watch tick.
+    const watch = safe("watch", async () => ({ ...(await enqueueDueWatchChecks()), staleSweep: await sweepStaleTriage() }));
     const retention = safe("retention", () => runRetention());
     setTimeout(discovery, 10_000);
     setTimeout(watch, 20_000);

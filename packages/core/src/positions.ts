@@ -214,7 +214,7 @@ export async function listPositions(q: ListPositionsQuery) {
   }
   const { field, dir } = parseListSort(
     q.sort,
-    ["updated", "score", "company", "status", "first_seen", "last_changed", "posted", "title", "workplace", "geo", "location"],
+    ["updated", "score", "company", "status", "first_seen", "last_changed", "triaged", "posted", "title", "workplace", "geo", "location"],
     "updated",
     "desc",
   );
@@ -248,6 +248,8 @@ export async function listPositions(q: ListPositionsQuery) {
             ? [d(positions.firstSeenAt), desc(positions.id)]
             : field === "last_changed"
               ? [d(positions.lastChangedAt), desc(positions.id)]
+            : field === "triaged"
+              ? [d(positions.triagedAt), desc(positions.id)]
             : field === "posted"
               ? [
                   dir === "asc"

@@ -54,6 +54,10 @@ export const TriageConfig = z.object({
   jdMaxChars: z.number().int().min(500).default(6000),
   /** Deprecated: marginal verdicts are never auto-archived (only hard disqualifiers archive). Kept for config compatibility. */
   keepMarginal: z.boolean().default(true),
+  /** Scheduled re-triage of active positions scored under an older profile (runs with the watch tick). */
+  staleSweepEnabled: z.boolean().default(true),
+  /** Most stale positions one sweep enqueues, oldest triage first; also bounded by the daily triage cap. */
+  staleSweepMaxRows: z.number().int().min(1).max(25).default(20),
 });
 export type TriageConfig = z.infer<typeof TriageConfig>;
 
@@ -326,7 +330,7 @@ export const DEFAULT_SETTINGS: Settings = {
     modelsCatalogCachedAt: null,
   },
   gate: DEFAULT_GATE,
-  triage: { passThreshold: 3.5, marginalThreshold: 3.0, jdMaxChars: 6000, keepMarginal: true },
+  triage: { passThreshold: 3.5, marginalThreshold: 3.0, jdMaxChars: 6000, keepMarginal: true, staleSweepEnabled: true, staleSweepMaxRows: 20 },
   retention: { snapshotsKeep: 3, jobsDays: 7, discoveryDays: 30, deltasDays: 30, llmRunsDays: 90, llmTranscriptDays: 14 },
   scan: { boardIntervalMinutes: 30, boardsPerTick: 40, autoTriage: true },
   autopilot: { preset: "assisted", budget: { dailyCalls: 0, dailyTokens: 0 }, ...AUTOPILOT_PRESET_VALUES.assisted },

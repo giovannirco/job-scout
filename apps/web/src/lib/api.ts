@@ -521,7 +521,7 @@ export type Settings = {
     modelsCatalogCachedAt: string | null;
   };
   gate: { titleInclude: string[]; titleExclude: string[]; geoAllow: string[]; geoBlock: string[]; maxPostingAgeDays: number; allowUnknownGeo: boolean };
-  triage: { passThreshold: number; marginalThreshold: number; jdMaxChars: number; keepMarginal: boolean };
+  triage: { passThreshold: number; marginalThreshold: number; jdMaxChars: number; keepMarginal: boolean; staleSweepEnabled: boolean; staleSweepMaxRows: number };
   retention: { snapshotsKeep: number; jobsDays: number; discoveryDays: number; deltasDays: number; llmRunsDays: number };
   scan: { boardIntervalMinutes: number; boardsPerTick: number; autoTriage: boolean };
   notifications?: NotificationsConfig;

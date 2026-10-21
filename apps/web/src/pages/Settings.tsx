@@ -320,10 +320,16 @@ function GateTab() {
           <Input label="Triage PASS ≥" type="number" step="0.1" value={triage.passThreshold} onChange={(e) => setTriage({ ...triage, passThreshold: Number(e.target.value) })} />
           <Input label="Triage MARGINAL ≥" type="number" step="0.1" value={triage.marginalThreshold} onChange={(e) => setTriage({ ...triage, marginalThreshold: Number(e.target.value) })} />
           <Input label="JD chars sent to triage" type="number" value={triage.jdMaxChars} onChange={(e) => setTriage({ ...triage, jdMaxChars: Number(e.target.value) })} />
+          <Select label="Stale triage sweep" value={triage.staleSweepEnabled ? "on" : "off"} onChange={(e) => setTriage({ ...triage, staleSweepEnabled: e.target.value === "on" })}>
+            <option value="on">re-triage on schedule</option>
+            <option value="off">off</option>
+          </Select>
+          <Input label="Stale rows per sweep (max 25)" type="number" min={1} max={25} value={triage.staleSweepMaxRows} onChange={(e) => setTriage({ ...triage, staleSweepMaxRows: Number(e.target.value) })} />
           <Input label="Board scan interval (min)" type="number" value={scan.boardIntervalMinutes} onChange={(e) => setScan({ ...scan, boardIntervalMinutes: Number(e.target.value) })} />
           <Input label="Boards per tick" type="number" value={scan.boardsPerTick} onChange={(e) => setScan({ ...scan, boardsPerTick: Number(e.target.value) })} />
         </div>
         <p className="text-[12px] text-muted mt-3">A listing still on the board is kept even when it is older than the max posting age.</p>
+        <p className="text-[12px] text-muted mt-1">The stale sweep re-scores active positions triaged under an older profile, oldest first, with each watch tick. It skips archived, closed, quarantined and in-process positions, stops while the AI provider is down, and uses at most half of what remains of the daily triage cap.</p>
         <p className="text-[12px] text-muted mt-1">Triage archives a listing only for a hard disqualifier: residency, work authorization, onsite or hybrid, or posted pay under the profile's cash floor. Low scores and skill gaps stay in the pipeline, and a listing someone restored is never archived again automatically.</p>
       </Panel>
       <p className="text-[11.5px] text-faint">

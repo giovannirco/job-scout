@@ -2,7 +2,7 @@
 # job-scout — one image, three entrypoints:
 #   api:       node --import tsx apps/api/src/index.ts     (serves apps/web/dist, runs migrations on boot)
 #   worker:    node --import tsx apps/worker/src/index.ts
-#   cron:      node --import tsx apps/worker/src/once.ts discovery|watch|retention
+#   cron:      node --import tsx apps/worker/src/once.ts discovery|watch|retention|stale-triage
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate

@@ -23,7 +23,7 @@ flowchart LR
 |--|--|--|
 | **api** | `apps/api/src/index.ts` | Hono REST under `/api/v1`, MCP under `/mcp`, static web bundle in prod. Runs drizzle migrations on boot. Runs the chat agent loop (SSE). `EMBED_WORKER=1` also starts the worker in-process (dev). |
 | **worker** | `apps/worker/src/index.ts` | Claims `jobs` rows (`FOR UPDATE SKIP LOCKED`), runs them with bounded concurrency, retries transient LLM/network failures, parks jobs that hit a cap for an hour, requeues stale `running` rows every 15 min and releases in-flight jobs on SIGTERM. Flushes WhatsApp `notification_outbox` (~4s). Inbound chat is a WAHA webhook into the API. In-process scheduler (`WORKER_SCHEDULER=1`) enqueues discovery/watch/retention on timers; in Kubernetes that is off and CronJobs do it. |
-| **once** | `apps/worker/src/once.ts <task>` | One-shot `discovery` / `watch` / `retention` for CronJobs. |
+| **once** | `apps/worker/src/once.ts <task>` | One-shot `discovery` / `watch` / `retention` for CronJobs (`stale-triage` runs the sweep alone). `watch` also runs the capped stale-triage sweep. |
 
 Both api and worker import `@job-scout/core`; there is no HTTP between them, the database is the queue and the contract. Both serve Prometheus metrics on `:9464/metrics` and log JSON to stdout; the api additionally reports DB-truth gauges (queue depth, funnel, inbox). See [OBSERVABILITY](./OBSERVABILITY.md).
 
@@ -34,7 +34,7 @@ Both api and worker import `@job-scout/core`; there is no HTTP between them, the
 | `board_scan` | discovery scheduler, Discovery, MCP | fetch a board, diff against the last snapshot, run the gate, upsert positions, enqueue `triage` only when a model key is set |
 | `scan_url` | Add URL, MCP `intake` | fetch one JD, create/refresh the position, enqueue `triage` only when a model key is set |
 | `watch_check` | watch scheduler, Position › refresh | re-fetch a JD, write a `jd_revisions` row if it changed, detect closed listings |
-| `triage` | gate pass, autopilot | cheap 1–5 score + hard disqualifiers; sets `triage_*` on the position |
+| `triage` | gate pass, autopilot, stale-triage sweep (watch tick) | cheap 1–5 score + hard disqualifiers; sets `triage_*` on the position |
 | `evaluate` | you, autopilot | A–H markdown report + summary JSON → `evaluations` |
 | `company_research` | you, autopilot | company dossier → `evaluations(kind=company_research)` |
 | `jd_review` | material JD change, you | what changed and whether it matters → `evaluations(kind=jd_review)` |
