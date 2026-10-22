@@ -864,6 +864,37 @@ export async function listAshbyBoard(
   return { jobs, total: jobs.length };
 }
 
+/**
+ * Lever splits a posting into the opening/description, `lists` (responsibilities,
+ * requirements, bonus points) and `additional` (closing, benefits). The JD is all of it:
+ * `descriptionPlain` alone is often only the company intro.
+ */
+export function leverJdText(data: {
+  descriptionPlain?: string; description?: string;
+  lists?: Array<{ text?: string; content?: string }>;
+  additionalPlain?: string; additional?: string;
+}): { descriptionText: string; descriptionHtml?: string } {
+  const lists = Array.isArray(data.lists) ? data.lists : [];
+  const listBlobs = lists
+    .map((l) => [l.text?.trim(), l.content ? stripHtml(l.content) : ""].filter(Boolean).join("\n"))
+    .filter(Boolean);
+  const intro = data.descriptionPlain?.trim() || stripHtml(data.description || "");
+  const closing = data.additionalPlain?.trim() || stripHtml(data.additional || "");
+  const descriptionText = [intro, ...listBlobs, closing].filter(Boolean).join("\n\n");
+  const listHtml = lists.map((l) => [l.text ? `<h3>${l.text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</h3>` : "", l.content ? `<ul>${l.content}</ul>` : ""].join("")).filter(Boolean);
+  const html = [data.description || "", ...listHtml, data.additional || ""].filter(Boolean).join("\n");
+  return { descriptionText, descriptionHtml: html || undefined };
+}
+
+/** Lever `workplaceType` (remote | hybrid | onSite | unspecified) in the shared vocabulary. */
+export function leverWorkplaceType(v?: string | null): string | undefined {
+  const t = (v || "").trim().toLowerCase().replace(/[\s_-]+/g, "");
+  if (t === "remote") return "remote";
+  if (t === "hybrid") return "hybrid";
+  if (t === "onsite") return "onsite";
+  return undefined;
+}
+
 export async function fetchLeverJob(company: string, jobId: string): Promise<AtsJob> {
   const url = `https://api.lever.co/v0/postings/${encodeURIComponent(company)}/${encodeURIComponent(jobId)}`;
   const { status, body, ok } = await fetchText(url);
@@ -883,6 +914,8 @@ export async function fetchLeverJob(company: string, jobId: string): Promise<Ats
     id: string;
     text: string;
     hostedUrl?: string;
+    applyUrl?: string;
+    workplaceType?: string;
     categories?: {
       location?: string;
       commitment?: string;
@@ -892,14 +925,11 @@ export async function fetchLeverJob(company: string, jobId: string): Promise<Ats
     descriptionPlain?: string;
     description?: string;
     lists?: Array<{ text?: string; content?: string }>;
+    additionalPlain?: string;
+    additional?: string;
   };
-  const lists = (data.lists || []) as Array<{ text?: string; content?: string }>;
-  const listBlobs = lists
-    .map((l) => [l.text, l.content ? stripHtml(l.content) : ""].filter(Boolean).join("\n"))
-    .filter(Boolean);
-  const descriptionText =
-    data.descriptionPlain ||
-    [stripHtml(data.description || ""), ...listBlobs].filter(Boolean).join("\n\n");
+  const { descriptionText, descriptionHtml } = leverJdText(data);
+  const workplaceType = leverWorkplaceType(data.workplaceType);
   return {
     provider: "lever",
     boardToken: company,
@@ -907,11 +937,13 @@ export async function fetchLeverJob(company: string, jobId: string): Promise<Ats
     externalIdentity: `lever:${company}:${data.id || jobId}`,
     title: data.text || "",
     url: data.hostedUrl || `https://jobs.lever.co/${company}/${jobId}`,
-    applyUrl: data.hostedUrl,
+    applyUrl: data.applyUrl || data.hostedUrl,
     locationRaw: data.categories?.location,
     employmentType: data.categories?.commitment,
+    workplaceType,
+    isRemote: workplaceType === "remote" ? true : undefined,
     descriptionText,
-    descriptionHtml: data.description,
+    descriptionHtml,
     departments: data.categories
       ? [data.categories.team, data.categories.department].filter(Boolean) as string[]
       : undefined,
@@ -935,19 +967,25 @@ export async function listLeverBoard(
     text: string;
     hostedUrl?: string;
     createdAt?: number;
+    workplaceType?: string;
     categories?: { location?: string };
   }>;
-  const jobs = (Array.isArray(data) ? data : []).map((j) => ({
-    provider: "lever",
-    boardToken: token,
-    jobId: j.id,
-    externalIdentity: `lever:${token}:${j.id}`,
-    title: j.text,
-    url: j.hostedUrl,
-    postedAt: postingDate(j.createdAt),
-    locationRaw: j.categories?.location,
-    company,
-  }));
+  const jobs = (Array.isArray(data) ? data : []).map((j) => {
+    const workplaceType = leverWorkplaceType(j.workplaceType);
+    return {
+      provider: "lever",
+      boardToken: token,
+      jobId: j.id,
+      externalIdentity: `lever:${token}:${j.id}`,
+      title: j.text,
+      url: j.hostedUrl,
+      postedAt: postingDate(j.createdAt),
+      locationRaw: j.categories?.location,
+      workplaceType,
+      isRemote: workplaceType === "remote" ? true : undefined,
+      company,
+    };
+  });
   return { jobs, total: jobs.length };
 }
 
