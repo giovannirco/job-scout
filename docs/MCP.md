@@ -146,7 +146,7 @@ Cursor / Claude Code: same URL and header in the MCP server list. Mint one token
 
 ## Attribution
 
-Writes record an actor in the position timeline. By default it is the token's name. When several agents share one token, each can name itself with an `X-Job-Scout-Actor` header (or `X-Agent-Name`); `set_position_status` also accepts an `actor` argument, which takes precedence. The timeline then shows `<caller> via <token name>`, for example `pipeline-sync via shared-agent`. The caller name is reduced to letters, digits and `. _ : @ -`, capped at 64 characters, and the token name is always kept, so a header cannot impersonate another token or the operator. Automation rules still follow the token: a caller using an automated token stays automated.
+Writes record an actor in the position timeline. By default it is the token's name. When several agents share one token, each can name itself with an `X-Job-Scout-Actor` header (or `X-Agent-Name`); `set_position_status` and `update_position` also accept an `actor` argument, which takes precedence. The timeline then shows `<caller> via <token name>`, for example `pipeline-sync via shared-agent`. The caller name is reduced to letters, digits and `. _ : @ -`, capped at 64 characters, and the token name is always kept, so a header cannot impersonate another token or the operator. Automation rules still follow the token: a caller using an automated token stays automated.
 
 ```toml
 [mcp_servers.job-scout.headers]
