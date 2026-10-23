@@ -1,0 +1,8 @@
+# 2.14.4
+
+The career-ops sync can no longer move a role backwards. No database migration; rollback is image-only.
+
+- **Status precedence for tracker writes.** A stale tracker row used to override job-scout: `create_position_from_career_ops` turned a rejected role into `interview`, and the sync's `set_position_status` calls reopened archived or closed roles as `review`. A status write that comes from the career-ops sync (by token or actor name, `source: "career-ops"`, or a `career-ops` note) now applies only when it moves the role forward. It never leaves `rejected`, never goes back a stage, and a pre-apply label never reopens an archived or skipped role. Forward moves such as `review` → `applied`, `applied` → `rejected` and `archived` → `applied` still apply. A declined write leaves a timeline note (`career-ops says X; not applied, job-scout status Y is later`), and the echo reports `statusApplied: false`. The rule covers `set_position_status`, `update_position`, `create_position_from_career_ops`, `set_match_override` (`match`) and REST `PATCH /positions/:id`. Writes from a person are unaffected.
+- **Repair.** `pnpm db:repair-career-ops-reversals [--days 7] [--actors <tokens>] [--apply]` lists backwards sync writes from the last N days and proposes the prior status for each. Dry-run unless `--apply`; a role that has moved again since is reported as `already_moved` and left alone. `--snapshot <file>` plans from exported data without a database.
+
+**Expect after upgrading:** sync runs may report some status updates as not applied. Those notes mean job-scout already holds a later status than the tracker; update the tracker row rather than retrying.

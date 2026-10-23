@@ -50,7 +50,7 @@ Non-secret settings go in `env` (rendered into a ConfigMap). Every variable is d
 # values.private.yaml (kept in your private deployment repository)
 image:
   repository: registry.example.com/job-scout
-  tag: "2.14.3"
+  tag: "2.14.4"
 imagePullSecrets:
   - name: registry-credentials
 env:

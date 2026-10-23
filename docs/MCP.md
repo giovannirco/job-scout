@@ -58,7 +58,7 @@ Positions are drained first; evaluations start on the page that returns the last
 |--|--|
 | `intake` | create/refresh a position from a job `url` (`company`, `status` `triaged`/`review` optional); queues triage when a model key is set. Board/careers index URLs are refused with `code: "board_index"` and a board suggestion. A JD too short to score is stored with `metadata.needsJd` and triage waits for the full JD |
 | `refresh_jd` | re-fetch the ATS page; revision if changed. A failed fetch returns `reason` (`http_status`, `blocked`, `timeout`, `network`, `parse_failed`, `unsupported_provider`) with `httpStatus`/`causeCode`, also stored in `metadata.lastAtsFetch`. Refused with `frozen:<status>` at interview/offer unless `force: true` (explicit operator refresh) |
-| `update_position` | PATCH status, priority, notes, nextAction, resumeSurface, watchEnabled, appliedAt, and the listing corrections below (`title`, `primaryUrl`, `workplace`, `geoClass`, `geoNotes`). The career-ops guard below applies to a `skip`/`archived` status; the other fields still apply. Optional `actor` names the calling agent (see [Attribution](#attribution)). `status: materials` follows the materials rule below |
+| `update_position` | PATCH status, priority, notes, nextAction, resumeSurface, watchEnabled, appliedAt, and the listing corrections below (`title`, `primaryUrl`, `workplace`, `geoClass`, `geoNotes`). The career-ops guard below applies to the status; the other fields still apply. Optional `actor` names the calling agent (see [Attribution](#attribution)). `status: materials` follows the materials rule below |
 | `set_position_status` | any pipeline status; `archived` requires a reason. Subject to the career-ops guard below; optional `actor` names the calling agent (see [Attribution](#attribution)); `materials` follows the materials rule below |
 | `log_activity` | append a timeline note (`title`, optional `body`, `kind`, `idOrSlug`; global without a position) |
 | `upsert_lead` | create or update a recruiter lead; dedupes on recruiter × pitched role (see [Recruiter leads](#recruiter-leads)). `id` patches that lead, including `status`. Optional `message` logs the first message |
@@ -100,7 +100,7 @@ Positions are drained first; evaluations start on the page that returns the last
 
 `set_match_override` (`human_skip` archives, `match` → review) and `list_eval_inbox` (review without evaluation) keep older agent prompts working. `human_skip` is subject to the career-ops guard below.
 
-### career-ops skip/archive guard
+### career-ops guard
 
 A career-ops tracker label never removes a role from the pipeline on its own. `update_position`, `set_position_status` and `set_match_override` (`human_skip`) record a `skip` or `archived` request as a timeline note (`career-ops says skip; not applied`) instead of applying it when the call comes from the career-ops sync:
 
@@ -109,7 +109,9 @@ A career-ops tracker label never removes a role from the pipeline on its own. `u
 - or the caller names itself `career-ops…` on any token (`X-Job-Scout-Actor`, `X-Agent-Name` or `actor`; see [Attribution](#attribution));
 - or the `note` starts with `career-ops` (`set_position_status`).
 
-Other statuses (applied, interview, rejected, …) apply normally. Tokens with any other name are treated as a person or operator agent: their skip/archive applies, and their restore of an archived or skipped role stops triage from re-archiving it until a person archives or skips it again.
+Other statuses from the career-ops sync apply only when they move the role forward, because the tracker is often stale. A sync write never takes a role out of `rejected`, never moves it to an earlier stage (`interview` → `review`), and a pre-apply label (`triaged`, `review`, `materials`) never reopens an `archived` or `skip` role. Forward moves still apply: `review` → `applied`, `applied` → `rejected`, `archived` → `applied` when the tracker records an application. A declined write is recorded as a timeline note (`career-ops says X; not applied, job-scout status Y is later`), and the echo carries `statusApplied: false` and `statusNote`. The same rule covers `create_position_from_career_ops` when it links an existing position, `set_match_override` (`match`), and REST `PATCH /positions/:id` with `source` or a `career-ops` note. `pnpm db:repair-career-ops-reversals [--days 7] [--actors <tokens>] [--apply]` lists earlier backwards sync writes and, with `--apply`, puts each role that has not moved since back to its prior status.
+
+Tokens with any other name are treated as a person or operator agent: their skip/archive applies, and their restore of an archived or skipped role stops triage from re-archiving it until a person archives or skips it again.
 
 ### Recruiter leads
 

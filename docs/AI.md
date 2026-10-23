@@ -43,7 +43,7 @@ A triage `fail` archives a position only for a hard disqualifier the candidate c
 
 A timezone or working-hours window alone never disqualifies, hard-geo-classifies or archives a role. With `metadata.acceptableTzRange` (`{min, max}` UTC offsets) on the profile, a window outside it is one soft flag (at most −0.5); without it the window only informs. Location reads structured data first (JSON-LD, the ATS workplace type), and multi-country or region-remote postings stay remote.
 
-When a person (or an operator agent token) restores an archived or skipped position, triage does not archive it again until a person archives or skips it. Automated actors (scans, triage, career-ops sync, repairs) never count as a restore. The career-ops sync cannot skip or archive on its own; see [MCP › career-ops guard](./MCP.md#career-ops-skiparchive-guard). `pnpm db:repair-triage-archives` and `pnpm db:retriage-timezone` revisit archives made under the older rules ([Upgrading](./UPGRADING.md#upgrading-to-214)).
+When a person (or an operator agent token) restores an archived or skipped position, triage does not archive it again until a person archives or skips it. Automated actors (scans, triage, career-ops sync, repairs) never count as a restore. The career-ops sync cannot skip or archive on its own, nor move a role backwards; see [MCP › career-ops guard](./MCP.md#career-ops-guard). `pnpm db:repair-triage-archives` and `pnpm db:retriage-timezone` revisit archives made under the older rules ([Upgrading](./UPGRADING.md#upgrading-to-214)).
 
 ## Autopilot
 
