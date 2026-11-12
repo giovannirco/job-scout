@@ -3,7 +3,7 @@
 #   api:       node --import tsx apps/api/src/index.ts     (serves apps/web/dist, runs migrations on boot)
 #   worker:    node --import tsx apps/worker/src/index.ts
 #   cron:      node --import tsx apps/worker/src/once.ts discovery|watch|retention|stale-triage
-FROM node:22-bookworm-slim AS build
+FROM node:22.23.5-bookworm-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee AS build
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json vitest.config.ts ./
@@ -18,7 +18,7 @@ RUN pnpm build
 # CI skips pnpm's "reinstall from scratch?" prompt, which otherwise waits on a TTY.
 RUN CI=true pnpm prune --prod
 
-FROM node:22-bookworm-slim AS runner
+FROM node:22.23.5-bookworm-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
