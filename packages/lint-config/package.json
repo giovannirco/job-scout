@@ -4,8 +4,8 @@
   "type": "module",
   "exports": "./eslint.config.mjs",
   "devDependencies": {
-    "eslint": "10.10.0",
+    "eslint": "10.14.0",
     "typescript": "npm:@typescript/typescript6@6.0.2",
-    "typescript-eslint": "8.70.0"
+    "typescript-eslint": "8.72.2"
   }
 }
